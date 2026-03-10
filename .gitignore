@@ -26,6 +26,9 @@ docker-compose.override.yml
 *.log
 *.pid
 
+# Sonar
+.sonar/
+
 # Environment
 .env
 *.env.local
