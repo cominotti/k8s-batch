@@ -1,0 +1,18 @@
+{{- if and .Values.kafka.enabled .Values.features.kafka }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "k8s-batch.fullname" . }}-kafka
+  labels:
+    {{- include "k8s-batch.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kafka
+spec:
+  type: {{ .Values.kafka.service.type }}
+  ports:
+    - name: client
+      port: {{ .Values.kafka.service.port }}
+      targetPort: client
+  selector:
+    {{- include "k8s-batch.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: kafka
+{{- end }}

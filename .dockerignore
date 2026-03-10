@@ -1,0 +1,11 @@
+target/
+.git/
+.idea/
+*.iml
+.vscode/
+docs/
+helm/
+k8s-batch-integration-tests/
+*.md
+.gitignore
+docker-compose*.yml

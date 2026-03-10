@@ -1,0 +1,16 @@
+k8s-batch has been deployed!
+
+To check the status:
+  kubectl get pods -l app.kubernetes.io/instance={{ .Release.Name }}
+
+To access the application:
+  kubectl port-forward svc/{{ include "k8s-batch.fullname" . }} 8080:{{ .Values.app.service.port }}
+  curl http://localhost:8080/hello
+  curl http://localhost:8080/actuator/health
+
+{{- if .Values.ingress.enabled }}
+The application is exposed via Ingress at:
+{{- range .Values.ingress.hosts }}
+  http://{{ .host }}
+{{- end }}
+{{- end }}

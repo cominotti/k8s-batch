@@ -1,0 +1,210 @@
+# ======================================================================
+# Application
+# ======================================================================
+app:
+  replicaCount: 2
+
+  image:
+    repository: ghcr.io/cominotti/k8s-batch
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  imagePullSecrets: []
+
+  serviceAccount:
+    create: true
+    name: ""
+    annotations: {}
+
+  podAnnotations: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    fsGroup: 1000
+
+  securityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 1Gi
+
+  springProfile: remote-partitioning
+
+  extraEnv: []
+
+  livenessProbe:
+    httpGet:
+      path: /actuator/health/liveness
+      port: http
+    initialDelaySeconds: 60
+    periodSeconds: 15
+    failureThreshold: 5
+    timeoutSeconds: 5
+
+  readinessProbe:
+    httpGet:
+      path: /actuator/health/readiness
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    failureThreshold: 3
+    timeoutSeconds: 5
+
+  service:
+    type: ClusterIP
+    port: 8080
+
+  config:
+    serverPort: 8080
+    batchInitializeSchema: never
+    extra: {}
+
+# ======================================================================
+# Ingress
+# ======================================================================
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: k8s-batch.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# ======================================================================
+# HPA
+# ======================================================================
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 120
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+
+# ======================================================================
+# MySQL
+# ======================================================================
+mysql:
+  enabled: true
+
+  image:
+    repository: mysql
+    tag: "8.0"
+    pullPolicy: IfNotPresent
+
+  auth:
+    rootPassword: ""
+    database: k8sbatch
+    username: k8sbatch
+    password: ""
+    existingSecret: ""
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+  persistence:
+    storageClass: ""
+    size: 10Gi
+    accessModes:
+      - ReadWriteOnce
+
+  service:
+    type: ClusterIP
+    port: 3306
+
+  config:
+    mysqlCharacterSetServer: utf8mb4
+    mysqlCollationServer: utf8mb4_unicode_ci
+
+# ======================================================================
+# Kafka (KRaft mode, no Zookeeper)
+# ======================================================================
+kafka:
+  enabled: true
+
+  image:
+    repository: bitnami/kafka
+    tag: "3.7"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 3
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1536Mi
+
+  persistence:
+    storageClass: ""
+    size: 10Gi
+    accessModes:
+      - ReadWriteOnce
+
+  service:
+    type: ClusterIP
+    port: 9092
+
+  kraft:
+    clusterId: ""
+
+  topics:
+    partitionRequests:
+      name: batch-partition-requests
+      partitions: 10
+      replicationFactor: 2
+    partitionReplies:
+      name: batch-partition-replies
+      partitions: 10
+      replicationFactor: 2
+    extra: []
+
+# ======================================================================
+# Feature flags
+# ======================================================================
+features:
+  kafka: true
+  hpa: true
+  ingress: false

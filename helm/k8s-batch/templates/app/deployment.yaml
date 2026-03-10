@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "k8s-batch.fullname" . }}
+  labels:
+    {{- include "k8s-batch.labels" . | nindent 4 }}
+    app.kubernetes.io/component: app
+spec:
+  {{- if not .Values.hpa.enabled }}
+  replicas: {{ .Values.app.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "k8s-batch.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: app
+  template:
+    metadata:
+      labels:
+        {{- include "k8s-batch.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: app
+      annotations:
+        checksum/config: {{ include (print .Template.BasePath "/app/configmap.yaml") . | sha256sum }}
+        {{- with .Values.app.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "k8s-batch.fullname" . }}
+      {{- with .Values.app.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.app.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: wait-for-mysql
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z {{ include "k8s-batch.mysql.host" . }} {{ .Values.mysql.service.port }}; do
+                echo "Waiting for MySQL..."
+                sleep 3
+              done
+        {{- if and .Values.kafka.enabled .Values.features.kafka }}
+        - name: wait-for-kafka
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              KAFKA_HOST="{{ include "k8s-batch.fullname" . }}-kafka-0.{{ include "k8s-batch.fullname" . }}-kafka-headless"
+              until nc -z $KAFKA_HOST {{ .Values.kafka.service.port }}; do
+                echo "Waiting for Kafka..."
+                sleep 3
+              done
+        {{- end }}
+      containers:
+        - name: app
+          image: "{{ .Values.app.image.repository }}:{{ .Values.app.image.tag }}"
+          imagePullPolicy: {{ .Values.app.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.app.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.app.config.serverPort }}
+              protocol: TCP
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: {{ .Values.app.springProfile | quote }}
+            - name: SPRING_DATASOURCE_URL
+              value: {{ include "k8s-batch.mysql.jdbcUrl" . | quote }}
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "k8s-batch.mysql.secretName" . }}
+                  key: username
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "k8s-batch.mysql.secretName" . }}
+                  key: password
+            - name: SPRING_BATCH_JDBC_INITIALIZE_SCHEMA
+              value: {{ .Values.app.config.batchInitializeSchema | quote }}
+            {{- if and .Values.kafka.enabled .Values.features.kafka }}
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: {{ include "k8s-batch.kafka.bootstrapServers" . | quote }}
+            {{- end }}
+            - name: SERVER_PORT
+              value: {{ .Values.app.config.serverPort | quote }}
+            {{- with .Values.app.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "k8s-batch.fullname" . }}-config
+          livenessProbe:
+            {{- toYaml .Values.app.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.app.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.app.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

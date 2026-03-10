@@ -1,0 +1,35 @@
+spring:
+  batch:
+    jdbc:
+      initialize-schema: always
+    job:
+      enabled: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+management:
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+  health:
+    db:
+      enabled: true
+    kafka:
+      enabled: true
+
+batch:
+  partition:
+    grid-size: 4
+    chunk-size: 25
+  file-range:
+    input-file: ""
+  multi-file:
+    input-directory: ""
+
+logging:
+  level:
+    org.springframework.batch: DEBUG
+    org.testcontainers: INFO
+    com.cominotti.k8sbatch: DEBUG
