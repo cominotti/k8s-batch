@@ -26,7 +26,6 @@ class HelloEndpointIT extends AbstractIntegrationTest {
                 .retrieve()
                 .body(String.class);
 
-        assertThat(body).isNotNull();
-        assertThat(body).startsWith("{");
+        assertThat(body).isNotNull().startsWith("{");
     }
 }
