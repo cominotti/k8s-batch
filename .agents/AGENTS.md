@@ -50,6 +50,9 @@ Spring Batch 6 restructured packages. **Always use these imports**:
 | `ItemProcessor` | `org.springframework.batch.infrastructure.item.ItemProcessor` |
 | `FlatFileItemReader` | `org.springframework.batch.infrastructure.item.file.FlatFileItemReader` |
 | `JdbcBatchItemWriter` | `org.springframework.batch.infrastructure.item.database.JdbcBatchItemWriter` |
+| `JobExecutionListener` | `org.springframework.batch.core.listener.JobExecutionListener` |
+| `StepExecutionListener` | `org.springframework.batch.core.listener.StepExecutionListener` |
+| `ExitStatus` | `org.springframework.batch.core.ExitStatus` |
 
 **Never use** the old `org.springframework.batch.item.*` or `org.springframework.batch.core.Job` (top-level) packages.
 
@@ -116,6 +119,16 @@ Both jobs follow the same pattern: **Partitioner → Manager Step → Worker Ste
 - **Worker-side processing**: `StepExecutionRequestHandler` + `BeanFactoryStepLocator` in `KafkaIntegrationConfig` handles incoming partition requests
 - **`@Qualifier`** is required on `Step` bean parameters in job/manager configs to resolve ambiguity when multiple worker steps exist
 
+## Logging Conventions
+
+- **Logger declaration**: plain SLF4J `private static final Logger log = LoggerFactory.getLogger(ClassName.class)` — no Lombok
+- **Log format**: `key=value | key=value` pipe-separated structured fields for machine parseability
+- **Configuration**: `logback-spring.xml` with `<springProfile>` blocks — do NOT use `logging.level` in application YAML files (avoids precedence confusion)
+- **Profile levels**: production=INFO, standalone=INFO (standalone subpackage DEBUG), integration-test=DEBUG
+- **Batch listeners**: `LoggingJobExecutionListener` and `LoggingStepExecutionListener` are `@Component` beans — register via `.listener()` on `JobBuilder` and `StepBuilder`/`RemotePartitioningManagerStepBuilder` respectively
+- **Duration utility**: `BatchDurationUtils.between(start, end)` for null-safe `Duration.between()` — shared by both listeners
+- **Log levels**: INFO for business events (job/step lifecycle, partition creation, config init), DEBUG for per-item details (filtered records, reader/writer creation), ERROR for failures, WARN for unexpected-but-non-fatal statuses
+
 ## Helm Chart Conventions
 
 - Schema initialization: MySQL `docker-entrypoint-initdb.d` ConfigMap, not `initialize-schema: always`
@@ -128,7 +141,7 @@ Both jobs follow the same pattern: **Partitioner → Manager Step → Worker Ste
 
 ```
 k8s-batch-app/src/main/java/com/cominotti/k8sbatch/
-  batch/common/       — shared data model, reader factory, writer, processor
+  batch/common/       — shared data model, reader factory, writer, processor, batch listeners
   batch/filerange/    — file-range partitioning job
   batch/multifile/    — multi-file partitioning job
   batch/standalone/   — standalone (no Kafka) manager step config

@@ -8,7 +8,6 @@ import org.springframework.batch.core.listener.JobExecutionListener;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
 
 @Component
 public class LoggingJobExecutionListener implements JobExecutionListener {
@@ -27,7 +26,7 @@ public class LoggingJobExecutionListener implements JobExecutionListener {
     public void afterJob(JobExecution jobExecution) {
         String jobName = jobExecution.getJobInstance().getJobName();
         Long executionId = jobExecution.getId();
-        Duration duration = computeDuration(jobExecution.getStartTime(), jobExecution.getEndTime());
+        Duration duration = BatchDurationUtils.between(jobExecution.getStartTime(), jobExecution.getEndTime());
         BatchStatus status = jobExecution.getStatus();
 
         if (status == BatchStatus.COMPLETED) {
@@ -41,12 +40,5 @@ public class LoggingJobExecutionListener implements JobExecutionListener {
             log.warn("Job '{}' ended with status {} | jobExecutionId={} | duration={}",
                     jobName, status, executionId, duration);
         }
-    }
-
-    private Duration computeDuration(LocalDateTime start, LocalDateTime end) {
-        if (start == null || end == null) {
-            return Duration.ZERO;
-        }
-        return Duration.between(start, end);
     }
 }

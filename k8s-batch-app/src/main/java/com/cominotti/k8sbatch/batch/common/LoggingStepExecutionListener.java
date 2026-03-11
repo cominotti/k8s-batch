@@ -9,7 +9,6 @@ import org.springframework.batch.core.step.StepExecution;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
 
 @Component
 public class LoggingStepExecutionListener implements StepExecutionListener {
@@ -28,7 +27,7 @@ public class LoggingStepExecutionListener implements StepExecutionListener {
     public ExitStatus afterStep(StepExecution stepExecution) {
         String stepName = stepExecution.getStepName();
         String thread = Thread.currentThread().getName();
-        Duration duration = computeDuration(stepExecution.getStartTime(), stepExecution.getEndTime());
+        Duration duration = BatchDurationUtils.between(stepExecution.getStartTime(), stepExecution.getEndTime());
         BatchStatus status = stepExecution.getStatus();
 
         if (status == BatchStatus.COMPLETED) {
@@ -55,12 +54,5 @@ public class LoggingStepExecutionListener implements StepExecutionListener {
         }
 
         return null;
-    }
-
-    private Duration computeDuration(LocalDateTime start, LocalDateTime end) {
-        if (start == null || end == null) {
-            return Duration.ZERO;
-        }
-        return Duration.between(start, end);
     }
 }

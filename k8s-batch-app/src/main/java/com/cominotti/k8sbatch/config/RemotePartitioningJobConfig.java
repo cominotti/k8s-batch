@@ -40,6 +40,7 @@ public class RemotePartitioningJobConfig {
 
     private static final Logger log = LoggerFactory.getLogger(RemotePartitioningJobConfig.class);
     private static final long PARTITION_TIMEOUT_MS = 60_000;
+    private static final String WORKER_CONSUMER_GROUP = "k8s-batch-workers";
 
     private final BatchPartitionProperties partitionProperties;
     private final LoggingStepExecutionListener stepExecutionListener;
@@ -89,7 +90,7 @@ public class RemotePartitioningJobConfig {
     public ConsumerFactory<String, byte[]> requestsConsumerFactory() {
         return new DefaultKafkaConsumerFactory<>(Map.of(
                 ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers,
-                ConsumerConfig.GROUP_ID_CONFIG, "k8s-batch-workers",
+                ConsumerConfig.GROUP_ID_CONFIG, WORKER_CONSUMER_GROUP,
                 ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest",
                 ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class,
                 ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class
@@ -124,7 +125,7 @@ public class RemotePartitioningJobConfig {
 
     @Bean
     public IntegrationFlow workerFlow(StepExecutionRequestHandler stepExecutionRequestHandler) {
-        log.info("Configuring worker inbound flow | topic={} | consumerGroup=k8s-batch-workers", requestsTopic);
+        log.info("Configuring worker inbound flow | topic={} | consumerGroup={}", requestsTopic, WORKER_CONSUMER_GROUP);
         return IntegrationFlow.from(
                         Kafka.messageDrivenChannelAdapter(
                                 requestsConsumerFactory(), requestsTopic))

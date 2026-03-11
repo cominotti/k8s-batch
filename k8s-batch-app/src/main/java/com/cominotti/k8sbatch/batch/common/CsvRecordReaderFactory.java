@@ -17,7 +17,6 @@ public final class CsvRecordReaderFactory {
     }
 
     public static FlatFileItemReader<CsvRecord> create(Resource resource) {
-        log.debug("Creating CSV reader for resource: {}", resource.getDescription());
         return new FlatFileItemReaderBuilder<CsvRecord>()
                 .name("csvRecordReader")
                 .resource(resource)
