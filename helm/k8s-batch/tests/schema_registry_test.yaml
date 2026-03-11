@@ -1,0 +1,95 @@
+suite: Schema Registry
+templates:
+  - templates/kafka/schema-registry-deployment.yaml
+release:
+  name: test-release
+tests:
+  - it: should render Schema Registry Deployment when all flags are true
+    set:
+      kafka.enabled: true
+      features.kafka: true
+      schemaRegistry.enabled: true
+      features.schemaRegistry: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Deployment
+
+  - it: should not render when kafka.enabled is false
+    set:
+      kafka.enabled: false
+      features.kafka: true
+      schemaRegistry.enabled: true
+      features.schemaRegistry: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render when features.kafka is false
+    set:
+      kafka.enabled: true
+      features.kafka: false
+      schemaRegistry.enabled: true
+      features.schemaRegistry: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render when schemaRegistry.enabled is false
+    set:
+      kafka.enabled: true
+      features.kafka: true
+      schemaRegistry.enabled: false
+      features.schemaRegistry: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render when features.schemaRegistry is false
+    set:
+      kafka.enabled: true
+      features.kafka: true
+      schemaRegistry.enabled: true
+      features.schemaRegistry: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should set SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS
+    set:
+      kafka.enabled: true
+      features.kafka: true
+      schemaRegistry.enabled: true
+      features.schemaRegistry: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS
+          any: true
+
+  - it: should include wait-for-kafka init container
+    set:
+      kafka.enabled: true
+      features.kafka: true
+      schemaRegistry.enabled: true
+      features.schemaRegistry: true
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers
+          content:
+            name: wait-for-kafka
+          any: true
+
+  - it: should set replica count from values
+    set:
+      kafka.enabled: true
+      features.kafka: true
+      schemaRegistry.enabled: true
+      features.schemaRegistry: true
+      schemaRegistry.replicaCount: 3
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 3

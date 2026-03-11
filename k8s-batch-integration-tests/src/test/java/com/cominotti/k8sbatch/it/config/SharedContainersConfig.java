@@ -11,7 +11,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
 import org.testcontainers.mysql.MySQLContainer;
-import org.testcontainers.kafka.ConfluentKafkaContainer;
+import org.testcontainers.redpanda.RedpandaContainer;
 
 import java.util.List;
 import java.util.Map;
@@ -32,7 +32,7 @@ public class SharedContainersConfig {
 
     private static void createAndVerifyKafkaTopics() {
         try (AdminClient admin = AdminClient.create(
-                Map.of(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, ContainerHolder.KAFKA.getBootstrapServers()))) {
+                Map.of(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, ContainerHolder.REDPANDA.getBootstrapServers()))) {
             admin.createTopics(List.of(
                     new NewTopic("batch-partition-requests", 1, (short) 1),
                     new NewTopic("batch-partition-replies", 1, (short) 1)
@@ -60,7 +60,7 @@ public class SharedContainersConfig {
     }
 
     @Bean
-    ConfluentKafkaContainer kafkaContainer() {
-        return ContainerHolder.KAFKA;
+    RedpandaContainer redpandaContainer() {
+        return ContainerHolder.REDPANDA;
     }
 }

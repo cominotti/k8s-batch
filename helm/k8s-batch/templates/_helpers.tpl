@@ -52,6 +52,13 @@ Kafka bootstrap servers (computed from replica count)
 {{- end }}
 
 {{/*
+Schema Registry URL
+*/}}
+{{- define "k8s-batch.schemaRegistry.url" -}}
+http://{{ include "k8s-batch.fullname" . }}-schema-registry:{{ .Values.schemaRegistry.service.port }}
+{{- end }}
+
+{{/*
 MySQL secret name
 */}}
 {{- define "k8s-batch.mysql.secretName" -}}

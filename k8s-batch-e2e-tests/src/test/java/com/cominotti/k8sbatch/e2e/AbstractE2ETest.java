@@ -76,6 +76,7 @@ public abstract class AbstractE2ETest {
 
         if (requiresKafka()) {
             K3sClusterManager.loadImage(E2EContainerImages.KAFKA_IMAGE);
+            K3sClusterManager.loadImage(E2EContainerImages.SCHEMA_REGISTRY_IMAGE);
         }
     }
 }

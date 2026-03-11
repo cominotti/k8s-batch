@@ -1,0 +1,62 @@
+{{- if and .Values.kafka.enabled .Values.features.kafka .Values.schemaRegistry.enabled .Values.features.schemaRegistry }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "k8s-batch.fullname" . }}-schema-registry
+  labels:
+    {{- include "k8s-batch.labels" . | nindent 4 }}
+    app.kubernetes.io/component: schema-registry
+spec:
+  replicas: {{ .Values.schemaRegistry.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "k8s-batch.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: schema-registry
+  template:
+    metadata:
+      labels:
+        {{- include "k8s-batch.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: schema-registry
+    spec:
+      initContainers:
+        - name: wait-for-kafka
+          image: "{{ .Values.global.initImage.repository }}:{{ .Values.global.initImage.tag }}"
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z {{ include "k8s-batch.fullname" . }}-kafka {{ .Values.kafka.service.port }}; do
+                echo "Waiting for Kafka broker..."
+                sleep 3
+              done
+      containers:
+        - name: schema-registry
+          image: "{{ .Values.schemaRegistry.image.repository }}:{{ .Values.schemaRegistry.image.tag }}"
+          imagePullPolicy: {{ .Values.schemaRegistry.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8081
+          env:
+            - name: SCHEMA_REGISTRY_HOST_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS
+              value: {{ include "k8s-batch.kafka.bootstrapServers" . | quote }}
+            - name: SCHEMA_REGISTRY_LISTENERS
+              value: "http://0.0.0.0:8081"
+          resources:
+            {{- toYaml .Values.schemaRegistry.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+{{- end }}

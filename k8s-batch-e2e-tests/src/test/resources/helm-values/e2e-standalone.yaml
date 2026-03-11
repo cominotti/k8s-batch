@@ -83,7 +83,11 @@ mysql:
 kafka:
   enabled: false
 
+schemaRegistry:
+  enabled: false
+
 features:
   kafka: false
+  schemaRegistry: false
   hpa: false
   ingress: false

@@ -55,6 +55,18 @@ spec:
                 sleep 3
               done
         {{- end }}
+        {{- if and .Values.schemaRegistry.enabled .Values.features.schemaRegistry }}
+        - name: wait-for-schema-registry
+          image: "{{ .Values.global.initImage.repository }}:{{ .Values.global.initImage.tag }}"
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z {{ include "k8s-batch.fullname" . }}-schema-registry {{ .Values.schemaRegistry.service.port }}; do
+                echo "Waiting for Schema Registry..."
+                sleep 3
+              done
+        {{- end }}
       containers:
         - name: app
           image: "{{ .Values.app.image.repository }}:{{ .Values.app.image.tag }}"
@@ -85,6 +97,10 @@ spec:
             {{- if and .Values.kafka.enabled .Values.features.kafka }}
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
               value: {{ include "k8s-batch.kafka.bootstrapServers" . | quote }}
+            {{- end }}
+            {{- if and .Values.schemaRegistry.enabled .Values.features.schemaRegistry }}
+            - name: SPRING_KAFKA_PROPERTIES_SCHEMA_REGISTRY_URL
+              value: {{ include "k8s-batch.schemaRegistry.url" . | quote }}
             {{- end }}
             - name: SERVER_PORT
               value: {{ .Values.app.config.serverPort | quote }}

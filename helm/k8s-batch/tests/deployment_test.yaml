@@ -162,3 +162,67 @@ tests:
       - equal:
           path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
           value: false
+
+  - it: should include SCHEMA_REGISTRY_URL when schema registry enabled
+    documentSelector:
+      path: kind
+      value: Deployment
+      skipEmptyTemplates: true
+    set:
+      kafka.enabled: true
+      features.kafka: true
+      schemaRegistry.enabled: true
+      features.schemaRegistry: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SPRING_KAFKA_PROPERTIES_SCHEMA_REGISTRY_URL
+          any: true
+
+  - it: should exclude SCHEMA_REGISTRY_URL when schema registry disabled
+    documentSelector:
+      path: kind
+      value: Deployment
+      skipEmptyTemplates: true
+    set:
+      kafka.enabled: true
+      features.kafka: true
+      schemaRegistry.enabled: false
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SPRING_KAFKA_PROPERTIES_SCHEMA_REGISTRY_URL
+          any: true
+
+  - it: should include wait-for-schema-registry when enabled
+    documentSelector:
+      path: kind
+      value: Deployment
+      skipEmptyTemplates: true
+    set:
+      kafka.enabled: true
+      features.kafka: true
+      schemaRegistry.enabled: true
+      features.schemaRegistry: true
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers
+          content:
+            name: wait-for-schema-registry
+          any: true
+
+  - it: should exclude wait-for-schema-registry when disabled
+    documentSelector:
+      path: kind
+      value: Deployment
+      skipEmptyTemplates: true
+    set:
+      schemaRegistry.enabled: false
+    asserts:
+      - notContains:
+          path: spec.template.spec.initContainers
+          content:
+            name: wait-for-schema-registry
+          any: true

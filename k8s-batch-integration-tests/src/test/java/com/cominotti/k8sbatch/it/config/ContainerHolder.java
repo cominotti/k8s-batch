@@ -4,9 +4,9 @@ package com.cominotti.k8sbatch.it.config;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.kafka.ConfluentKafkaContainer;
 import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.mysql.MySQLContainer;
+import org.testcontainers.redpanda.RedpandaContainer;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -17,7 +17,7 @@ import java.util.stream.Stream;
 /**
  * Holds shared Testcontainer instances with decoupled lifecycle.
  * <p>
- * Standalone tests call {@link #startMysqlOnly()} to avoid starting Kafka.
+ * Standalone tests call {@link #startMysqlOnly()} to avoid starting Redpanda.
  * Remote-partitioning tests call {@link #startAll()} to start both in parallel.
  */
 final class ContainerHolder {
@@ -30,12 +30,12 @@ final class ContainerHolder {
                     .withUsername("test")
                     .withPassword("test");
 
-    static final ConfluentKafkaContainer KAFKA =
-            new ConfluentKafkaContainer(TestContainerImages.KAFKA_IMAGE)
+    static final RedpandaContainer REDPANDA =
+            new RedpandaContainer(TestContainerImages.REDPANDA_IMAGE)
                     .withStartupTimeout(Duration.ofSeconds(120));
 
     private static volatile boolean mysqlStarted = false;
-    private static volatile boolean kafkaStarted = false;
+    private static volatile boolean redpandaStarted = false;
 
     static synchronized void startMysqlOnly() {
         if (mysqlStarted) {
@@ -51,26 +51,30 @@ final class ContainerHolder {
     }
 
     static synchronized void startAll() {
-        if (mysqlStarted && kafkaStarted) {
+        if (mysqlStarted && redpandaStarted) {
             return;
         }
-        if (!mysqlStarted && !kafkaStarted) {
-            log.info("Starting MySQL and Kafka containers in parallel...");
-            Startables.deepStart(Stream.of(MYSQL, KAFKA)).join();
+        if (!mysqlStarted && !redpandaStarted) {
+            log.info("Starting MySQL and Redpanda containers in parallel...");
+            Startables.deepStart(Stream.of(MYSQL, REDPANDA)).join();
             log.info("MySQL container started | jdbcUrl={} | mappedPort={}",
                     MYSQL.getJdbcUrl(), MYSQL.getMappedPort(3306));
-            log.info("Kafka container started | bootstrapServers={}", KAFKA.getBootstrapServers());
+            log.info("Redpanda container started | bootstrapServers={} | schemaRegistryUrl={}",
+                    REDPANDA.getBootstrapServers(), REDPANDA.getSchemaRegistryAddress());
             verifyMysqlReady();
             log.info("MySQL health check passed");
             mysqlStarted = true;
-        } else if (!kafkaStarted) {
-            log.info("Starting Kafka container | image={}", TestContainerImages.KAFKA_IMAGE);
-            KAFKA.start();
-            log.info("Kafka container started | bootstrapServers={}", KAFKA.getBootstrapServers());
+        } else if (!redpandaStarted) {
+            log.info("Starting Redpanda container | image={}", TestContainerImages.REDPANDA_IMAGE);
+            REDPANDA.start();
+            log.info("Redpanda container started | bootstrapServers={} | schemaRegistryUrl={}",
+                    REDPANDA.getBootstrapServers(), REDPANDA.getSchemaRegistryAddress());
         }
-        System.setProperty("spring.kafka.bootstrap-servers", KAFKA.getBootstrapServers());
-        log.debug("Set spring.kafka.bootstrap-servers={}", KAFKA.getBootstrapServers());
-        kafkaStarted = true;
+        System.setProperty("spring.kafka.bootstrap-servers", REDPANDA.getBootstrapServers());
+        System.setProperty("spring.kafka.properties.schema.registry.url", REDPANDA.getSchemaRegistryAddress());
+        log.debug("Set spring.kafka.bootstrap-servers={}", REDPANDA.getBootstrapServers());
+        log.debug("Set spring.kafka.properties.schema.registry.url={}", REDPANDA.getSchemaRegistryAddress());
+        redpandaStarted = true;
     }
 
     private static void verifyMysqlReady() {

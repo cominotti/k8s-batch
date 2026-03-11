@@ -1,0 +1,18 @@
+{{- if and .Values.kafka.enabled .Values.features.kafka .Values.schemaRegistry.enabled .Values.features.schemaRegistry }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "k8s-batch.fullname" . }}-schema-registry
+  labels:
+    {{- include "k8s-batch.labels" . | nindent 4 }}
+    app.kubernetes.io/component: schema-registry
+spec:
+  type: {{ .Values.schemaRegistry.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.schemaRegistry.service.port }}
+      targetPort: http
+  selector:
+    {{- include "k8s-batch.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: schema-registry
+{{- end }}

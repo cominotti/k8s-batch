@@ -11,7 +11,6 @@ package com.cominotti.k8sbatch.it.config;
 public final class TestContainerImages {
 
     public static final String MYSQL_IMAGE = "mysql:8.0";
-    public static final String KAFKA_IMAGE = "confluentinc/cp-kafka:7.9.0";
     public static final String REDPANDA_IMAGE = "docker.redpanda.com/redpandadata/redpanda:v25.1.9";
 
     private TestContainerImages() {

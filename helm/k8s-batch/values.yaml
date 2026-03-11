@@ -212,9 +212,35 @@ kafka:
     extra: []
 
 # ======================================================================
+# Schema Registry (Confluent)
+# ======================================================================
+schemaRegistry:
+  enabled: true
+
+  image:
+    repository: confluentinc/cp-schema-registry
+    tag: "7.9.0"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  service:
+    type: ClusterIP
+    port: 8081
+
+# ======================================================================
 # Feature flags
 # ======================================================================
 features:
   kafka: true
+  schemaRegistry: true
   hpa: true
   ingress: false

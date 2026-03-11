@@ -107,7 +107,23 @@ kafka:
       partitions: 4
       replicationFactor: 1
 
+schemaRegistry:
+  enabled: true
+  image:
+    repository: confluentinc/cp-schema-registry
+    tag: "7.9.0"
+    pullPolicy: Never
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
 features:
   kafka: true
+  schemaRegistry: true
   hpa: false
   ingress: false
