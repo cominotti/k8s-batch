@@ -2,7 +2,10 @@ package com.cominotti.k8sbatch.it;
 
 import com.cominotti.k8sbatch.K8sBatchApplication;
 import com.cominotti.k8sbatch.it.config.SharedContainersConfig;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Timeout;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -19,11 +22,18 @@ import java.util.concurrent.TimeUnit;
 @Timeout(value = 120, unit = TimeUnit.SECONDS)
 public abstract class AbstractIntegrationTest {
 
+    private static final Logger log = LoggerFactory.getLogger(AbstractIntegrationTest.class);
+
     @LocalServerPort
     protected int port;
 
     @Autowired
     protected JdbcTemplate jdbcTemplate;
+
+    @BeforeEach
+    void logTestPort() {
+        log.debug("Integration test server running on port {}", port);
+    }
 
     protected RestClient restClient() {
         return RestClient.create("http://localhost:" + port);

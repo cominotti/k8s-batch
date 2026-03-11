@@ -28,9 +28,3 @@ batch:
     input-file: ""
   multi-file:
     input-directory: ""
-
-logging:
-  level:
-    org.springframework.batch: DEBUG
-    org.testcontainers: INFO
-    com.cominotti.k8sbatch: DEBUG

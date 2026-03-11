@@ -1,6 +1,7 @@
 package com.cominotti.k8sbatch.config;
 
 import com.cominotti.k8sbatch.batch.common.BatchPartitionProperties;
+import com.cominotti.k8sbatch.batch.common.LoggingStepExecutionListener;
 import com.cominotti.k8sbatch.batch.filerange.FileRangePartitioner;
 import com.cominotti.k8sbatch.batch.multifile.MultiFilePartitioner;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -9,6 +10,8 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.Step;
 import org.springframework.batch.integration.partition.BeanFactoryStepLocator;
@@ -35,17 +38,25 @@ import java.util.Map;
 @Profile("remote-partitioning")
 public class RemotePartitioningJobConfig {
 
+    private static final Logger log = LoggerFactory.getLogger(RemotePartitioningJobConfig.class);
+    private static final long PARTITION_TIMEOUT_MS = 60_000;
+
     private final BatchPartitionProperties partitionProperties;
+    private final LoggingStepExecutionListener stepExecutionListener;
     private final String bootstrapServers;
     private final String requestsTopic;
 
     public RemotePartitioningJobConfig(
             BatchPartitionProperties partitionProperties,
+            LoggingStepExecutionListener stepExecutionListener,
             @Value("${spring.kafka.bootstrap-servers:localhost:9092}") String bootstrapServers,
             @Value("${batch.kafka.requests-topic:batch-partition-requests}") String requestsTopic) {
         this.partitionProperties = partitionProperties;
+        this.stepExecutionListener = stepExecutionListener;
         this.bootstrapServers = bootstrapServers;
         this.requestsTopic = requestsTopic;
+        log.info("RemotePartitioningJobConfig initialized | bootstrapServers={} | requestsTopic={} | gridSize={} | chunkSize={}",
+                bootstrapServers, requestsTopic, partitionProperties.gridSize(), partitionProperties.chunkSize());
     }
 
     // ── Builder Factory ──────────────────────────────────────────
@@ -89,6 +100,7 @@ public class RemotePartitioningJobConfig {
 
     @Bean
     public IntegrationFlow managerOutboundRequestsFlow() {
+        log.info("Configuring manager outbound flow | topic={}", requestsTopic);
         return IntegrationFlow.from(managerRequestsChannel())
                 .transform(Transformers.serializer())
                 .handle(Kafka.outboundChannelAdapter(partitionProducerFactory())
@@ -101,6 +113,7 @@ public class RemotePartitioningJobConfig {
     @Bean
     public StepExecutionRequestHandler stepExecutionRequestHandler(
             JobRepository jobRepository, BeanFactory beanFactory) {
+        log.info("Configuring StepExecutionRequestHandler for worker-side processing");
         StepExecutionRequestHandler handler = new StepExecutionRequestHandler();
         handler.setJobRepository(jobRepository);
         BeanFactoryStepLocator stepLocator = new BeanFactoryStepLocator();
@@ -111,6 +124,7 @@ public class RemotePartitioningJobConfig {
 
     @Bean
     public IntegrationFlow workerFlow(StepExecutionRequestHandler stepExecutionRequestHandler) {
+        log.info("Configuring worker inbound flow | topic={} | consumerGroup=k8s-batch-workers", requestsTopic);
         return IntegrationFlow.from(
                         Kafka.messageDrivenChannelAdapter(
                                 requestsConsumerFactory(), requestsTopic))
@@ -126,11 +140,14 @@ public class RemotePartitioningJobConfig {
     public Step fileRangeManagerStep(
             RemotePartitioningManagerStepBuilderFactory factory,
             FileRangePartitioner fileRangePartitioner) {
+        log.info("Configuring remote manager step 'fileRangeManagerStep' | gridSize={} | timeout={}ms",
+                partitionProperties.gridSize(), PARTITION_TIMEOUT_MS);
         return factory.get("fileRangeManagerStep")
                 .partitioner("fileRangeWorkerStep", fileRangePartitioner)
                 .gridSize(partitionProperties.gridSize())
                 .outputChannel(managerRequestsChannel())
-                .timeout(60_000)
+                .timeout(PARTITION_TIMEOUT_MS)
+                .listener(stepExecutionListener)
                 .build();
     }
 
@@ -138,11 +155,14 @@ public class RemotePartitioningJobConfig {
     public Step multiFileManagerStep(
             RemotePartitioningManagerStepBuilderFactory factory,
             MultiFilePartitioner multiFilePartitioner) {
+        log.info("Configuring remote manager step 'multiFileManagerStep' | gridSize={} | timeout={}ms",
+                partitionProperties.gridSize(), PARTITION_TIMEOUT_MS);
         return factory.get("multiFileManagerStep")
                 .partitioner("multiFileWorkerStep", multiFilePartitioner)
                 .gridSize(partitionProperties.gridSize())
                 .outputChannel(managerRequestsChannel())
-                .timeout(60_000)
+                .timeout(PARTITION_TIMEOUT_MS)
+                .listener(stepExecutionListener)
                 .build();
     }
 }

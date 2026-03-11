@@ -1,5 +1,7 @@
 package com.cominotti.k8sbatch.batch.common;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.batch.infrastructure.item.database.JdbcBatchItemWriter;
 import org.springframework.batch.infrastructure.item.database.builder.JdbcBatchItemWriterBuilder;
 
@@ -7,10 +9,13 @@ import javax.sql.DataSource;
 
 public final class CsvRecordWriter {
 
+    private static final Logger log = LoggerFactory.getLogger(CsvRecordWriter.class);
+
     private CsvRecordWriter() {
     }
 
     public static JdbcBatchItemWriter<CsvRecord> create(DataSource dataSource, String sourceFile) {
+        log.debug("Creating JDBC batch writer | sourceFile={}", sourceFile);
         return new JdbcBatchItemWriterBuilder<CsvRecord>()
                 .sql("""
                         INSERT INTO target_records (id, name, email, amount, record_date, source_file)

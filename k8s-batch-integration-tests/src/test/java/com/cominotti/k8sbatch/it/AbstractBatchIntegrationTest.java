@@ -5,6 +5,8 @@ import com.cominotti.k8sbatch.it.config.BatchTestJobConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Timeout;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.job.parameters.JobParameters;
 import org.springframework.batch.core.job.parameters.JobParametersBuilder;
 import org.springframework.batch.core.repository.JobRepository;
@@ -25,6 +27,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Timeout(value = 120, unit = TimeUnit.SECONDS)
 public abstract class AbstractBatchIntegrationTest {
 
+    private static final Logger log = LoggerFactory.getLogger(AbstractBatchIntegrationTest.class);
+
     @Autowired
     protected JobRepositoryTestUtils jobRepositoryTestUtils;
 
@@ -36,19 +40,23 @@ public abstract class AbstractBatchIntegrationTest {
 
     @BeforeEach
     void verifySchemaReady() {
+        log.debug("Verifying target_records table exists...");
         Integer tableCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'k8sbatch' AND table_name = 'target_records'",
                 Integer.class);
         assertThat(tableCount).as("target_records table must exist (Flyway migration)").isEqualTo(1);
+        log.debug("Schema verification passed: target_records table exists");
     }
 
     @AfterEach
     void cleanupBatchMetadata() {
+        log.debug("Cleaning up batch job execution metadata");
         jobRepositoryTestUtils.removeJobExecutions();
     }
 
     @AfterEach
     void cleanupAppData() {
+        log.debug("Cleaning up target_records table");
         jdbcTemplate.execute("DELETE FROM target_records");
     }
 

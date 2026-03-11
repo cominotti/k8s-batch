@@ -1,5 +1,7 @@
 package com.cominotti.k8sbatch.batch.filerange;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.partition.Partitioner;
 import org.springframework.batch.infrastructure.item.ExecutionContext;
 import org.springframework.core.io.Resource;
@@ -14,6 +16,8 @@ import java.util.Map;
 
 public class FileRangePartitioner implements Partitioner {
 
+    private static final Logger log = LoggerFactory.getLogger(FileRangePartitioner.class);
+
     private final Resource resource;
 
     public FileRangePartitioner(Resource resource) {
@@ -24,6 +28,9 @@ public class FileRangePartitioner implements Partitioner {
     public Map<String, ExecutionContext> partition(int gridSize) {
         int totalLines = countLines();
         int linesPerPartition = Math.max(1, (int) Math.ceil((double) totalLines / gridSize));
+
+        log.info("FileRangePartitioner: totalLines={} | gridSize={} | linesPerPartition={} | resource={}",
+                totalLines, gridSize, linesPerPartition, resource.getDescription());
 
         Map<String, ExecutionContext> partitions = new HashMap<>();
         int start = 0;
@@ -36,10 +43,13 @@ public class FileRangePartitioner implements Partitioner {
             context.putInt("endLine", end);
             context.putString("resourcePath", ((FileSystemResource) resource).getPath());
 
+            log.debug("  partition{}: startLine={} | endLine={}", i, start, end);
+
             partitions.put("partition" + i, context);
             start = end;
         }
 
+        log.info("FileRangePartitioner created {} partitions", partitions.size());
         return partitions;
     }
 
@@ -49,6 +59,7 @@ public class FileRangePartitioner implements Partitioner {
             int count = (int) reader.lines().count();
             return Math.max(0, count - 1); // subtract header line
         } catch (IOException e) {
+            log.error("Failed to count lines in resource: {}", resource, e);
             throw new IllegalStateException("Failed to count lines in resource: " + resource, e);
         }
     }

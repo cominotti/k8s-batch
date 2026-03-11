@@ -1,8 +1,11 @@
 package com.cominotti.k8sbatch.batch.standalone;
 
 import com.cominotti.k8sbatch.batch.common.BatchPartitionProperties;
+import com.cominotti.k8sbatch.batch.common.LoggingStepExecutionListener;
 import com.cominotti.k8sbatch.batch.filerange.FileRangePartitioner;
 import com.cominotti.k8sbatch.batch.multifile.MultiFilePartitioner;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.partition.support.TaskExecutorPartitionHandler;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.Step;
@@ -17,10 +20,15 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 @Profile("standalone")
 public class StandaloneJobConfig {
 
-    private final BatchPartitionProperties partitionProperties;
+    private static final Logger log = LoggerFactory.getLogger(StandaloneJobConfig.class);
 
-    public StandaloneJobConfig(BatchPartitionProperties partitionProperties) {
+    private final BatchPartitionProperties partitionProperties;
+    private final LoggingStepExecutionListener stepExecutionListener;
+
+    public StandaloneJobConfig(BatchPartitionProperties partitionProperties,
+                               LoggingStepExecutionListener stepExecutionListener) {
         this.partitionProperties = partitionProperties;
+        this.stepExecutionListener = stepExecutionListener;
     }
 
     @Bean
@@ -33,9 +41,13 @@ public class StandaloneJobConfig {
         handler.setTaskExecutor(partitionTaskExecutor("file-range-"));
         handler.setGridSize(partitionProperties.gridSize());
 
+        log.info("Configuring standalone manager step 'fileRangeManagerStep' | gridSize={}",
+                partitionProperties.gridSize());
+
         return new StepBuilder("fileRangeManagerStep", jobRepository)
                 .partitioner("fileRangeWorkerStep", fileRangePartitioner)
                 .partitionHandler(handler)
+                .listener(stepExecutionListener)
                 .build();
     }
 
@@ -49,13 +61,19 @@ public class StandaloneJobConfig {
         handler.setTaskExecutor(partitionTaskExecutor("multi-file-"));
         handler.setGridSize(partitionProperties.gridSize());
 
+        log.info("Configuring standalone manager step 'multiFileManagerStep' | gridSize={}",
+                partitionProperties.gridSize());
+
         return new StepBuilder("multiFileManagerStep", jobRepository)
                 .partitioner("multiFileWorkerStep", multiFilePartitioner)
                 .partitionHandler(handler)
+                .listener(stepExecutionListener)
                 .build();
     }
 
     private ThreadPoolTaskExecutor partitionTaskExecutor(String threadNamePrefix) {
+        log.info("Creating partition thread pool | prefix={} | poolSize={}",
+                threadNamePrefix, partitionProperties.gridSize());
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(partitionProperties.gridSize());
         executor.setMaxPoolSize(partitionProperties.gridSize());

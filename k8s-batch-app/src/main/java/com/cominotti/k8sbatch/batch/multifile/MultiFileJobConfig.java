@@ -5,6 +5,10 @@ import com.cominotti.k8sbatch.batch.common.CsvRecord;
 import com.cominotti.k8sbatch.batch.common.CsvRecordProcessor;
 import com.cominotti.k8sbatch.batch.common.CsvRecordReaderFactory;
 import com.cominotti.k8sbatch.batch.common.CsvRecordWriter;
+import com.cominotti.k8sbatch.batch.common.LoggingJobExecutionListener;
+import com.cominotti.k8sbatch.batch.common.LoggingStepExecutionListener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.builder.JobBuilder;
@@ -25,15 +29,26 @@ import java.nio.file.Path;
 @Configuration
 public class MultiFileJobConfig {
 
-    private final BatchPartitionProperties partitionProperties;
+    private static final Logger log = LoggerFactory.getLogger(MultiFileJobConfig.class);
 
-    public MultiFileJobConfig(BatchPartitionProperties partitionProperties) {
+    private final BatchPartitionProperties partitionProperties;
+    private final LoggingJobExecutionListener jobExecutionListener;
+    private final LoggingStepExecutionListener stepExecutionListener;
+
+    public MultiFileJobConfig(BatchPartitionProperties partitionProperties,
+                              LoggingJobExecutionListener jobExecutionListener,
+                              LoggingStepExecutionListener stepExecutionListener) {
         this.partitionProperties = partitionProperties;
+        this.jobExecutionListener = jobExecutionListener;
+        this.stepExecutionListener = stepExecutionListener;
+        log.info("MultiFileJobConfig initialized | gridSize={} | chunkSize={}",
+                partitionProperties.gridSize(), partitionProperties.chunkSize());
     }
 
     @Bean
     public Job multiFileEtlJob(JobRepository jobRepository, @Qualifier("multiFileManagerStep") Step multiFileManagerStep) {
         return new JobBuilder("multiFileEtlJob", jobRepository)
+                .listener(jobExecutionListener)
                 .start(multiFileManagerStep)
                 .build();
     }
@@ -79,6 +94,7 @@ public class MultiFileJobConfig {
                 .reader(multiFileItemReader)
                 .processor(multiFileItemProcessor)
                 .writer(multiFileItemWriter)
+                .listener(stepExecutionListener)
                 .build();
     }
 }
