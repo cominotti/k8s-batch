@@ -12,7 +12,8 @@ COPY k8s-batch-integration-tests/pom.xml k8s-batch-integration-tests/
 COPY k8s-batch-e2e-tests/pom.xml k8s-batch-e2e-tests/
 RUN mvn dependency:go-offline -B -pl k8s-batch-app -am
 
-# Copy source and build
+# Copy license scripts (needed for Maven validate phase) and source
+COPY scripts/license scripts/license
 COPY k8s-batch-app/src k8s-batch-app/src
 RUN mvn package -DskipTests -B -pl k8s-batch-app -am && \
     java -Djarmode=tools -jar k8s-batch-app/target/*-exec.jar extract --layers --launcher --destination extracted

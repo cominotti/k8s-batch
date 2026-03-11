@@ -31,7 +31,7 @@ final class ContainerHolder {
                     .withPassword("test");
 
     static final ConfluentKafkaContainer KAFKA =
-            new ConfluentKafkaContainer("confluentinc/cp-kafka:7.7.0")
+            new ConfluentKafkaContainer("confluentinc/cp-kafka:7.9.0")
                     .withStartupTimeout(Duration.ofSeconds(120));
 
     private static volatile boolean mysqlStarted = false;
@@ -64,7 +64,7 @@ final class ContainerHolder {
             log.info("MySQL health check passed");
             mysqlStarted = true;
         } else if (!kafkaStarted) {
-            log.info("Starting Kafka container (cp-kafka:7.7.0)...");
+            log.info("Starting Kafka container (cp-kafka:7.9.0)...");
             KAFKA.start();
             log.info("Kafka container started | bootstrapServers={}", KAFKA.getBootstrapServers());
         }

@@ -75,7 +75,7 @@ public abstract class AbstractE2ETest {
         K3sClusterManager.loadImage("busybox:1.36");
 
         if (requiresKafka()) {
-            K3sClusterManager.loadImage("bitnami/kafka:3.7");
+            K3sClusterManager.loadImage("confluentinc/cp-kafka:7.9.0");
         }
     }
 }

@@ -34,20 +34,20 @@ spec:
             - |
               BOOTSTRAP="{{ include "k8s-batch.fullname" . }}-kafka:{{ .Values.kafka.service.port }}"
 
-              kafka-topics.sh --bootstrap-server $BOOTSTRAP \
+              kafka-topics --bootstrap-server $BOOTSTRAP \
                 --create --if-not-exists \
                 --topic {{ .Values.kafka.topics.partitionRequests.name }} \
                 --partitions {{ .Values.kafka.topics.partitionRequests.partitions }} \
                 --replication-factor {{ .Values.kafka.topics.partitionRequests.replicationFactor }}
 
-              kafka-topics.sh --bootstrap-server $BOOTSTRAP \
+              kafka-topics --bootstrap-server $BOOTSTRAP \
                 --create --if-not-exists \
                 --topic {{ .Values.kafka.topics.partitionReplies.name }} \
                 --partitions {{ .Values.kafka.topics.partitionReplies.partitions }} \
                 --replication-factor {{ .Values.kafka.topics.partitionReplies.replicationFactor }}
 
               {{- range .Values.kafka.topics.extra }}
-              kafka-topics.sh --bootstrap-server $BOOTSTRAP \
+              kafka-topics --bootstrap-server $BOOTSTRAP \
                 --create --if-not-exists \
                 --topic {{ .name }} \
                 --partitions {{ .partitions }} \

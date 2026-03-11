@@ -73,5 +73,5 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].env
           content:
-            name: KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE
+            name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
             value: "false"
