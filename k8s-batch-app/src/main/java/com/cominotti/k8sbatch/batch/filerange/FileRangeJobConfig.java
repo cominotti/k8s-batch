@@ -1,5 +1,6 @@
 package com.cominotti.k8sbatch.batch.filerange;
 
+import com.cominotti.k8sbatch.batch.common.BatchPartitionProperties;
 import com.cominotti.k8sbatch.batch.common.CsvRecord;
 import com.cominotti.k8sbatch.batch.common.CsvRecordProcessor;
 import com.cominotti.k8sbatch.batch.common.CsvRecordReaderFactory;
@@ -24,11 +25,11 @@ import javax.sql.DataSource;
 @Configuration
 public class FileRangeJobConfig {
 
-    @Value("${batch.partition.grid-size:4}")
-    private int gridSize;
+    private final BatchPartitionProperties partitionProperties;
 
-    @Value("${batch.partition.chunk-size:100}")
-    private int chunkSize;
+    public FileRangeJobConfig(BatchPartitionProperties partitionProperties) {
+        this.partitionProperties = partitionProperties;
+    }
 
     @Bean
     public Job fileRangeEtlJob(JobRepository jobRepository, Step fileRangeManagerStep) {
@@ -55,9 +56,8 @@ public class FileRangeJobConfig {
 
     @Bean
     @StepScope
-    public CsvRecordProcessor fileRangeItemProcessor(
-            @Value("#{stepExecutionContext['resourcePath']}") String resourcePath) {
-        return new CsvRecordProcessor(resourcePath);
+    public CsvRecordProcessor fileRangeItemProcessor() {
+        return new CsvRecordProcessor();
     }
 
     @Bean
@@ -76,7 +76,7 @@ public class FileRangeJobConfig {
             CsvRecordProcessor fileRangeItemProcessor,
             JdbcBatchItemWriter<CsvRecord> fileRangeItemWriter) {
         return new StepBuilder("fileRangeWorkerStep", jobRepository)
-                .<CsvRecord, CsvRecord>chunk(chunkSize)
+                .<CsvRecord, CsvRecord>chunk(partitionProperties.chunkSize())
                 .transactionManager(transactionManager)
                 .reader(fileRangeItemReader)
                 .processor(fileRangeItemProcessor)

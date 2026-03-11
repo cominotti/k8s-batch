@@ -14,13 +14,13 @@ public final class CsvRecordWriter {
         return new JdbcBatchItemWriterBuilder<CsvRecord>()
                 .sql("""
                         INSERT INTO target_records (id, name, email, amount, record_date, source_file)
-                        VALUES (?, ?, ?, ?, ?, ?)
+                        VALUES (?, ?, ?, ?, ?, ?) AS new_row
                         ON DUPLICATE KEY UPDATE
-                            name = VALUES(name),
-                            email = VALUES(email),
-                            amount = VALUES(amount),
-                            record_date = VALUES(record_date),
-                            source_file = VALUES(source_file)
+                            name = new_row.name,
+                            email = new_row.email,
+                            amount = new_row.amount,
+                            record_date = new_row.record_date,
+                            source_file = new_row.source_file
                         """)
                 .itemPreparedStatementSetter((item, ps) -> {
                     ps.setLong(1, item.id());

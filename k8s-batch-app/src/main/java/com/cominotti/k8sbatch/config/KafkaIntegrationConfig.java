@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import com.cominotti.k8sbatch.batch.common.BatchPartitionProperties;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.channel.QueueChannel;
 import org.springframework.integration.dsl.IntegrationFlow;
@@ -18,13 +19,13 @@ import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.support.serializer.JacksonJsonDeserializer;
 import org.springframework.kafka.support.serializer.JacksonJsonSerializer;
-import org.springframework.messaging.MessageChannel;
-
 import java.util.Map;
 
 @Configuration
 @Profile("remote-partitioning")
 public class KafkaIntegrationConfig {
+
+    private static final int QUEUE_CAPACITY_MULTIPLIER = 2;
 
     @Value("${spring.kafka.bootstrap-servers:localhost:9092}")
     private String bootstrapServers;
@@ -35,6 +36,12 @@ public class KafkaIntegrationConfig {
     @Value("${batch.kafka.replies-topic:batch-partition-replies}")
     private String repliesTopic;
 
+    private final BatchPartitionProperties partitionProperties;
+
+    public KafkaIntegrationConfig(BatchPartitionProperties partitionProperties) {
+        this.partitionProperties = partitionProperties;
+    }
+
     // --- Channels ---
 
     @Bean
@@ -44,7 +51,7 @@ public class KafkaIntegrationConfig {
 
     @Bean
     public QueueChannel inboundRequests() {
-        return new QueueChannel();
+        return new QueueChannel(partitionProperties.gridSize() * QUEUE_CAPACITY_MULTIPLIER);
     }
 
     @Bean
@@ -54,7 +61,7 @@ public class KafkaIntegrationConfig {
 
     @Bean
     public QueueChannel inboundReplies() {
-        return new QueueChannel();
+        return new QueueChannel(partitionProperties.gridSize() * QUEUE_CAPACITY_MULTIPLIER);
     }
 
     // --- Producer/Consumer Factories ---
@@ -76,7 +83,7 @@ public class KafkaIntegrationConfig {
                 ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest",
                 ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class,
                 ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JacksonJsonDeserializer.class,
-                JacksonJsonDeserializer.TRUSTED_PACKAGES, "*"
+                JacksonJsonDeserializer.TRUSTED_PACKAGES, "org.springframework.batch.core.step,org.springframework.batch.infrastructure.item,java.util"
         ));
     }
 

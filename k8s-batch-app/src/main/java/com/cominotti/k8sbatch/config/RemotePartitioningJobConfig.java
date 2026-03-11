@@ -1,12 +1,12 @@
 package com.cominotti.k8sbatch.config;
 
+import com.cominotti.k8sbatch.batch.common.BatchPartitionProperties;
 import com.cominotti.k8sbatch.batch.filerange.FileRangePartitioner;
 import com.cominotti.k8sbatch.batch.multifile.MultiFilePartitioner;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.Step;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.integration.partition.MessageChannelPartitionHandler;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -18,8 +18,11 @@ import org.springframework.integration.core.MessagingTemplate;
 @Profile("remote-partitioning")
 public class RemotePartitioningJobConfig {
 
-    @Value("${batch.partition.grid-size:4}")
-    private int gridSize;
+    private final BatchPartitionProperties partitionProperties;
+
+    public RemotePartitioningJobConfig(BatchPartitionProperties partitionProperties) {
+        this.partitionProperties = partitionProperties;
+    }
 
     // --- File-Range Job: Manager Step ---
 
@@ -29,7 +32,7 @@ public class RemotePartitioningJobConfig {
             QueueChannel inboundReplies) {
         MessageChannelPartitionHandler handler = new MessageChannelPartitionHandler();
         handler.setStepName("fileRangeWorkerStep");
-        handler.setGridSize(gridSize);
+        handler.setGridSize(partitionProperties.gridSize());
         handler.setReplyChannel(inboundReplies);
 
         MessagingTemplate template = new MessagingTemplate();
@@ -59,7 +62,7 @@ public class RemotePartitioningJobConfig {
             QueueChannel inboundReplies) {
         MessageChannelPartitionHandler handler = new MessageChannelPartitionHandler();
         handler.setStepName("multiFileWorkerStep");
-        handler.setGridSize(gridSize);
+        handler.setGridSize(partitionProperties.gridSize());
         handler.setReplyChannel(inboundReplies);
 
         MessagingTemplate template = new MessagingTemplate();

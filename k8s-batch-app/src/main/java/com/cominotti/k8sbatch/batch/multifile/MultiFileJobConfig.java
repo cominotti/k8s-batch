@@ -1,5 +1,6 @@
 package com.cominotti.k8sbatch.batch.multifile;
 
+import com.cominotti.k8sbatch.batch.common.BatchPartitionProperties;
 import com.cominotti.k8sbatch.batch.common.CsvRecord;
 import com.cominotti.k8sbatch.batch.common.CsvRecordProcessor;
 import com.cominotti.k8sbatch.batch.common.CsvRecordReaderFactory;
@@ -23,11 +24,11 @@ import java.nio.file.Path;
 @Configuration
 public class MultiFileJobConfig {
 
-    @Value("${batch.partition.grid-size:4}")
-    private int gridSize;
+    private final BatchPartitionProperties partitionProperties;
 
-    @Value("${batch.partition.chunk-size:100}")
-    private int chunkSize;
+    public MultiFileJobConfig(BatchPartitionProperties partitionProperties) {
+        this.partitionProperties = partitionProperties;
+    }
 
     @Bean
     public Job multiFileEtlJob(JobRepository jobRepository, Step multiFileManagerStep) {
@@ -51,9 +52,8 @@ public class MultiFileJobConfig {
 
     @Bean
     @StepScope
-    public CsvRecordProcessor multiFileItemProcessor(
-            @Value("#{stepExecutionContext['fileName']}") String fileName) {
-        return new CsvRecordProcessor(fileName);
+    public CsvRecordProcessor multiFileItemProcessor() {
+        return new CsvRecordProcessor();
     }
 
     @Bean
@@ -72,7 +72,7 @@ public class MultiFileJobConfig {
             CsvRecordProcessor multiFileItemProcessor,
             JdbcBatchItemWriter<CsvRecord> multiFileItemWriter) {
         return new StepBuilder("multiFileWorkerStep", jobRepository)
-                .<CsvRecord, CsvRecord>chunk(chunkSize)
+                .<CsvRecord, CsvRecord>chunk(partitionProperties.chunkSize())
                 .transactionManager(transactionManager)
                 .reader(multiFileItemReader)
                 .processor(multiFileItemProcessor)

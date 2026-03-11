@@ -4,8 +4,6 @@ import com.cominotti.k8sbatch.it.AbstractStandaloneBatchTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.job.JobExecution;
-import org.springframework.batch.core.job.parameters.JobParameters;
-import org.springframework.batch.core.job.parameters.JobParametersBuilder;
 import org.springframework.batch.core.step.StepExecution;
 import org.springframework.batch.test.JobOperatorTestUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,21 +17,13 @@ class FileRangePartitionStandaloneIT extends AbstractStandaloneBatchTest {
 
     @Autowired
     @Qualifier("fileRangeJobOperatorTestUtils")
-    private JobOperatorTestUtils jobLauncherTestUtils;
-
-    private JobParameters jobParams(String inputFile) {
-        return new JobParametersBuilder()
-                .addString("batch.file-range.input-file", inputFile)
-                .addLong("timestamp", System.currentTimeMillis())
-                .toJobParameters();
-    }
+    private JobOperatorTestUtils jobOperatorTestUtils;
 
     @Test
     void shouldCompleteJobSuccessfully() throws Exception {
-        String inputFile = getClass().getClassLoader()
-                .getResource("test-data/csv/single/sample-100rows.csv").getPath();
+        String inputFile = testResourcePath("test-data/csv/single/sample-100rows.csv");
 
-        JobExecution execution = jobLauncherTestUtils.startJob(jobParams(inputFile));
+        JobExecution execution = jobOperatorTestUtils.startJob(fileRangeJobParams(inputFile));
 
         assertThat(execution.getStatus()).isEqualTo(BatchStatus.COMPLETED);
 
@@ -44,10 +34,9 @@ class FileRangePartitionStandaloneIT extends AbstractStandaloneBatchTest {
 
     @Test
     void shouldPartitionByLineRanges() throws Exception {
-        String inputFile = getClass().getClassLoader()
-                .getResource("test-data/csv/single/sample-100rows.csv").getPath();
+        String inputFile = testResourcePath("test-data/csv/single/sample-100rows.csv");
 
-        JobExecution execution = jobLauncherTestUtils.startJob(jobParams(inputFile));
+        JobExecution execution = jobOperatorTestUtils.startJob(fileRangeJobParams(inputFile));
 
         Collection<StepExecution> stepExecutions = execution.getStepExecutions();
         long workerSteps = stepExecutions.stream()
@@ -58,10 +47,9 @@ class FileRangePartitionStandaloneIT extends AbstractStandaloneBatchTest {
 
     @Test
     void shouldHandleSmallFile() throws Exception {
-        String inputFile = getClass().getClassLoader()
-                .getResource("test-data/csv/single/sample-10rows.csv").getPath();
+        String inputFile = testResourcePath("test-data/csv/single/sample-10rows.csv");
 
-        JobExecution execution = jobLauncherTestUtils.startJob(jobParams(inputFile));
+        JobExecution execution = jobOperatorTestUtils.startJob(fileRangeJobParams(inputFile));
 
         assertThat(execution.getStatus()).isEqualTo(BatchStatus.COMPLETED);
         Integer count = jdbcTemplate.queryForObject(
@@ -71,10 +59,9 @@ class FileRangePartitionStandaloneIT extends AbstractStandaloneBatchTest {
 
     @Test
     void shouldSkipMalformedRows() throws Exception {
-        String inputFile = getClass().getClassLoader()
-                .getResource("test-data/csv/single/sample-with-errors.csv").getPath();
+        String inputFile = testResourcePath("test-data/csv/single/sample-with-errors.csv");
 
-        JobExecution execution = jobLauncherTestUtils.startJob(jobParams(inputFile));
+        JobExecution execution = jobOperatorTestUtils.startJob(fileRangeJobParams(inputFile));
 
         assertThat(execution.getStatus()).isEqualTo(BatchStatus.COMPLETED);
         Integer count = jdbcTemplate.queryForObject(
@@ -84,10 +71,9 @@ class FileRangePartitionStandaloneIT extends AbstractStandaloneBatchTest {
 
     @Test
     void shouldRecordStepExecutionMetadata() throws Exception {
-        String inputFile = getClass().getClassLoader()
-                .getResource("test-data/csv/single/sample-100rows.csv").getPath();
+        String inputFile = testResourcePath("test-data/csv/single/sample-100rows.csv");
 
-        JobExecution execution = jobLauncherTestUtils.startJob(jobParams(inputFile));
+        JobExecution execution = jobOperatorTestUtils.startJob(fileRangeJobParams(inputFile));
 
         long totalReadCount = execution.getStepExecutions().stream()
                 .mapToLong(StepExecution::getReadCount)

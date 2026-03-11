@@ -13,7 +13,7 @@ import org.springframework.context.annotation.Bean;
 public class BatchTestJobConfig {
 
     @Bean
-    public JobOperatorTestUtils fileRangeJobTestUtils(
+    public JobOperatorTestUtils fileRangeJobOperatorTestUtils(
             JobOperator jobOperator,
             JobRepository jobRepository,
             @Qualifier("fileRangeEtlJob") Job fileRangeEtlJob) {
@@ -23,7 +23,7 @@ public class BatchTestJobConfig {
     }
 
     @Bean
-    public JobOperatorTestUtils multiFileJobTestUtils(
+    public JobOperatorTestUtils multiFileJobOperatorTestUtils(
             JobOperator jobOperator,
             JobRepository jobRepository,
             @Qualifier("multiFileEtlJob") Job multiFileEtlJob) {

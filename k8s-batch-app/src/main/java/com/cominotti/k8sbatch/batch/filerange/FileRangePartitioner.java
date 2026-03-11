@@ -4,6 +4,8 @@ import org.springframework.batch.core.partition.Partitioner;
 import org.springframework.batch.infrastructure.item.ExecutionContext;
 import org.springframework.core.io.Resource;
 
+import org.springframework.core.io.FileSystemResource;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -32,7 +34,7 @@ public class FileRangePartitioner implements Partitioner {
 
             context.putInt("startLine", start);
             context.putInt("endLine", end);
-            context.putString("resourcePath", resource.getDescription());
+            context.putString("resourcePath", ((FileSystemResource) resource).getPath());
 
             partitions.put("partition" + i, context);
             start = end;

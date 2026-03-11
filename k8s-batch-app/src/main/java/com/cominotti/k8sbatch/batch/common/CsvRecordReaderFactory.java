@@ -5,6 +5,8 @@ import org.springframework.batch.infrastructure.item.file.builder.FlatFileItemRe
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 
+import java.time.LocalDate;
+
 public final class CsvRecordReaderFactory {
 
     private CsvRecordReaderFactory() {
@@ -22,10 +24,7 @@ public final class CsvRecordReaderFactory {
                         fieldSet.readString("name"),
                         fieldSet.readString("email"),
                         fieldSet.readBigDecimal("amount"),
-                        fieldSet.readDate("recordDate", "yyyy-MM-dd")
-                                .toInstant()
-                                .atZone(java.time.ZoneId.systemDefault())
-                                .toLocalDate()
+                        LocalDate.parse(fieldSet.readString("recordDate"))
                 ))
                 .build();
     }
