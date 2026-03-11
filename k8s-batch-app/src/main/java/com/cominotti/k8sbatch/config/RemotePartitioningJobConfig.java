@@ -11,7 +11,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.integration.channel.DirectChannel;
-import org.springframework.integration.channel.QueueChannel;
 import org.springframework.integration.core.MessagingTemplate;
 
 @Configuration
@@ -28,16 +27,15 @@ public class RemotePartitioningJobConfig {
 
     @Bean
     public MessageChannelPartitionHandler fileRangePartitionHandler(
-            DirectChannel outboundRequests,
-            QueueChannel inboundReplies) {
+            DirectChannel outboundRequests, JobRepository jobRepository) {
         MessageChannelPartitionHandler handler = new MessageChannelPartitionHandler();
         handler.setStepName("fileRangeWorkerStep");
         handler.setGridSize(partitionProperties.gridSize());
-        handler.setReplyChannel(inboundReplies);
+        handler.setJobRepository(jobRepository);
 
         MessagingTemplate template = new MessagingTemplate();
         template.setDefaultChannel(outboundRequests);
-        template.setReceiveTimeout(120_000);
+        template.setReceiveTimeout(60_000);
         handler.setMessagingOperations(template);
 
         return handler;
@@ -58,16 +56,15 @@ public class RemotePartitioningJobConfig {
 
     @Bean
     public MessageChannelPartitionHandler multiFilePartitionHandler(
-            DirectChannel outboundRequests,
-            QueueChannel inboundReplies) {
+            DirectChannel outboundRequests, JobRepository jobRepository) {
         MessageChannelPartitionHandler handler = new MessageChannelPartitionHandler();
         handler.setStepName("multiFileWorkerStep");
         handler.setGridSize(partitionProperties.gridSize());
-        handler.setReplyChannel(inboundReplies);
+        handler.setJobRepository(jobRepository);
 
         MessagingTemplate template = new MessagingTemplate();
         template.setDefaultChannel(outboundRequests);
-        template.setReceiveTimeout(120_000);
+        template.setReceiveTimeout(60_000);
         handler.setMessagingOperations(template);
 
         return handler;

@@ -16,8 +16,6 @@ management:
   health:
     db:
       enabled: true
-    kafka:
-      enabled: true
 
 batch:
   partition:

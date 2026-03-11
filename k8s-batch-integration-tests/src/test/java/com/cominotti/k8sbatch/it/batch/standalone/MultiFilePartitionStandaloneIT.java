@@ -58,6 +58,7 @@ class MultiFilePartitionStandaloneIT extends AbstractStandaloneBatchTest {
         JobExecution execution = jobOperatorTestUtils.startJob(multiFileJobParams(inputDir));
 
         long totalWriteCount = execution.getStepExecutions().stream()
+                .filter(s -> s.getStepName().startsWith("multiFileWorkerStep"))
                 .mapToLong(StepExecution::getWriteCount)
                 .sum();
         assertThat(totalWriteCount).isEqualTo(120);

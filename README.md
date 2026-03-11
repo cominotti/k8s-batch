@@ -103,20 +103,20 @@ Tests use Testcontainers to spin up MySQL and Kafka automatically. Docker must b
 
 ```bash
 # Run all integration tests
-mvn -pl k8s-batch-integration-tests verify
+mvn -pl k8s-batch-integration-tests -am verify
 
 # Run a specific test class
-mvn -pl k8s-batch-integration-tests verify -Dit.test=FileRangePartitionStandaloneIT
+mvn -pl k8s-batch-integration-tests -am verify -Dit.test=FileRangePartitionStandaloneIT
 
 # Skip integration tests
 mvn install -DskipITs
 ```
 
-### Test Categories (41 tests)
+### Test Categories (40 tests)
 
 | Category | Tests | Description |
 |----------|-------|-------------|
-| REST Endpoints | 6 | Hello endpoint + Actuator health indicators |
+| REST Endpoints | 5 | Hello endpoint + Actuator health indicators |
 | Batch Standalone | 12 | Both jobs without Kafka, recovery, skip policies |
 | Batch Remote | 10 | Both jobs with real Kafka partitioning |
 | Database | 7 | Batch schema, Flyway migrations, constraints |

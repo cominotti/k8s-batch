@@ -18,7 +18,7 @@ Spring Boot 4.0.3 + Spring Batch 6.x reference project for horizontally-scalable
 ```bash
 mvn clean compile                              # compile all modules
 mvn test-compile                               # compile including test sources
-mvn -pl k8s-batch-integration-tests verify     # run integration tests (requires Docker)
+mvn -pl k8s-batch-integration-tests -am verify  # run integration tests (requires Docker)
 mvn package -DskipTests                        # build JAR without tests
 docker-compose up -d                           # local stack (app + MySQL + Kafka)
 helm lint helm/k8s-batch                       # validate Helm chart

@@ -1,8 +1,9 @@
 package com.cominotti.k8sbatch.it;
 
+import com.cominotti.k8sbatch.K8sBatchApplication;
 import com.cominotti.k8sbatch.it.config.BatchTestJobConfig;
-import com.cominotti.k8sbatch.it.config.SharedContainersConfig;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Timeout;
 import org.springframework.batch.core.job.parameters.JobParameters;
 import org.springframework.batch.core.job.parameters.JobParametersBuilder;
 import org.springframework.batch.core.repository.JobRepository;
@@ -13,9 +14,12 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
-@SpringBootTest
-@Import({SharedContainersConfig.class, BatchTestJobConfig.class})
+import java.util.concurrent.TimeUnit;
+
+@SpringBootTest(classes = K8sBatchApplication.class)
+@Import(BatchTestJobConfig.class)
 @ActiveProfiles("integration-test")
+@Timeout(value = 120, unit = TimeUnit.SECONDS)
 public abstract class AbstractBatchIntegrationTest {
 
     @Autowired

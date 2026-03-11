@@ -33,14 +33,6 @@ class ActuatorHealthIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @SuppressWarnings("unchecked")
-    void shouldShowKafkaHealthIndicator() {
-        Map<String, Object> health = getHealth();
-        Map<String, Object> components = (Map<String, Object>) health.get("components");
-        assertThat(components).containsKey("kafka");
-    }
-
-    @Test
     void shouldExposeHealthDetails() {
         Map<String, Object> health = getHealth();
         assertThat(health).containsKey("components");

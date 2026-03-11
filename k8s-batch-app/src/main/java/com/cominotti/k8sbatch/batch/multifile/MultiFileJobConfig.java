@@ -13,6 +13,7 @@ import org.springframework.batch.core.step.Step;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.infrastructure.item.database.JdbcBatchItemWriter;
 import org.springframework.batch.infrastructure.item.file.FlatFileItemReader;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -31,15 +32,16 @@ public class MultiFileJobConfig {
     }
 
     @Bean
-    public Job multiFileEtlJob(JobRepository jobRepository, Step multiFileManagerStep) {
+    public Job multiFileEtlJob(JobRepository jobRepository, @Qualifier("multiFileManagerStep") Step multiFileManagerStep) {
         return new JobBuilder("multiFileEtlJob", jobRepository)
                 .start(multiFileManagerStep)
                 .build();
     }
 
     @Bean
+    @StepScope
     public MultiFilePartitioner multiFilePartitioner(
-            @Value("${batch.multi-file.input-directory:}") String inputDirectory) {
+            @Value("#{jobParameters['batch.multi-file.input-directory']}") String inputDirectory) {
         return new MultiFilePartitioner(Path.of(inputDirectory));
     }
 

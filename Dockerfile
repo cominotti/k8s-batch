@@ -14,7 +14,7 @@ RUN mvn dependency:go-offline -B -pl k8s-batch-app -am
 # Copy source and build
 COPY k8s-batch-app/src k8s-batch-app/src
 RUN mvn package -DskipTests -B -pl k8s-batch-app -am && \
-    java -Djarmode=tools -jar k8s-batch-app/target/*.jar extract --layers --launcher --destination extracted
+    java -Djarmode=tools -jar k8s-batch-app/target/*-exec.jar extract --layers --launcher --destination extracted
 
 # ============================================================
 # Stage 2: Runtime

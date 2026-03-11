@@ -4,6 +4,10 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.springframework.batch.core.repository.JobRepository;
+import org.springframework.batch.integration.partition.BeanFactoryStepLocator;
+import org.springframework.batch.integration.partition.StepExecutionRequestHandler;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -50,18 +54,8 @@ public class KafkaIntegrationConfig {
     }
 
     @Bean
-    public QueueChannel inboundRequests() {
-        return new QueueChannel(partitionProperties.gridSize() * QUEUE_CAPACITY_MULTIPLIER);
-    }
-
-    @Bean
     public DirectChannel outboundReplies() {
         return new DirectChannel();
-    }
-
-    @Bean
-    public QueueChannel inboundReplies() {
-        return new QueueChannel(partitionProperties.gridSize() * QUEUE_CAPACITY_MULTIPLIER);
     }
 
     // --- Producer/Consumer Factories ---
@@ -75,17 +69,22 @@ public class KafkaIntegrationConfig {
         ));
     }
 
-    @Bean
-    public ConsumerFactory<String, Object> partitionConsumerFactory() {
-        return new DefaultKafkaConsumerFactory<>(Map.of(
+    private Map<String, Object> consumerConfig(String groupId) {
+        return Map.of(
                 ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers,
-                ConsumerConfig.GROUP_ID_CONFIG, "k8s-batch-workers",
+                ConsumerConfig.GROUP_ID_CONFIG, groupId,
                 ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest",
                 ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class,
                 ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JacksonJsonDeserializer.class,
-                JacksonJsonDeserializer.TRUSTED_PACKAGES, "org.springframework.batch.core.step,org.springframework.batch.infrastructure.item,java.util"
-        ));
+                JacksonJsonDeserializer.TRUSTED_PACKAGES, "*"
+        );
     }
+
+    @Bean
+    public ConsumerFactory<String, Object> requestsConsumerFactory() {
+        return new DefaultKafkaConsumerFactory<>(consumerConfig("k8s-batch-workers"));
+    }
+
 
     // --- Outbound: Manager sends partition requests to Kafka ---
 
@@ -97,15 +96,27 @@ public class KafkaIntegrationConfig {
                 .get();
     }
 
-    // --- Inbound: Workers receive partition requests from Kafka ---
+    // --- Worker: Receive partition requests from Kafka, process, send replies ---
 
     @Bean
-    public IntegrationFlow inboundRequestsFlow() {
+    public StepExecutionRequestHandler stepExecutionRequestHandler(
+            JobRepository jobRepository, BeanFactory beanFactory) {
+        StepExecutionRequestHandler handler = new StepExecutionRequestHandler();
+        handler.setJobRepository(jobRepository);
+        BeanFactoryStepLocator stepLocator = new BeanFactoryStepLocator();
+        stepLocator.setBeanFactory(beanFactory);
+        handler.setStepLocator(stepLocator);
+        return handler;
+    }
+
+    @Bean
+    public IntegrationFlow workerFlow(StepExecutionRequestHandler stepExecutionRequestHandler) {
         return IntegrationFlow.from(
                         Kafka.messageDrivenChannelAdapter(
-                                partitionConsumerFactory(),
+                                requestsConsumerFactory(),
                                 requestsTopic))
-                .channel(inboundRequests())
+                .handle(stepExecutionRequestHandler)
+                .channel(outboundReplies())
                 .get();
     }
 
@@ -119,15 +130,4 @@ public class KafkaIntegrationConfig {
                 .get();
     }
 
-    // --- Inbound: Manager receives replies from Kafka ---
-
-    @Bean
-    public IntegrationFlow inboundRepliesFlow() {
-        return IntegrationFlow.from(
-                        Kafka.messageDrivenChannelAdapter(
-                                partitionConsumerFactory(),
-                                repliesTopic))
-                .channel(inboundReplies())
-                .get();
-    }
 }

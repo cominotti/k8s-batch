@@ -13,6 +13,7 @@ import org.springframework.batch.core.step.Step;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.infrastructure.item.database.JdbcBatchItemWriter;
 import org.springframework.batch.infrastructure.item.file.FlatFileItemReader;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -32,15 +33,16 @@ public class FileRangeJobConfig {
     }
 
     @Bean
-    public Job fileRangeEtlJob(JobRepository jobRepository, Step fileRangeManagerStep) {
+    public Job fileRangeEtlJob(JobRepository jobRepository, @Qualifier("fileRangeManagerStep") Step fileRangeManagerStep) {
         return new JobBuilder("fileRangeEtlJob", jobRepository)
                 .start(fileRangeManagerStep)
                 .build();
     }
 
     @Bean
+    @StepScope
     public FileRangePartitioner fileRangePartitioner(
-            @Value("${batch.file-range.input-file:}") String inputFile) {
+            @Value("#{jobParameters['batch.file-range.input-file']}") String inputFile) {
         return new FileRangePartitioner(new FileSystemResource(inputFile));
     }
 

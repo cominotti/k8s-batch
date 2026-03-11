@@ -7,6 +7,7 @@ import org.springframework.batch.core.partition.support.TaskExecutorPartitionHan
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.Step;
 import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -26,7 +27,7 @@ public class StandaloneJobConfig {
     public Step fileRangeManagerStep(
             JobRepository jobRepository,
             FileRangePartitioner fileRangePartitioner,
-            Step fileRangeWorkerStep) {
+            @Qualifier("fileRangeWorkerStep") Step fileRangeWorkerStep) {
         TaskExecutorPartitionHandler handler = new TaskExecutorPartitionHandler();
         handler.setStep(fileRangeWorkerStep);
         handler.setTaskExecutor(partitionTaskExecutor("file-range-"));
@@ -42,7 +43,7 @@ public class StandaloneJobConfig {
     public Step multiFileManagerStep(
             JobRepository jobRepository,
             MultiFilePartitioner multiFilePartitioner,
-            Step multiFileWorkerStep) {
+            @Qualifier("multiFileWorkerStep") Step multiFileWorkerStep) {
         TaskExecutorPartitionHandler handler = new TaskExecutorPartitionHandler();
         handler.setStep(multiFileWorkerStep);
         handler.setTaskExecutor(partitionTaskExecutor("multi-file-"));

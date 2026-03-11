@@ -76,6 +76,7 @@ class FileRangePartitionStandaloneIT extends AbstractStandaloneBatchTest {
         JobExecution execution = jobOperatorTestUtils.startJob(fileRangeJobParams(inputFile));
 
         long totalReadCount = execution.getStepExecutions().stream()
+                .filter(s -> s.getStepName().startsWith("fileRangeWorkerStep"))
                 .mapToLong(StepExecution::getReadCount)
                 .sum();
         assertThat(totalReadCount).isEqualTo(100);
