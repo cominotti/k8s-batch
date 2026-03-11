@@ -29,6 +29,8 @@
         <java.version>21</java.version>
         <spring-batch-integration.version>6.0.3</spring-batch-integration.version>
         <testcontainers.version>2.0.3</testcontainers.version>
+        <exec.maven.plugin.version>3.6.2</exec.maven.plugin.version>
+        <skip.spdx.license.check>false</skip.spdx.license.check>
     </properties>
 
     <dependencyManagement>
@@ -47,4 +49,72 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>${exec.maven.plugin.version}</version>
+                <inherited>false</inherited>
+                <executions>
+                    <execution>
+                        <id>spdx-license-check</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${skip.spdx.license.check}</skip>
+                            <workingDirectory>${maven.multiModuleProjectDirectory}</workingDirectory>
+                            <executable>${maven.multiModuleProjectDirectory}/scripts/license/check-spdx.sh</executable>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <profile>
+            <id>license-fix</id>
+            <properties>
+                <skip.spdx.license.check>true</skip.spdx.license.check>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>${exec.maven.plugin.version}</version>
+                        <inherited>false</inherited>
+                        <executions>
+                            <execution>
+                                <id>spdx-license-fix</id>
+                                <phase>validate</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <workingDirectory>${maven.multiModuleProjectDirectory}</workingDirectory>
+                                    <executable>${maven.multiModuleProjectDirectory}/scripts/license/apply-spdx.sh</executable>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>spdx-license-check-after-fix</id>
+                                <phase>validate</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <workingDirectory>${maven.multiModuleProjectDirectory}</workingDirectory>
+                                    <executable>${maven.multiModuleProjectDirectory}/scripts/license/check-spdx.sh</executable>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

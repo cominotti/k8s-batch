@@ -26,6 +26,8 @@ docker build -t k8s-batch:e2e .                # build Docker image for E2E test
 docker-compose up -d                           # local stack (app + MySQL + Kafka)
 helm lint helm/k8s-batch                       # validate Helm chart
 helm unittest helm/k8s-batch                   # run Helm unit tests (34 tests, ~40ms)
+mvn validate                                   # verify Apache-2.0 SPDX headers
+mvn -Plicense-fix validate                     # auto-apply missing SPDX headers
 ```
 
 ## Module Structure
@@ -209,4 +211,19 @@ k8s-batch-e2e-tests/src/test/java/com/cominotti/k8sbatch/e2e/
   batch/              — FileRangeJobE2E, MultiFileJobE2E, StandaloneProfileE2E, PartitionDistributionE2E
 
 .github/workflows/    — CI pipelines (helm-validate.yml)
+
+scripts/license/
+  check-spdx.sh       — validates SPDX headers on all Java/shell files
+  apply-spdx.sh       — auto-applies missing SPDX headers
 ```
+
+## License
+
+Apache-2.0. Every Java and shell source file must start with an SPDX header:
+
+- **Java**: `// SPDX-License-Identifier: Apache-2.0` as the very first line
+- **Shell**: `# SPDX-License-Identifier: Apache-2.0` (line 2 if shebang present, line 1 otherwise)
+
+**Enforcement**: `check-spdx.sh` runs automatically during Maven's `validate` phase via `exec-maven-plugin`. Any `mvn compile`, `mvn test`, or `mvn verify` will fail if headers are missing.
+
+**Auto-fix**: `mvn -Plicense-fix validate` or directly `./scripts/license/apply-spdx.sh`

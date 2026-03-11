@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package com.cominotti.k8sbatch.e2e.diagnostics;
 
 import io.fabric8.kubernetes.api.model.Event;

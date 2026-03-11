@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package com.cominotti.k8sbatch.it.rest;
 
 import com.cominotti.k8sbatch.it.AbstractIntegrationTest;

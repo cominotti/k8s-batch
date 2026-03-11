@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package com.cominotti.k8sbatch.web;
 
 import org.springframework.web.bind.annotation.GetMapping;

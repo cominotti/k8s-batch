@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package com.cominotti.k8sbatch.it.config;
 
 import com.cominotti.k8sbatch.batch.common.BatchStepNames;

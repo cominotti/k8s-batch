@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+
 
 # Fetch SonarCloud quality gate status and unresolved issues via REST API.
 #

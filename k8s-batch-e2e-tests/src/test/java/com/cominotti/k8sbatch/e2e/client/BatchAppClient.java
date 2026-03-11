@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package com.cominotti.k8sbatch.e2e.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
