@@ -122,6 +122,49 @@ mvn install -DskipITs
 | Database | 7 | Batch schema, Flyway migrations, constraints |
 | Infrastructure | 6 | MySQL/Kafka connectivity smoke tests |
 
+### Container Startup Optimization
+
+Container lifecycle is managed by `ContainerHolder` with decoupled startup:
+- **Standalone tests** start only MySQL (via `MysqlOnlyContainersConfig` → `ContainerHolder.startMysqlOnly()`)
+- **Remote tests** start MySQL + Kafka in parallel (via `SharedContainersConfig` → `ContainerHolder.startAll()` using `Startables.deepStart()`)
+
+### Timeout Layering
+
+Tests are protected by multiple timeout layers:
+- **Maven failsafe**: 5-minute process timeout (`forkedProcessTimeoutInSeconds: 300`)
+- **JUnit `@Timeout`**: 120s for remote tests, 30s for standalone tests
+- **Spring Batch partition timeout**: 15s in tests (production: 60s)
+- **Kafka/JDBC/HTTP**: bounded timeouts on all external calls
+
+## Helm Chart Testing
+
+### Unit Tests (`helm-unittest`)
+
+34 YAML-based tests validate template rendering: conditionals (HPA, Kafka, init containers), values substitution, probes, and security contexts.
+
+```bash
+# Install plugin (one-time)
+helm plugin install https://github.com/helm-unittest/helm-unittest
+
+# Run tests (~40ms)
+helm unittest helm/k8s-batch
+```
+
+### Manifest Validation (`kubeconform`)
+
+Validates rendered manifests against Kubernetes OpenAPI schemas:
+
+```bash
+helm template test-release helm/k8s-batch | kubeconform -strict -kubernetes-version 1.30.0
+```
+
+### CI Pipeline (GitHub Actions)
+
+`.github/workflows/helm-validate.yml` runs three jobs:
+1. **lint-and-unittest** — `helm lint` + `helm unittest`
+2. **kubeconform** — schema validation against K8s 1.30
+3. **k8s-smoke-test** — builds Docker image, deploys to K3s cluster via Helm, verifies health endpoint
+
 ## Kubernetes Deployment
 
 ### Helm Install
@@ -192,15 +235,19 @@ k8s-batch/
 ├── k8s-batch-integration-tests/     # Integration tests
 │   ├── pom.xml
 │   └── src/test/
-│       ├── java/.../it/             # 12 test classes
+│       ├── java/.../it/             # 13 test classes
+│       │   └── config/              # ContainerHolder, SharedContainersConfig, etc.
 │       └── resources/test-data/     # CSV fixtures
-└── helm/k8s-batch/                  # Helm 3 chart
-    ├── Chart.yaml
-    ├── values.yaml
-    └── templates/
-        ├── app/                     # Deployment, Service, HPA, Ingress
-        ├── mysql/                   # StatefulSet, init schema
-        └── kafka/                   # KRaft StatefulSet, topic init Job
+├── helm/k8s-batch/                  # Helm 3 chart
+│   ├── Chart.yaml
+│   ├── values.yaml
+│   ├── tests/                       # helm-unittest YAML tests (34 tests)
+│   └── templates/
+│       ├── app/                     # Deployment, Service, HPA, Ingress
+│       ├── mysql/                   # StatefulSet, init schema
+│       └── kafka/                   # KRaft StatefulSet, topic init Job
+└── .github/workflows/               # CI pipelines
+    └── helm-validate.yml            # Helm lint, unittest, kubeconform, K3s smoke test
 ```
 
 ## How Horizontal Scaling Works
