@@ -1,5 +1,6 @@
 package com.cominotti.k8sbatch.it.config;
 
+import com.cominotti.k8sbatch.batch.common.BatchStepNames;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.job.Job;
@@ -20,7 +21,7 @@ public class BatchTestJobConfig {
     public JobOperatorTestUtils fileRangeJobOperatorTestUtils(
             JobOperator jobOperator,
             JobRepository jobRepository,
-            @Qualifier("fileRangeEtlJob") Job fileRangeEtlJob) {
+            @Qualifier(BatchStepNames.FILE_RANGE_ETL_JOB) Job fileRangeEtlJob) {
         log.debug("Creating JobOperatorTestUtils for fileRangeEtlJob");
         JobOperatorTestUtils utils = new JobOperatorTestUtils(jobOperator, jobRepository);
         utils.setJob(fileRangeEtlJob);
@@ -31,7 +32,7 @@ public class BatchTestJobConfig {
     public JobOperatorTestUtils multiFileJobOperatorTestUtils(
             JobOperator jobOperator,
             JobRepository jobRepository,
-            @Qualifier("multiFileEtlJob") Job multiFileEtlJob) {
+            @Qualifier(BatchStepNames.MULTI_FILE_ETL_JOB) Job multiFileEtlJob) {
         log.debug("Creating JobOperatorTestUtils for multiFileEtlJob");
         JobOperatorTestUtils utils = new JobOperatorTestUtils(jobOperator, jobRepository);
         utils.setJob(multiFileEtlJob);

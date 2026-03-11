@@ -118,6 +118,8 @@ Both jobs follow the same pattern: **Partitioner → Manager Step → Worker Ste
 - **Remote partitioning manager** uses `JobRepository` polling (not reply channels) to detect worker completion — avoids `StepExecution` serialization issues through Kafka
 - **Worker-side processing**: `StepExecutionRequestHandler` + `BeanFactoryStepLocator` in `KafkaIntegrationConfig` handles incoming partition requests
 - **`@Qualifier`** is required on `Step` bean parameters in job/manager configs to resolve ambiguity when multiple worker steps exist
+- **`BatchStepNames`** constants class — always use these constants for job/step names in builders and `@Qualifier` annotations (never raw strings)
+- **`BatchPartitionProperties`** includes `timeoutMs` — configurable via `batch.partition.timeout-ms` (default 60000)
 
 ## Logging Conventions
 

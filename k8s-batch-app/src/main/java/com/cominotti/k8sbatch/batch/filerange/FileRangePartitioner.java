@@ -59,7 +59,6 @@ public class FileRangePartitioner implements Partitioner {
             int count = (int) reader.lines().count();
             return Math.max(0, count - 1); // subtract header line
         } catch (IOException e) {
-            log.error("Failed to count lines in resource: {}", resource, e);
             throw new IllegalStateException("Failed to count lines in resource: " + resource, e);
         }
     }

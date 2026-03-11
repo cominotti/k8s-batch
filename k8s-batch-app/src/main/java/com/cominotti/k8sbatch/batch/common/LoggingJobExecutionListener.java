@@ -29,15 +29,13 @@ public class LoggingJobExecutionListener implements JobExecutionListener {
         Duration duration = BatchDurationUtils.between(jobExecution.getStartTime(), jobExecution.getEndTime());
         BatchStatus status = jobExecution.getStatus();
 
-        if (status == BatchStatus.COMPLETED) {
-            log.info("Job '{}' completed | jobExecutionId={} | duration={} | steps={}",
+        switch (status) {
+            case COMPLETED -> log.info("Job '{}' completed | jobExecutionId={} | duration={} | steps={}",
                     jobName, executionId, duration, jobExecution.getStepExecutions().size());
-        } else if (status == BatchStatus.FAILED) {
-            log.error("Job '{}' FAILED | jobExecutionId={} | duration={} | exitDescription={}",
+            case FAILED -> log.error("Job '{}' FAILED | jobExecutionId={} | duration={} | exitDescription={}",
                     jobName, executionId, duration,
                     jobExecution.getExitStatus().getExitDescription());
-        } else {
-            log.warn("Job '{}' ended with status {} | jobExecutionId={} | duration={}",
+            default -> log.warn("Job '{}' ended with status {} | jobExecutionId={} | duration={}",
                     jobName, status, executionId, duration);
         }
     }

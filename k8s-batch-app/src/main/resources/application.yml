@@ -44,3 +44,4 @@ batch:
   partition:
     grid-size: ${BATCH_PARTITION_GRID_SIZE:4}
     chunk-size: ${BATCH_PARTITION_CHUNK_SIZE:100}
+    timeout-ms: ${BATCH_PARTITION_TIMEOUT_MS:60000}

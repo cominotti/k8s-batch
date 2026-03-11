@@ -40,7 +40,6 @@ public class MultiFilePartitioner implements Partitioner {
                 index++;
             }
         } catch (IOException e) {
-            log.error("Failed to list CSV files in directory: {}", directory, e);
             throw new IllegalStateException(
                     "Failed to list CSV files in directory: " + directory, e);
         }

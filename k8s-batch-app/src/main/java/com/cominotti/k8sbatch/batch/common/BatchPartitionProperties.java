@@ -3,7 +3,7 @@ package com.cominotti.k8sbatch.batch.common;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "batch.partition")
-public record BatchPartitionProperties(int gridSize, int chunkSize) {
+public record BatchPartitionProperties(int gridSize, int chunkSize, long timeoutMs) {
 
     public BatchPartitionProperties {
         if (gridSize <= 0) {
@@ -11,6 +11,9 @@ public record BatchPartitionProperties(int gridSize, int chunkSize) {
         }
         if (chunkSize <= 0) {
             chunkSize = 100;
+        }
+        if (timeoutMs <= 0) {
+            timeoutMs = 60_000;
         }
     }
 }

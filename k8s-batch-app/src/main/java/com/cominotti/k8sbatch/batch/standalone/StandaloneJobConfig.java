@@ -1,6 +1,7 @@
 package com.cominotti.k8sbatch.batch.standalone;
 
 import com.cominotti.k8sbatch.batch.common.BatchPartitionProperties;
+import com.cominotti.k8sbatch.batch.common.BatchStepNames;
 import com.cominotti.k8sbatch.batch.common.LoggingStepExecutionListener;
 import com.cominotti.k8sbatch.batch.filerange.FileRangePartitioner;
 import com.cominotti.k8sbatch.batch.multifile.MultiFilePartitioner;
@@ -35,37 +36,36 @@ public class StandaloneJobConfig {
     public Step fileRangeManagerStep(
             JobRepository jobRepository,
             FileRangePartitioner fileRangePartitioner,
-            @Qualifier("fileRangeWorkerStep") Step fileRangeWorkerStep) {
-        TaskExecutorPartitionHandler handler = new TaskExecutorPartitionHandler();
-        handler.setStep(fileRangeWorkerStep);
-        handler.setTaskExecutor(partitionTaskExecutor("file-range-"));
-        handler.setGridSize(partitionProperties.gridSize());
-
-        log.info("Configuring standalone manager step 'fileRangeManagerStep' | gridSize={}",
-                partitionProperties.gridSize());
-
-        return new StepBuilder("fileRangeManagerStep", jobRepository)
-                .partitioner("fileRangeWorkerStep", fileRangePartitioner)
-                .partitionHandler(handler)
-                .listener(stepExecutionListener)
-                .build();
+            @Qualifier(BatchStepNames.FILE_RANGE_WORKER_STEP) Step fileRangeWorkerStep) {
+        return buildStandaloneManagerStep(jobRepository, BatchStepNames.FILE_RANGE_MANAGER_STEP,
+                BatchStepNames.FILE_RANGE_WORKER_STEP, fileRangePartitioner,
+                fileRangeWorkerStep, "file-range-");
     }
 
     @Bean
     public Step multiFileManagerStep(
             JobRepository jobRepository,
             MultiFilePartitioner multiFilePartitioner,
-            @Qualifier("multiFileWorkerStep") Step multiFileWorkerStep) {
+            @Qualifier(BatchStepNames.MULTI_FILE_WORKER_STEP) Step multiFileWorkerStep) {
+        return buildStandaloneManagerStep(jobRepository, BatchStepNames.MULTI_FILE_MANAGER_STEP,
+                BatchStepNames.MULTI_FILE_WORKER_STEP, multiFilePartitioner,
+                multiFileWorkerStep, "multi-file-");
+    }
+
+    private Step buildStandaloneManagerStep(
+            JobRepository jobRepository, String managerStepName, String workerStepName,
+            org.springframework.batch.core.partition.Partitioner partitioner,
+            Step workerStep, String threadPrefix) {
         TaskExecutorPartitionHandler handler = new TaskExecutorPartitionHandler();
-        handler.setStep(multiFileWorkerStep);
-        handler.setTaskExecutor(partitionTaskExecutor("multi-file-"));
+        handler.setStep(workerStep);
+        handler.setTaskExecutor(partitionTaskExecutor(threadPrefix));
         handler.setGridSize(partitionProperties.gridSize());
 
-        log.info("Configuring standalone manager step 'multiFileManagerStep' | gridSize={}",
-                partitionProperties.gridSize());
+        log.info("Configuring standalone manager step '{}' | gridSize={}",
+                managerStepName, partitionProperties.gridSize());
 
-        return new StepBuilder("multiFileManagerStep", jobRepository)
-                .partitioner("multiFileWorkerStep", multiFilePartitioner)
+        return new StepBuilder(managerStepName, jobRepository)
+                .partitioner(workerStepName, partitioner)
                 .partitionHandler(handler)
                 .listener(stepExecutionListener)
                 .build();

@@ -1,6 +1,7 @@
 package com.cominotti.k8sbatch.batch.multifile;
 
 import com.cominotti.k8sbatch.batch.common.BatchPartitionProperties;
+import com.cominotti.k8sbatch.batch.common.BatchStepNames;
 import com.cominotti.k8sbatch.batch.common.CsvRecord;
 import com.cominotti.k8sbatch.batch.common.CsvRecordProcessor;
 import com.cominotti.k8sbatch.batch.common.CsvRecordReaderFactory;
@@ -46,8 +47,8 @@ public class MultiFileJobConfig {
     }
 
     @Bean
-    public Job multiFileEtlJob(JobRepository jobRepository, @Qualifier("multiFileManagerStep") Step multiFileManagerStep) {
-        return new JobBuilder("multiFileEtlJob", jobRepository)
+    public Job multiFileEtlJob(JobRepository jobRepository, @Qualifier(BatchStepNames.MULTI_FILE_MANAGER_STEP) Step multiFileManagerStep) {
+        return new JobBuilder(BatchStepNames.MULTI_FILE_ETL_JOB, jobRepository)
                 .listener(jobExecutionListener)
                 .start(multiFileManagerStep)
                 .build();
@@ -88,7 +89,7 @@ public class MultiFileJobConfig {
             FlatFileItemReader<CsvRecord> multiFileItemReader,
             CsvRecordProcessor multiFileItemProcessor,
             JdbcBatchItemWriter<CsvRecord> multiFileItemWriter) {
-        return new StepBuilder("multiFileWorkerStep", jobRepository)
+        return new StepBuilder(BatchStepNames.MULTI_FILE_WORKER_STEP, jobRepository)
                 .<CsvRecord, CsvRecord>chunk(partitionProperties.chunkSize())
                 .transactionManager(transactionManager)
                 .reader(multiFileItemReader)

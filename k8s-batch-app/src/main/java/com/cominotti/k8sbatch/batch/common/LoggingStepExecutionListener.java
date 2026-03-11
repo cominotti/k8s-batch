@@ -30,23 +30,21 @@ public class LoggingStepExecutionListener implements StepExecutionListener {
         Duration duration = BatchDurationUtils.between(stepExecution.getStartTime(), stepExecution.getEndTime());
         BatchStatus status = stepExecution.getStatus();
 
-        if (status == BatchStatus.COMPLETED) {
-            log.info("Step '{}' completed | read={} | written={} | filtered={} | skipped={} | duration={} | thread={}",
+        switch (status) {
+            case COMPLETED -> log.info("Step '{}' completed | read={} | written={} | filtered={} | skipped={} | duration={} | thread={}",
                     stepName,
                     stepExecution.getReadCount(),
                     stepExecution.getWriteCount(),
                     stepExecution.getFilterCount(),
                     stepExecution.getReadSkipCount() + stepExecution.getWriteSkipCount() + stepExecution.getProcessSkipCount(),
                     duration, thread);
-        } else if (status == BatchStatus.FAILED) {
-            log.error("Step '{}' FAILED | read={} | written={} | exitDescription={} | thread={}",
+            case FAILED -> log.error("Step '{}' FAILED | read={} | written={} | exitDescription={} | thread={}",
                     stepName,
                     stepExecution.getReadCount(),
                     stepExecution.getWriteCount(),
                     stepExecution.getExitStatus().getExitDescription(),
                     thread);
-        } else {
-            log.warn("Step '{}' ended with status {} | read={} | written={} | duration={} | thread={}",
+            default -> log.warn("Step '{}' ended with status {} | read={} | written={} | duration={} | thread={}",
                     stepName, status,
                     stepExecution.getReadCount(),
                     stepExecution.getWriteCount(),

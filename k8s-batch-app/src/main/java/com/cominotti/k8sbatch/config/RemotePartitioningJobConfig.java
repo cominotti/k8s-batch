@@ -1,6 +1,7 @@
 package com.cominotti.k8sbatch.config;
 
 import com.cominotti.k8sbatch.batch.common.BatchPartitionProperties;
+import com.cominotti.k8sbatch.batch.common.BatchStepNames;
 import com.cominotti.k8sbatch.batch.common.LoggingStepExecutionListener;
 import com.cominotti.k8sbatch.batch.filerange.FileRangePartitioner;
 import com.cominotti.k8sbatch.batch.multifile.MultiFilePartitioner;
@@ -39,7 +40,6 @@ import java.util.Map;
 public class RemotePartitioningJobConfig {
 
     private static final Logger log = LoggerFactory.getLogger(RemotePartitioningJobConfig.class);
-    private static final long PARTITION_TIMEOUT_MS = 60_000;
     private static final String WORKER_CONSUMER_GROUP = "k8s-batch-workers";
 
     private final BatchPartitionProperties partitionProperties;
@@ -141,28 +141,29 @@ public class RemotePartitioningJobConfig {
     public Step fileRangeManagerStep(
             RemotePartitioningManagerStepBuilderFactory factory,
             FileRangePartitioner fileRangePartitioner) {
-        log.info("Configuring remote manager step 'fileRangeManagerStep' | gridSize={} | timeout={}ms",
-                partitionProperties.gridSize(), PARTITION_TIMEOUT_MS);
-        return factory.get("fileRangeManagerStep")
-                .partitioner("fileRangeWorkerStep", fileRangePartitioner)
-                .gridSize(partitionProperties.gridSize())
-                .outputChannel(managerRequestsChannel())
-                .timeout(PARTITION_TIMEOUT_MS)
-                .listener(stepExecutionListener)
-                .build();
+        return buildRemoteManagerStep(factory, BatchStepNames.FILE_RANGE_MANAGER_STEP,
+                BatchStepNames.FILE_RANGE_WORKER_STEP, fileRangePartitioner);
     }
 
     @Bean
     public Step multiFileManagerStep(
             RemotePartitioningManagerStepBuilderFactory factory,
             MultiFilePartitioner multiFilePartitioner) {
-        log.info("Configuring remote manager step 'multiFileManagerStep' | gridSize={} | timeout={}ms",
-                partitionProperties.gridSize(), PARTITION_TIMEOUT_MS);
-        return factory.get("multiFileManagerStep")
-                .partitioner("multiFileWorkerStep", multiFilePartitioner)
+        return buildRemoteManagerStep(factory, BatchStepNames.MULTI_FILE_MANAGER_STEP,
+                BatchStepNames.MULTI_FILE_WORKER_STEP, multiFilePartitioner);
+    }
+
+    private Step buildRemoteManagerStep(
+            RemotePartitioningManagerStepBuilderFactory factory,
+            String managerStepName, String workerStepName,
+            org.springframework.batch.core.partition.Partitioner partitioner) {
+        log.info("Configuring remote manager step '{}' | gridSize={} | timeout={}ms",
+                managerStepName, partitionProperties.gridSize(), partitionProperties.timeoutMs());
+        return factory.get(managerStepName)
+                .partitioner(workerStepName, partitioner)
                 .gridSize(partitionProperties.gridSize())
                 .outputChannel(managerRequestsChannel())
-                .timeout(PARTITION_TIMEOUT_MS)
+                .timeout(partitionProperties.timeoutMs())
                 .listener(stepExecutionListener)
                 .build();
     }
