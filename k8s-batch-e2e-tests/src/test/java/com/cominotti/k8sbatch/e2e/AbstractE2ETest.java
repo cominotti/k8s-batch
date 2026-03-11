@@ -70,12 +70,12 @@ public abstract class AbstractE2ETest {
     }
 
     private void loadRequiredImages() throws Exception {
-        K3sClusterManager.loadImage("k8s-batch:e2e");
-        K3sClusterManager.loadImage("mysql:8.0");
-        K3sClusterManager.loadImage("busybox:1.36");
+        K3sClusterManager.loadImage(E2EContainerImages.APP_IMAGE);
+        K3sClusterManager.loadImage(E2EContainerImages.MYSQL_IMAGE);
+        K3sClusterManager.loadImage(E2EContainerImages.BUSYBOX_IMAGE);
 
         if (requiresKafka()) {
-            K3sClusterManager.loadImage("confluentinc/cp-kafka:7.9.0");
+            K3sClusterManager.loadImage(E2EContainerImages.KAFKA_IMAGE);
         }
     }
 }

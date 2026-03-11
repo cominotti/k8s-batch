@@ -11,6 +11,7 @@ import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.cominotti.k8sbatch.e2e.E2EContainerImages;
 import org.testcontainers.k3s.K3sContainer;
 import org.testcontainers.utility.DockerImageName;
 
@@ -188,7 +189,7 @@ public final class K3sClusterManager {
 
     private static void startK3s() {
         log.info("Starting K3s container...");
-        k3sContainer = new K3sContainer(DockerImageName.parse("rancher/k3s:v1.31.4-k3s1"))
+        k3sContainer = new K3sContainer(DockerImageName.parse(E2EContainerImages.K3S_IMAGE))
                 .withCommand("server", "--disable=traefik");
         k3sContainer.start();
         log.info("K3s container started");

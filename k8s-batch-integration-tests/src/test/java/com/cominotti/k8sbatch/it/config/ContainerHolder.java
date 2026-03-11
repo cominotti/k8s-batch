@@ -25,13 +25,13 @@ final class ContainerHolder {
     private static final Logger log = LoggerFactory.getLogger(ContainerHolder.class);
 
     static final MySQLContainer MYSQL =
-            new MySQLContainer("mysql:8.0")
+            new MySQLContainer(TestContainerImages.MYSQL_IMAGE)
                     .withDatabaseName("k8sbatch")
                     .withUsername("test")
                     .withPassword("test");
 
     static final ConfluentKafkaContainer KAFKA =
-            new ConfluentKafkaContainer("confluentinc/cp-kafka:7.9.0")
+            new ConfluentKafkaContainer(TestContainerImages.KAFKA_IMAGE)
                     .withStartupTimeout(Duration.ofSeconds(120));
 
     private static volatile boolean mysqlStarted = false;
@@ -41,7 +41,7 @@ final class ContainerHolder {
         if (mysqlStarted) {
             return;
         }
-        log.info("Starting MySQL container (mysql:8.0)...");
+        log.info("Starting MySQL container | image={}", TestContainerImages.MYSQL_IMAGE);
         MYSQL.start();
         log.info("MySQL container started | jdbcUrl={} | mappedPort={}",
                 MYSQL.getJdbcUrl(), MYSQL.getMappedPort(3306));
@@ -64,7 +64,7 @@ final class ContainerHolder {
             log.info("MySQL health check passed");
             mysqlStarted = true;
         } else if (!kafkaStarted) {
-            log.info("Starting Kafka container (cp-kafka:7.9.0)...");
+            log.info("Starting Kafka container | image={}", TestContainerImages.KAFKA_IMAGE);
             KAFKA.start();
             log.info("Kafka container started | bootstrapServers={}", KAFKA.getBootstrapServers());
         }

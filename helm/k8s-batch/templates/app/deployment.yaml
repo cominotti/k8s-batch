@@ -33,7 +33,7 @@ spec:
         {{- toYaml .Values.app.podSecurityContext | nindent 8 }}
       initContainers:
         - name: wait-for-mysql
-          image: busybox:1.36
+          image: "{{ .Values.global.initImage.repository }}:{{ .Values.global.initImage.tag }}"
           command:
             - sh
             - -c
@@ -44,7 +44,7 @@ spec:
               done
         {{- if and .Values.kafka.enabled .Values.features.kafka }}
         - name: wait-for-kafka
-          image: busybox:1.36
+          image: "{{ .Values.global.initImage.repository }}:{{ .Values.global.initImage.tag }}"
           command:
             - sh
             - -c
