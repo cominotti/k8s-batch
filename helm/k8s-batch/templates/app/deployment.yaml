@@ -55,7 +55,7 @@ spec:
                 sleep 3
               done
         {{- end }}
-        {{- if and .Values.schemaRegistry.enabled .Values.features.schemaRegistry }}
+        {{- if and .Values.kafka.enabled .Values.features.kafka .Values.schemaRegistry.enabled .Values.features.schemaRegistry }}
         - name: wait-for-schema-registry
           image: "{{ .Values.global.initImage.repository }}:{{ .Values.global.initImage.tag }}"
           command:
@@ -98,7 +98,7 @@ spec:
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
               value: {{ include "k8s-batch.kafka.bootstrapServers" . | quote }}
             {{- end }}
-            {{- if and .Values.schemaRegistry.enabled .Values.features.schemaRegistry }}
+            {{- if and .Values.kafka.enabled .Values.features.kafka .Values.schemaRegistry.enabled .Values.features.schemaRegistry }}
             - name: SPRING_KAFKA_PROPERTIES_SCHEMA_REGISTRY_URL
               value: {{ include "k8s-batch.schemaRegistry.url" . | quote }}
             {{- end }}

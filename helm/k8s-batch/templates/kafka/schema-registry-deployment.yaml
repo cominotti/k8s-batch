@@ -35,7 +35,7 @@ spec:
           imagePullPolicy: {{ .Values.schemaRegistry.image.pullPolicy }}
           ports:
             - name: http
-              containerPort: 8081
+              containerPort: {{ .Values.schemaRegistry.service.port }}
           env:
             - name: SCHEMA_REGISTRY_HOST_NAME
               valueFrom:
@@ -44,7 +44,7 @@ spec:
             - name: SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS
               value: {{ include "k8s-batch.kafka.bootstrapServers" . | quote }}
             - name: SCHEMA_REGISTRY_LISTENERS
-              value: "http://0.0.0.0:8081"
+              value: "http://0.0.0.0:{{ .Values.schemaRegistry.service.port }}"
           resources:
             {{- toYaml .Values.schemaRegistry.resources | nindent 12 }}
           livenessProbe:

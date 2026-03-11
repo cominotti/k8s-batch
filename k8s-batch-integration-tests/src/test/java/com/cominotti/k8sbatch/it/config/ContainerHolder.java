@@ -70,10 +70,12 @@ final class ContainerHolder {
             log.info("Redpanda container started | bootstrapServers={} | schemaRegistryUrl={}",
                     REDPANDA.getBootstrapServers(), REDPANDA.getSchemaRegistryAddress());
         }
-        System.setProperty("spring.kafka.bootstrap-servers", REDPANDA.getBootstrapServers());
-        System.setProperty("spring.kafka.properties.schema.registry.url", REDPANDA.getSchemaRegistryAddress());
-        log.debug("Set spring.kafka.bootstrap-servers={}", REDPANDA.getBootstrapServers());
-        log.debug("Set spring.kafka.properties.schema.registry.url={}", REDPANDA.getSchemaRegistryAddress());
+        String bootstrapServers = REDPANDA.getBootstrapServers();
+        String schemaRegistryUrl = REDPANDA.getSchemaRegistryAddress();
+        System.setProperty("spring.kafka.bootstrap-servers", bootstrapServers);
+        System.setProperty("spring.kafka.properties.schema.registry.url", schemaRegistryUrl);
+        log.debug("Set spring.kafka.bootstrap-servers={}", bootstrapServers);
+        log.debug("Set spring.kafka.properties.schema.registry.url={}", schemaRegistryUrl);
         redpandaStarted = true;
     }
 

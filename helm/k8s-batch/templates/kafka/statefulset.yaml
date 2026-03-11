@@ -37,24 +37,25 @@ spec:
               done
 
               # Coordinate cluster ID across pods
-              CLUSTER_ID="{{ .Values.kafka.kraft.clusterId | default "" }}"
-              if [ -z "$CLUSTER_ID" ]; then
-                if [ "$KAFKA_NODE_ID" = "0" ]; then
-                  CLUSTER_ID=$(kafka-storage random-uuid)
-                else
-                  while [ ! -f /shared/cluster-id ]; do sleep 1; done
-                  CLUSTER_ID=$(cat /shared/cluster-id)
+              # On restart, read existing cluster ID from formatted storage
+              if [ -f /data/meta.properties ]; then
+                CLUSTER_ID=$(grep 'cluster.id' /data/meta.properties | cut -d= -f2)
+              else
+                CLUSTER_ID="{{ .Values.kafka.kraft.clusterId | default "" }}"
+                if [ -z "$CLUSTER_ID" ]; then
+                  if [ "$KAFKA_NODE_ID" = "0" ]; then
+                    CLUSTER_ID=$(kafka-storage random-uuid)
+                  else
+                    while [ ! -f /shared/cluster-id ]; do sleep 1; done
+                    CLUSTER_ID=$(cat /shared/cluster-id)
+                  fi
                 fi
-              fi
-              echo "$CLUSTER_ID" > /shared/cluster-id
-              echo "$VOTERS" > /shared/voters
-
-              # Format storage if needed
-              if [ ! -f /data/meta.properties ]; then
                 kafka-storage format -t "$CLUSTER_ID" \
                   -c /etc/kafka/kraft/server.properties \
                   --ignore-formatted
               fi
+              echo "$CLUSTER_ID" > /shared/cluster-id
+              echo "$VOTERS" > /shared/voters
           volumeMounts:
             - name: data
               mountPath: /data

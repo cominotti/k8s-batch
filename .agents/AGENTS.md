@@ -8,7 +8,7 @@ Spring Boot 4.0.3 + Spring Batch 6.x reference project for horizontally-scalable
 
 - **Java 21**, **Spring Boot 4.0.3**, **Spring Batch 6.0.2**
 - **MySQL 8.0** — JobRepository + application data
-- **Kafka 3.7 (KRaft)** — remote partitioning messaging
+- **Kafka (Confluent Platform 7.9.0, KRaft mode)** — remote partitioning messaging
 - **Helm 3** — Kubernetes deployment
 - **Testcontainers 2.0.3** — integration tests
 - **Flyway** — database migrations
@@ -25,7 +25,7 @@ mvn package -DskipTests                        # build JAR without tests
 docker build -t k8s-batch:e2e .                # build Docker image for E2E tests
 docker-compose up -d                           # local stack (app + MySQL + Kafka)
 helm lint helm/k8s-batch                       # validate Helm chart
-helm unittest helm/k8s-batch                   # run Helm unit tests (34 tests, ~40ms)
+helm unittest helm/k8s-batch                   # run Helm unit tests (46 tests, ~60ms)
 mvn validate                                   # verify Apache-2.0 SPDX headers
 mvn -Plicense-fix validate                     # auto-apply missing SPDX headers
 ```
@@ -83,17 +83,18 @@ Use `JacksonJsonSerializer` / `JacksonJsonDeserializer` for Kafka partition requ
 
 ## Testcontainers 2.x Rules
 
-- **Artifact names** use `testcontainers-` prefix: `testcontainers-mysql`, `testcontainers-kafka`, `testcontainers-junit-jupiter`
+- **Artifact names** use `testcontainers-` prefix: `testcontainers-mysql`, `testcontainers-redpanda`, `testcontainers-junit-jupiter`
 - **MySQL**: `org.testcontainers.mysql.MySQLContainer` (not `org.testcontainers.containers.MySQLContainer`). **Non-generic** — no `<?>` wildcard.
-- **Kafka**: `org.testcontainers.kafka.ConfluentKafkaContainer` — use `.withStartupTimeout(Duration.ofSeconds(120))` (the 60s default is tight for the 700MB+ image)
+- **Redpanda** (replaces Confluent Kafka for integration tests): `org.testcontainers.redpanda.RedpandaContainer` — Kafka-compatible broker with built-in Schema Registry. Use `getBootstrapServers()` for Kafka API, `getSchemaRegistryAddress()` for Schema Registry URL. Much faster startup (~5-10s vs 30-60s for Confluent Kafka). E2E tests still use real Confluent Kafka via the Helm chart.
 - **`@ServiceConnection`** handles JDBC wiring automatically — never use `@DynamicPropertySource` for MySQL
 - **Kafka bootstrap servers** are set via `System.setProperty` in `ContainerHolder` (Kafka `@ServiceConnection` requires `spring-boot-kafka` which conflicts with manual `KafkaIntegrationConfig`)
+- **Schema Registry URL** is set via `System.setProperty("spring.kafka.properties.schema.registry.url", REDPANDA.getSchemaRegistryAddress())` in `ContainerHolder.startAll()`
 - **Container lifecycle** is managed by `ContainerHolder` (not directly in config classes):
-  - `ContainerHolder.startMysqlOnly()` — standalone tests, skips Kafka entirely
+  - `ContainerHolder.startMysqlOnly()` — standalone tests, skips Redpanda entirely
   - `ContainerHolder.startAll()` — parallel startup via `Startables.deepStart()` for remote tests
   - `SharedContainersConfig` delegates to `ContainerHolder.startAll()` + creates Kafka topics
   - `MysqlOnlyContainersConfig` delegates to `ContainerHolder.startMysqlOnly()`
-- **Parallel startup**: use `Startables.deepStart(Stream.of(MYSQL, KAFKA)).join()` — not sequential `.start()` calls
+- **Parallel startup**: use `Startables.deepStart(Stream.of(MYSQL, REDPANDA)).join()` — not sequential `.start()` calls
 
 ## Spring Boot 4.x Rules
 
@@ -156,6 +157,29 @@ Both jobs follow the same pattern: **Partitioner → Manager Step → Worker Ste
 - **Helm rendering**: `HelmRenderer` shells out to `helm template`; uses `redirectErrorStream(true)` to avoid deadlock
 - **Rendered manifests are cached** in `K3sClusterManager` for reuse during teardown
 
+## Image and Version Constants Rule
+
+**Never hardcode Docker image names, tags, or version numbers as string literals.** They must be defined in constants classes or values files and referenced by name.
+
+| Scope | Where to define | Example constants |
+|-------|----------------|-------------------|
+| Integration tests | `TestContainerImages` (in `it/config/`) | `MYSQL_IMAGE`, `REDPANDA_IMAGE` |
+| E2E tests | `E2EContainerImages` (in `e2e/`) | `APP_IMAGE`, `MYSQL_IMAGE`, `KAFKA_IMAGE`, `K3S_IMAGE`, `SCHEMA_REGISTRY_IMAGE` |
+| Helm chart | `values.yaml` (`global.initImage`, `*.image.repository/tag`) | busybox, kafka, mysql images |
+
+**Pattern**: `public final class` with `private` constructor and `public static final String` fields (same as `BatchStepNames`).
+
+**Log messages** must reference the constant or use a container's `getDockerImageName()` — never duplicate the version string:
+
+```java
+// CORRECT
+log.info("Starting container | image={}", TestContainerImages.REDPANDA_IMAGE);
+log.info("Container started | image={}", REDPANDA.getDockerImageName());
+
+// WRONG — duplicates the version string
+log.info("Starting Redpanda container (redpanda:v25.1.9)...");
+```
+
 ## Logging Conventions
 
 - **Logger declaration**: plain SLF4J `private static final Logger log = LoggerFactory.getLogger(ClassName.class)` — no Lombok
@@ -171,8 +195,10 @@ Both jobs follow the same pattern: **Partitioner → Manager Step → Worker Ste
 - Schema initialization: MySQL `docker-entrypoint-initdb.d` ConfigMap, not `initialize-schema: always`
 - App Deployment omits `replicas` when HPA is enabled (prevents Helm/HPA conflicts)
 - `checksum/config` annotation on Deployment triggers rolling restart on ConfigMap changes
-- Init containers gate app startup until MySQL and Kafka are reachable
+- Init containers gate app startup until MySQL, Kafka, and Schema Registry (when enabled) are reachable
 - Kafka runs in **KRaft mode** (no Zookeeper)
+- **Schema Registry** uses a `Deployment` (stateless — stores schemas in `_schemas` Kafka topic). Gated on `schemaRegistry.enabled AND features.schemaRegistry`. Schema Registry URL wired to app via `SPRING_KAFKA_PROPERTIES_SCHEMA_REGISTRY_URL` env var.
+- **Init container image** (`busybox`) is parameterized via `global.initImage` in `values.yaml` — never hardcode it in templates
 - **Helm unit tests**: `helm/k8s-batch/tests/*_test.yaml` using `helm-unittest` plugin. Run with `helm unittest helm/k8s-batch`
 - **Template dependencies**: when a template references another (e.g., deployment includes configmap for checksum), both must be listed in `templates:` in the test file, and use `documentSelector` with `skipEmptyTemplates: true` to target the correct document
 - **CI validation**: `.github/workflows/helm-validate.yml` runs helm lint, unittest, kubeconform, and K3s smoke test
@@ -200,7 +226,7 @@ helm/k8s-batch/
   templates/
     app/              — Deployment, Service, HPA, Ingress, ConfigMap
     mysql/            — StatefulSet, Service, Secret, ConfigMap (Batch DDL)
-    kafka/            — StatefulSet (KRaft), Services, topic init Job
+    kafka/            — StatefulSet (KRaft), Services, topic init Job, Schema Registry Deployment+Service
   tests/              — helm-unittest YAML tests (*_test.yaml)
 
 k8s-batch-e2e-tests/src/test/java/com/cominotti/k8sbatch/e2e/
