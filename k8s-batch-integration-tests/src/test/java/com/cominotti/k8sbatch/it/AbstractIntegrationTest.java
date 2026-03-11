@@ -12,8 +12,10 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 @SpringBootTest(classes = K8sBatchApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -36,6 +38,12 @@ public abstract class AbstractIntegrationTest {
     }
 
     protected RestClient restClient() {
-        return RestClient.create("http://localhost:" + port);
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofSeconds(5));
+        requestFactory.setReadTimeout(Duration.ofSeconds(10));
+        return RestClient.builder()
+                .baseUrl("http://localhost:" + port)
+                .requestFactory(requestFactory)
+                .build();
     }
 }

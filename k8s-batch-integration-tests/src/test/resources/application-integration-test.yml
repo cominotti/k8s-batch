@@ -24,6 +24,7 @@ batch:
   partition:
     grid-size: 4
     chunk-size: 25
+    timeout-ms: 15000
   file-range:
     input-file: ""
   multi-file:

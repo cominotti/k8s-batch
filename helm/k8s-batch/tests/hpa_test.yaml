@@ -1,0 +1,60 @@
+suite: HPA
+templates:
+  - templates/app/hpa.yaml
+release:
+  name: test-release
+tests:
+  - it: should render HPA when both hpa.enabled and features.hpa are true
+    set:
+      hpa.enabled: true
+      features.hpa: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: HorizontalPodAutoscaler
+      - equal:
+          path: apiVersion
+          value: autoscaling/v2
+
+  - it: should not render HPA when hpa.enabled is false
+    set:
+      hpa.enabled: false
+      features.hpa: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render HPA when features.hpa is false
+    set:
+      hpa.enabled: true
+      features.hpa: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should set min and max replicas from values
+    set:
+      hpa.enabled: true
+      features.hpa: true
+      hpa.minReplicas: 3
+      hpa.maxReplicas: 15
+    asserts:
+      - equal:
+          path: spec.minReplicas
+          value: 3
+      - equal:
+          path: spec.maxReplicas
+          value: 15
+
+  - it: should target the correct deployment
+    set:
+      hpa.enabled: true
+      features.hpa: true
+    asserts:
+      - equal:
+          path: spec.scaleTargetRef.kind
+          value: Deployment
+      - equal:
+          path: spec.scaleTargetRef.name
+          value: test-release-k8s-batch

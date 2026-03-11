@@ -1,0 +1,113 @@
+app:
+  replicaCount: 1
+  image:
+    repository: k8s-batch
+    tag: "e2e"
+    pullPolicy: Never
+  springProfile: remote-partitioning
+  podSecurityContext:
+    runAsNonRoot: false
+  securityContext:
+    runAsUser: 0
+    runAsGroup: 0
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 1Gi
+  livenessProbe:
+    httpGet:
+      path: /actuator/health/liveness
+      port: http
+    initialDelaySeconds: 90
+    periodSeconds: 15
+    failureThreshold: 10
+    timeoutSeconds: 5
+  readinessProbe:
+    httpGet:
+      path: /actuator/health/readiness
+      port: http
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    failureThreshold: 10
+    timeoutSeconds: 5
+  config:
+    serverPort: 8080
+    batchInitializeSchema: always
+  extraVolumeMounts:
+    - name: test-data
+      mountPath: /data/test
+      readOnly: true
+    - name: test-data-multi
+      mountPath: /data/test/multi
+      readOnly: true
+  extraVolumes:
+    - name: test-data
+      configMap:
+        name: e2e-test-data
+    - name: test-data-multi
+      configMap:
+        name: e2e-test-data-multi
+
+hpa:
+  enabled: false
+
+mysql:
+  enabled: true
+  image:
+    repository: mysql
+    tag: "8.0"
+    pullPolicy: Never
+  auth:
+    rootPassword: e2e_root
+    database: k8sbatch
+    username: k8sbatch
+    password: e2e_pass
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  persistence:
+    storageClass: local-path
+    size: 1Gi
+
+kafka:
+  enabled: true
+  image:
+    repository: bitnami/kafka
+    tag: "3.7"
+    pullPolicy: Never
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1536Mi
+  persistence:
+    storageClass: local-path
+    size: 1Gi
+  topics:
+    partitionRequests:
+      name: batch-partition-requests
+      partitions: 4
+      replicationFactor: 1
+    partitionReplies:
+      name: batch-partition-replies
+      partitions: 4
+      replicationFactor: 1
+
+features:
+  kafka: true
+  hpa: false
+  ingress: false

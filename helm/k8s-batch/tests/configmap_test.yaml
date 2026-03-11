@@ -1,0 +1,42 @@
+suite: app ConfigMap
+templates:
+  - templates/app/configmap.yaml
+release:
+  name: test-release
+tests:
+  - it: should set JAVA_OPTS with container support
+    asserts:
+      - equal:
+          path: data.JAVA_OPTS
+          value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+
+  - it: should enable actuator probes
+    asserts:
+      - equal:
+          path: data.MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED
+          value: "true"
+      - equal:
+          path: data.MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED
+          value: "true"
+      - equal:
+          path: data.MANAGEMENT_HEALTH_READINESSSTATE_ENABLED
+          value: "true"
+
+  - it: should expose health, info, prometheus, and metrics endpoints
+    asserts:
+      - equal:
+          path: data.MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
+          value: "health,info,prometheus,metrics"
+
+  - it: should include extra config entries
+    set:
+      app.config.extra:
+        CUSTOM_KEY: custom-value
+        ANOTHER_KEY: another-value
+    asserts:
+      - equal:
+          path: data.CUSTOM_KEY
+          value: "custom-value"
+      - equal:
+          path: data.ANOTHER_KEY
+          value: "another-value"

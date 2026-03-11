@@ -40,6 +40,8 @@ app:
   springProfile: remote-partitioning
 
   extraEnv: []
+  extraVolumeMounts: []
+  extraVolumes: []
 
   livenessProbe:
     httpGet:

@@ -52,6 +52,9 @@ public class StandaloneJobConfig {
                 multiFileWorkerStep, "multi-file-");
     }
 
+    // Note: TaskExecutorPartitionHandler does not expose a timeout API.
+    // In integration tests, the JUnit @Timeout annotation serves as the backstop
+    // to prevent indefinite hangs if a worker step blocks.
     private Step buildStandaloneManagerStep(
             JobRepository jobRepository, String managerStepName, String workerStepName,
             org.springframework.batch.core.partition.Partitioner partitioner,

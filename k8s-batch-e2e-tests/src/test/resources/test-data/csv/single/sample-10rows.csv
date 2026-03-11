@@ -1,0 +1,11 @@
+id,name,email,amount,recordDate
+1001,Alice,alice1001@example.com,406.89,2025-01-01
+1002,Bob,bob1002@example.com,45.16,2025-01-02
+1003,Charlie,charlie1003@example.com,77.23,2025-01-03
+1004,Diana,diana1004@example.com,200.38,2025-01-04
+1005,Eve,eve1005@example.com,181.59,2025-01-05
+1006,Frank,frank1006@example.com,38.06,2025-01-06
+1007,Grace,grace1007@example.com,228.23,2025-01-07
+1008,Henry,henry1008@example.com,229.2,2025-01-08
+1009,Iris,iris1009@example.com,358.97,2025-01-09
+1010,Jack,jack1010@example.com,351.59,2025-01-10

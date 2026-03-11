@@ -1,0 +1,77 @@
+suite: Kafka
+templates:
+  - templates/kafka/statefulset.yaml
+release:
+  name: test-release
+tests:
+  - it: should render Kafka StatefulSet when both kafka.enabled and features.kafka are true
+    set:
+      kafka.enabled: true
+      features.kafka: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: StatefulSet
+
+  - it: should not render when kafka.enabled is false
+    set:
+      kafka.enabled: false
+      features.kafka: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render when features.kafka is false
+    set:
+      kafka.enabled: true
+      features.kafka: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should set replica count from values
+    set:
+      kafka.enabled: true
+      features.kafka: true
+      kafka.replicaCount: 5
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 5
+
+  - it: should use Parallel pod management policy
+    set:
+      kafka.enabled: true
+      features.kafka: true
+    asserts:
+      - equal:
+          path: spec.podManagementPolicy
+          value: Parallel
+
+  - it: should expose client and controller ports
+    set:
+      kafka.enabled: true
+      features.kafka: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: client
+            containerPort: 9092
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: controller
+            containerPort: 9093
+
+  - it: should disable auto topic creation
+    set:
+      kafka.enabled: true
+      features.kafka: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE
+            value: "false"

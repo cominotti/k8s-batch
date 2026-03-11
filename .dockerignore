@@ -5,7 +5,10 @@ target/
 .vscode/
 docs/
 helm/
-k8s-batch-integration-tests/
+k8s-batch-integration-tests/src/
+k8s-batch-integration-tests/target/
+k8s-batch-e2e-tests/src/
+k8s-batch-e2e-tests/target/
 *.md
 .gitignore
 docker-compose*.yml

@@ -11,6 +11,8 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -20,31 +22,31 @@ class KafkaConnectivityIT extends AbstractIntegrationTest {
     private String bootstrapServers;
 
     @Test
-    void shouldConnectToKafka() throws ExecutionException, InterruptedException {
+    void shouldConnectToKafka() throws ExecutionException, InterruptedException, TimeoutException {
         try (AdminClient admin = AdminClient.create(
                 Map.of(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers))) {
-            String clusterId = admin.describeCluster().clusterId().get();
+            String clusterId = admin.describeCluster().clusterId().get(30, TimeUnit.SECONDS);
             assertThat(clusterId).isNotBlank();
         }
     }
 
     @Test
-    void shouldCreateTopic() throws ExecutionException, InterruptedException {
+    void shouldCreateTopic() throws ExecutionException, InterruptedException, TimeoutException {
         try (AdminClient admin = AdminClient.create(
                 Map.of(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers))) {
             admin.createTopics(Collections.singletonList(
-                    new NewTopic("test-connectivity-topic", 1, (short) 1))).all().get();
+                    new NewTopic("test-connectivity-topic", 1, (short) 1))).all().get(30, TimeUnit.SECONDS);
 
-            Set<String> topics = admin.listTopics().names().get();
+            Set<String> topics = admin.listTopics().names().get(30, TimeUnit.SECONDS);
             assertThat(topics).contains("test-connectivity-topic");
         }
     }
 
     @Test
-    void shouldListTopics() throws ExecutionException, InterruptedException {
+    void shouldListTopics() throws ExecutionException, InterruptedException, TimeoutException {
         try (AdminClient admin = AdminClient.create(
                 Map.of(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers))) {
-            Set<String> topics = admin.listTopics().names().get();
+            Set<String> topics = admin.listTopics().names().get(30, TimeUnit.SECONDS);
             assertThat(topics).isNotNull();
         }
     }

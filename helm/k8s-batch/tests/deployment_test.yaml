@@ -1,0 +1,164 @@
+suite: app deployment
+templates:
+  - templates/app/deployment.yaml
+  - templates/app/configmap.yaml
+release:
+  name: test-release
+tests:
+  - it: should omit replicas when HPA is enabled
+    documentSelector:
+      path: kind
+      value: Deployment
+      skipEmptyTemplates: true
+    set:
+      hpa.enabled: true
+    asserts:
+      - notExists:
+          path: spec.replicas
+
+  - it: should set replicas when HPA is disabled
+    documentSelector:
+      path: kind
+      value: Deployment
+      skipEmptyTemplates: true
+    set:
+      hpa.enabled: false
+      app.replicaCount: 3
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 3
+
+  - it: should include checksum/config annotation
+    documentSelector:
+      path: kind
+      value: Deployment
+      skipEmptyTemplates: true
+    asserts:
+      - exists:
+          path: spec.template.metadata.annotations["checksum/config"]
+
+  - it: should always include wait-for-mysql init container
+    documentSelector:
+      path: kind
+      value: Deployment
+      skipEmptyTemplates: true
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers
+          content:
+            name: wait-for-mysql
+          any: true
+
+  - it: should include wait-for-kafka when kafka is enabled
+    documentSelector:
+      path: kind
+      value: Deployment
+      skipEmptyTemplates: true
+    set:
+      kafka.enabled: true
+      features.kafka: true
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers
+          content:
+            name: wait-for-kafka
+          any: true
+
+  - it: should exclude wait-for-kafka when kafka is disabled
+    documentSelector:
+      path: kind
+      value: Deployment
+      skipEmptyTemplates: true
+    set:
+      kafka.enabled: false
+    asserts:
+      - notContains:
+          path: spec.template.spec.initContainers
+          content:
+            name: wait-for-kafka
+          any: true
+
+  - it: should exclude wait-for-kafka when features.kafka is false
+    documentSelector:
+      path: kind
+      value: Deployment
+      skipEmptyTemplates: true
+    set:
+      kafka.enabled: true
+      features.kafka: false
+    asserts:
+      - notContains:
+          path: spec.template.spec.initContainers
+          content:
+            name: wait-for-kafka
+          any: true
+
+  - it: should set spring profile from values
+    documentSelector:
+      path: kind
+      value: Deployment
+      skipEmptyTemplates: true
+    set:
+      app.springProfile: standalone
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SPRING_PROFILES_ACTIVE
+            value: "standalone"
+
+  - it: should include KAFKA_BOOTSTRAP_SERVERS when kafka enabled
+    documentSelector:
+      path: kind
+      value: Deployment
+      skipEmptyTemplates: true
+    set:
+      kafka.enabled: true
+      features.kafka: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+          any: true
+
+  - it: should exclude KAFKA_BOOTSTRAP_SERVERS when kafka disabled
+    documentSelector:
+      path: kind
+      value: Deployment
+      skipEmptyTemplates: true
+    set:
+      kafka.enabled: false
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+          any: true
+
+  - it: should set liveness and readiness probes
+    documentSelector:
+      path: kind
+      value: Deployment
+      skipEmptyTemplates: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /actuator/health/liveness
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /actuator/health/readiness
+
+  - it: should run as non-root by default
+    documentSelector:
+      path: kind
+      value: Deployment
+      skipEmptyTemplates: true
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false

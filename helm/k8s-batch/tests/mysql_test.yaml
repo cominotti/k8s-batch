@@ -1,0 +1,60 @@
+suite: MySQL
+templates:
+  - templates/mysql/statefulset.yaml
+release:
+  name: test-release
+tests:
+  - it: should render MySQL StatefulSet when enabled
+    set:
+      mysql.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: StatefulSet
+
+  - it: should not render MySQL StatefulSet when disabled
+    set:
+      mysql.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should mount init-scripts from ConfigMap
+    set:
+      mysql.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: init-scripts
+            configMap:
+              name: test-release-k8s-batch-mysql-init
+
+  - it: should configure liveness and readiness probes
+    set:
+      mysql.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.exec.command
+          value: ["mysqladmin", "ping", "-h", "localhost"]
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.exec.command
+          value: ["mysqladmin", "ping", "-h", "localhost"]
+
+  - it: should use single replica
+    set:
+      mysql.enabled: true
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 1
+
+  - it: should configure PVC with correct size
+    set:
+      mysql.enabled: true
+      mysql.persistence.size: 20Gi
+    asserts:
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.resources.requests.storage
+          value: 20Gi

@@ -12,10 +12,14 @@ public class MysqlOnlyContainersConfig {
 
     private static final Logger log = LoggerFactory.getLogger(MysqlOnlyContainersConfig.class);
 
+    static {
+        ContainerHolder.startMysqlOnly();
+    }
+
     @Bean
     @ServiceConnection
     MySQLContainer mysqlContainer() {
         log.debug("Providing MySQL-only container (standalone mode)");
-        return SharedContainersConfig.MYSQL;
+        return ContainerHolder.MYSQL;
     }
 }

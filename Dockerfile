@@ -9,6 +9,7 @@ WORKDIR /app
 COPY pom.xml .
 COPY k8s-batch-app/pom.xml k8s-batch-app/
 COPY k8s-batch-integration-tests/pom.xml k8s-batch-integration-tests/
+COPY k8s-batch-e2e-tests/pom.xml k8s-batch-e2e-tests/
 RUN mvn dependency:go-offline -B -pl k8s-batch-app -am
 
 # Copy source and build

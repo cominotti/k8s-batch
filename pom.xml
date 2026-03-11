@@ -22,6 +22,7 @@
     <modules>
         <module>k8s-batch-app</module>
         <module>k8s-batch-integration-tests</module>
+        <module>k8s-batch-e2e-tests</module>
     </modules>
 
     <properties>

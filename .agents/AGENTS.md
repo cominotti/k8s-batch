@@ -19,9 +19,13 @@ Spring Boot 4.0.3 + Spring Batch 6.x reference project for horizontally-scalable
 mvn clean compile                              # compile all modules
 mvn test-compile                               # compile including test sources
 mvn -pl k8s-batch-integration-tests -am verify  # run integration tests (requires Docker)
+mvn -pl k8s-batch-e2e-tests -am verify          # run E2E tests (requires Docker + helm CLI)
+mvn verify -DskipE2E=true                      # run integration tests, skip E2E
 mvn package -DskipTests                        # build JAR without tests
+docker build -t k8s-batch:e2e .                # build Docker image for E2E tests
 docker-compose up -d                           # local stack (app + MySQL + Kafka)
 helm lint helm/k8s-batch                       # validate Helm chart
+helm unittest helm/k8s-batch                   # run Helm unit tests (34 tests, ~40ms)
 ```
 
 ## Module Structure
@@ -30,6 +34,7 @@ helm lint helm/k8s-batch                       # validate Helm chart
 |--------|---------|
 | `k8s-batch-app` | Main Spring Boot application (REST, batch jobs, config) |
 | `k8s-batch-integration-tests` | Testcontainers integration tests (separate to keep test infra out of production artifact) |
+| `k8s-batch-e2e-tests` | E2E tests using Testcontainers K3s — deploys Helm chart into real K8s cluster |
 
 ## Spring Batch 6.x Package Rules
 
@@ -78,9 +83,15 @@ Use `JacksonJsonSerializer` / `JacksonJsonDeserializer` for Kafka partition requ
 
 - **Artifact names** use `testcontainers-` prefix: `testcontainers-mysql`, `testcontainers-kafka`, `testcontainers-junit-jupiter`
 - **MySQL**: `org.testcontainers.mysql.MySQLContainer` (not `org.testcontainers.containers.MySQLContainer`). **Non-generic** — no `<?>` wildcard.
-- **Kafka**: `org.testcontainers.kafka.ConfluentKafkaContainer`
+- **Kafka**: `org.testcontainers.kafka.ConfluentKafkaContainer` — use `.withStartupTimeout(Duration.ofSeconds(120))` (the 60s default is tight for the 700MB+ image)
 - **`@ServiceConnection`** handles JDBC wiring automatically — never use `@DynamicPropertySource` for MySQL
-- **Kafka bootstrap servers** are set via `System.setProperty` in `SharedContainersConfig` (Kafka `@ServiceConnection` requires `spring-boot-kafka` which conflicts with manual `KafkaIntegrationConfig`)
+- **Kafka bootstrap servers** are set via `System.setProperty` in `ContainerHolder` (Kafka `@ServiceConnection` requires `spring-boot-kafka` which conflicts with manual `KafkaIntegrationConfig`)
+- **Container lifecycle** is managed by `ContainerHolder` (not directly in config classes):
+  - `ContainerHolder.startMysqlOnly()` — standalone tests, skips Kafka entirely
+  - `ContainerHolder.startAll()` — parallel startup via `Startables.deepStart()` for remote tests
+  - `SharedContainersConfig` delegates to `ContainerHolder.startAll()` + creates Kafka topics
+  - `MysqlOnlyContainersConfig` delegates to `ContainerHolder.startMysqlOnly()`
+- **Parallel startup**: use `Startables.deepStart(Stream.of(MYSQL, KAFKA)).join()` — not sequential `.start()` calls
 
 ## Spring Boot 4.x Rules
 
@@ -119,7 +130,29 @@ Both jobs follow the same pattern: **Partitioner → Manager Step → Worker Ste
 - **Worker-side processing**: `StepExecutionRequestHandler` + `BeanFactoryStepLocator` in `KafkaIntegrationConfig` handles incoming partition requests
 - **`@Qualifier`** is required on `Step` bean parameters in job/manager configs to resolve ambiguity when multiple worker steps exist
 - **`BatchStepNames`** constants class — always use these constants for job/step names in builders and `@Qualifier` annotations (never raw strings)
-- **`BatchPartitionProperties`** includes `timeoutMs` — configurable via `batch.partition.timeout-ms` (default 60000)
+- **`BatchPartitionProperties`** includes `timeoutMs` — configurable via `batch.partition.timeout-ms` (default 60000, overridden to 15000 in integration-test profile)
+- **`TaskExecutorPartitionHandler`** (standalone mode) has no timeout API — JUnit `@Timeout` is the only backstop
+
+## Job REST API
+
+- **`JobController`** at `/api/jobs` — async job launch via `TaskExecutorJobLauncher`
+- `POST /api/jobs/{jobName}` — accepts `Map<String, String>` parameters, returns `JobExecutionResponse` with HTTP 202
+- `GET /api/jobs/{jobName}/executions/{executionId}` — polls execution status
+- Unknown job names return HTTP 400 (not 500)
+- `Map<String, Job> jobRegistry` auto-wires all `Job` beans by Spring bean name
+- **`TaskExecutorJobLauncher`** with `SimpleAsyncTaskExecutor` ensures POST returns immediately; the job runs in a background thread
+
+## E2E Test Rules
+
+- **Test class pattern**: `**/*E2E.java` (distinct from `*IT.java` integration tests)
+- **Skip flag**: `-DskipE2E=true` (default: `false`)
+- **Prerequisites**: Docker daemon (K3s needs privileged containers — Podman rootless won't work), `helm` CLI on PATH
+- **`K3sClusterManager`** singleton manages K3s lifecycle, follows `ContainerHolder` pattern
+- **Image loading**: `docker save` → `copyFileToContainer` → `ctr images import`; guarded by `loadedImages` set to avoid redundant loads
+- **`PodUtils.isReady(Pod)`** — shared pod readiness check (don't duplicate in each class)
+- **`AbstractE2ETest`** base class provides `@BeforeEach cleanTestData()`, `requiresKafka()` override, port-forward setup
+- **Helm rendering**: `HelmRenderer` shells out to `helm template`; uses `redirectErrorStream(true)` to avoid deadlock
+- **Rendered manifests are cached** in `K3sClusterManager` for reuse during teardown
 
 ## Logging Conventions
 
@@ -138,6 +171,9 @@ Both jobs follow the same pattern: **Partitioner → Manager Step → Worker Ste
 - `checksum/config` annotation on Deployment triggers rolling restart on ConfigMap changes
 - Init containers gate app startup until MySQL and Kafka are reachable
 - Kafka runs in **KRaft mode** (no Zookeeper)
+- **Helm unit tests**: `helm/k8s-batch/tests/*_test.yaml` using `helm-unittest` plugin. Run with `helm unittest helm/k8s-batch`
+- **Template dependencies**: when a template references another (e.g., deployment includes configmap for checksum), both must be listed in `templates:` in the test file, and use `documentSelector` with `skipEmptyTemplates: true` to target the correct document
+- **CI validation**: `.github/workflows/helm-validate.yml` runs helm lint, unittest, kubeconform, and K3s smoke test
 
 ## Key Directories
 
@@ -151,15 +187,26 @@ k8s-batch-app/src/main/java/com/cominotti/k8sbatch/
   web/                — REST controller
 
 k8s-batch-integration-tests/src/test/java/com/cominotti/k8sbatch/it/
-  config/             — container configs, batch test config
+  config/             — ContainerHolder, SharedContainersConfig, MysqlOnlyContainersConfig, BatchTestJobConfig
   rest/               — REST endpoint tests
   batch/standalone/   — standalone batch tests
   batch/remote/       — remote partitioning tests
   database/           — schema verification tests
   infra/              — connectivity smoke tests
 
-helm/k8s-batch/templates/
-  app/                — Deployment, Service, HPA, Ingress, ConfigMap
-  mysql/              — StatefulSet, Service, Secret, ConfigMap (Batch DDL)
-  kafka/              — StatefulSet (KRaft), Services, topic init Job
+helm/k8s-batch/
+  templates/
+    app/              — Deployment, Service, HPA, Ingress, ConfigMap
+    mysql/            — StatefulSet, Service, Secret, ConfigMap (Batch DDL)
+    kafka/            — StatefulSet (KRaft), Services, topic init Job
+  tests/              — helm-unittest YAML tests (*_test.yaml)
+
+k8s-batch-e2e-tests/src/test/java/com/cominotti/k8sbatch/e2e/
+  cluster/            — K3sClusterManager, HelmRenderer, PortForwardManager, PodUtils
+  client/             — BatchAppClient (HTTP), MysqlVerifier (JDBC)
+  diagnostics/        — PodDiagnostics (failure dump)
+  deploy/             — DeployHealthCheckE2E
+  batch/              — FileRangeJobE2E, MultiFileJobE2E, StandaloneProfileE2E, PartitionDistributionE2E
+
+.github/workflows/    — CI pipelines (helm-validate.yml)
 ```

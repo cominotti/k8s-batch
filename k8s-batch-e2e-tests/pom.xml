@@ -10,33 +10,24 @@
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>k8s-batch-integration-tests</artifactId>
-    <name>k8s-batch-integration-tests</name>
-    <description>Integration tests using Testcontainers for MySQL and Kafka</description>
+    <artifactId>k8s-batch-e2e-tests</artifactId>
+    <name>k8s-batch-e2e-tests</name>
+    <description>End-to-end tests using Testcontainers K3s for full Helm chart deployment verification</description>
+
+    <properties>
+        <fabric8-client.version>7.2.0</fabric8-client.version>
+        <awaitility.version>4.2.2</awaitility.version>
+        <skipE2E>false</skipE2E>
+    </properties>
 
     <dependencies>
-        <!-- Application under test -->
+        <!-- Testcontainers K3s -->
         <dependency>
-            <groupId>com.cominotti.k8sbatch</groupId>
-            <artifactId>k8s-batch-app</artifactId>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-k3s</artifactId>
+            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
-
-        <!-- Spring Boot Test -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- Spring Boot Testcontainers (@ServiceConnection) -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-testcontainers</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- Testcontainers 2.x (artifact names changed from 1.x) -->
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers</artifactId>
@@ -49,44 +40,60 @@
             <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
+
+        <!-- Fabric8 Kubernetes Client -->
         <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>testcontainers-mysql</artifactId>
-            <version>${testcontainers.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>testcontainers-kafka</artifactId>
-            <version>${testcontainers.version}</version>
+            <groupId>io.fabric8</groupId>
+            <artifactId>kubernetes-client</artifactId>
+            <version>${fabric8-client.version}</version>
             <scope>test</scope>
         </dependency>
 
-        <!-- Spring Batch Test -->
-        <dependency>
-            <groupId>org.springframework.batch</groupId>
-            <artifactId>spring-batch-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- Spring Kafka Test -->
-        <dependency>
-            <groupId>org.springframework.kafka</groupId>
-            <artifactId>spring-kafka-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- Awaitility for async assertions -->
-        <dependency>
-            <groupId>org.awaitility</groupId>
-            <artifactId>awaitility</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- MySQL driver (runtime) -->
+        <!-- MySQL JDBC for verification via port-forward -->
         <dependency>
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Awaitility for polling -->
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
+            <version>${awaitility.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Jackson for JSON parsing -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- JUnit 5 -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- AssertJ -->
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Logging -->
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -106,15 +113,16 @@
                 </executions>
                 <configuration>
                     <includes>
-                        <include>**/*IT.java</include>
+                        <include>**/*E2E.java</include>
                     </includes>
                     <forkCount>1</forkCount>
                     <reuseForks>true</reuseForks>
                     <failIfNoTests>true</failIfNoTests>
-                    <forkedProcessTimeoutInSeconds>300</forkedProcessTimeoutInSeconds>
+                    <forkedProcessTimeoutInSeconds>600</forkedProcessTimeoutInSeconds>
+                    <skipTests>${skipE2E}</skipTests>
                 </configuration>
             </plugin>
-            <!-- Skip spring-boot repackage for test-only module -->
+            <!-- No spring-boot repackage for test-only module -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
