@@ -69,20 +69,24 @@ new StepBuilder("stepName", jobRepository)
 
 ## Spring Kafka Serializers
 
-Use `JacksonJsonSerializer` / `JacksonJsonDeserializer` (the old `JsonSerializer` / `JsonDeserializer` are deprecated).
+Use `JacksonJsonSerializer` / `JacksonJsonDeserializer` for Kafka partition request messages (the old `JsonSerializer` / `JsonDeserializer` are deprecated). Set `JacksonJsonDeserializer.TRUSTED_PACKAGES` to `"*"` for remote partitioning messages.
 
 ## Testcontainers 2.x Rules
 
 - **Artifact names** use `testcontainers-` prefix: `testcontainers-mysql`, `testcontainers-kafka`, `testcontainers-junit-jupiter`
 - **MySQL**: `org.testcontainers.mysql.MySQLContainer` (not `org.testcontainers.containers.MySQLContainer`). **Non-generic** — no `<?>` wildcard.
 - **Kafka**: `org.testcontainers.kafka.ConfluentKafkaContainer`
-- **`@ServiceConnection`** handles connection wiring automatically — never use `@DynamicPropertySource`
+- **`@ServiceConnection`** handles JDBC wiring automatically — never use `@DynamicPropertySource` for MySQL
+- **Kafka bootstrap servers** are set via `System.setProperty` in `SharedContainersConfig` (Kafka `@ServiceConnection` requires `spring-boot-kafka` which conflicts with manual `KafkaIntegrationConfig`)
 
 ## Spring Boot 4.x Rules
 
 - `TestRestTemplate` is removed. Use `RestClient` with `@LocalServerPort`.
 - `spring-boot-starter-batch-jdbc` is required explicitly for database-backed `JobRepository`.
 - `spring.batch.job.enabled: false` prevents auto-launching jobs at startup.
+- **Auto-configuration modules extracted**: `spring-boot-flyway`, `spring-boot-integration`, `spring-boot-kafka` are separate dependencies in SB4 (not in `spring-boot-autoconfigure`).
+- **Multi-module `@SpringBootTest`**: always use `classes = K8sBatchApplication.class` — Spring can't find it by package scanning across modules.
+- **`spring-boot-maven-plugin` classifier**: use `<classifier>exec</classifier>` so dependent modules see the original JAR, not the fat JAR.
 
 ## Test Utilities
 
@@ -107,7 +111,10 @@ Both jobs follow the same pattern: **Partitioner → Manager Step → Worker Ste
 - `MultiFilePartitioner` — assigns one CSV file per partition
 - Manager step: `RemotePartitioningJobConfig` (Kafka) or `StandaloneJobConfig` (local threads)
 - Worker step: `FlatFileItemReader` → `CsvRecordProcessor` → `JdbcBatchItemWriter`
-- `@StepScope` is mandatory on reader/processor/writer beans to enable partition-specific `ExecutionContext` injection
+- `@StepScope` is mandatory on reader/processor/writer/partitioner beans to enable partition-specific `ExecutionContext` and job parameter injection
+- **Remote partitioning manager** uses `JobRepository` polling (not reply channels) to detect worker completion — avoids `StepExecution` serialization issues through Kafka
+- **Worker-side processing**: `StepExecutionRequestHandler` + `BeanFactoryStepLocator` in `KafkaIntegrationConfig` handles incoming partition requests
+- **`@Qualifier`** is required on `Step` bean parameters in job/manager configs to resolve ambiguity when multiple worker steps exist
 
 ## Helm Chart Conventions
 
