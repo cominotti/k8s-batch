@@ -3,81 +3,146 @@ package com.cominotti.k8sbatch.config;
 import com.cominotti.k8sbatch.batch.common.BatchPartitionProperties;
 import com.cominotti.k8sbatch.batch.filerange.FileRangePartitioner;
 import com.cominotti.k8sbatch.batch.multifile.MultiFilePartitioner;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.serialization.ByteArrayDeserializer;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.Step;
-import org.springframework.batch.core.step.builder.StepBuilder;
-import org.springframework.batch.integration.partition.MessageChannelPartitionHandler;
+import org.springframework.batch.integration.partition.BeanFactoryStepLocator;
+import org.springframework.batch.integration.partition.RemotePartitioningManagerStepBuilderFactory;
+import org.springframework.batch.integration.partition.StepExecutionRequestHandler;
+import org.springframework.beans.factory.BeanFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.integration.channel.DirectChannel;
-import org.springframework.integration.core.MessagingTemplate;
+import org.springframework.integration.channel.NullChannel;
+import org.springframework.integration.dsl.IntegrationFlow;
+import org.springframework.integration.dsl.Transformers;
+import org.springframework.integration.kafka.dsl.Kafka;
+import org.springframework.kafka.core.ConsumerFactory;
+import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.kafka.core.DefaultKafkaProducerFactory;
+import org.springframework.kafka.core.ProducerFactory;
+
+import java.util.Map;
 
 @Configuration
 @Profile("remote-partitioning")
 public class RemotePartitioningJobConfig {
 
     private final BatchPartitionProperties partitionProperties;
+    private final String bootstrapServers;
+    private final String requestsTopic;
 
-    public RemotePartitioningJobConfig(BatchPartitionProperties partitionProperties) {
+    public RemotePartitioningJobConfig(
+            BatchPartitionProperties partitionProperties,
+            @Value("${spring.kafka.bootstrap-servers:localhost:9092}") String bootstrapServers,
+            @Value("${batch.kafka.requests-topic:batch-partition-requests}") String requestsTopic) {
         this.partitionProperties = partitionProperties;
+        this.bootstrapServers = bootstrapServers;
+        this.requestsTopic = requestsTopic;
     }
 
-    // --- File-Range Job: Manager Step ---
+    // ── Builder Factory ──────────────────────────────────────────
 
     @Bean
-    public MessageChannelPartitionHandler fileRangePartitionHandler(
-            DirectChannel outboundRequests, JobRepository jobRepository) {
-        MessageChannelPartitionHandler handler = new MessageChannelPartitionHandler();
-        handler.setStepName("fileRangeWorkerStep");
-        handler.setGridSize(partitionProperties.gridSize());
+    public RemotePartitioningManagerStepBuilderFactory managerStepBuilderFactory(
+            JobRepository jobRepository) {
+        return new RemotePartitioningManagerStepBuilderFactory(jobRepository);
+    }
+
+    // ── Channels ─────────────────────────────────────────────────
+
+    @Bean
+    public DirectChannel managerRequestsChannel() {
+        return new DirectChannel();
+    }
+
+    // ── Kafka Factories (Java serialization) ─────────────────────
+
+    @Bean
+    public ProducerFactory<String, byte[]> partitionProducerFactory() {
+        return new DefaultKafkaProducerFactory<>(Map.of(
+                ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers,
+                ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class,
+                ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class
+        ));
+    }
+
+    @Bean
+    public ConsumerFactory<String, byte[]> requestsConsumerFactory() {
+        return new DefaultKafkaConsumerFactory<>(Map.of(
+                ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers,
+                ConsumerConfig.GROUP_ID_CONFIG, "k8s-batch-workers",
+                ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest",
+                ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class,
+                ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class
+        ));
+    }
+
+    // ── Manager: Outbound requests to Kafka ──────────────────────
+
+    @Bean
+    public IntegrationFlow managerOutboundRequestsFlow() {
+        return IntegrationFlow.from(managerRequestsChannel())
+                .transform(Transformers.serializer())
+                .handle(Kafka.outboundChannelAdapter(partitionProducerFactory())
+                        .topic(requestsTopic))
+                .get();
+    }
+
+    // ── Worker: Inbound requests from Kafka → handler ────────────
+
+    @Bean
+    public StepExecutionRequestHandler stepExecutionRequestHandler(
+            JobRepository jobRepository, BeanFactory beanFactory) {
+        StepExecutionRequestHandler handler = new StepExecutionRequestHandler();
         handler.setJobRepository(jobRepository);
-
-        MessagingTemplate template = new MessagingTemplate();
-        template.setDefaultChannel(outboundRequests);
-        template.setReceiveTimeout(60_000);
-        handler.setMessagingOperations(template);
-
+        BeanFactoryStepLocator stepLocator = new BeanFactoryStepLocator();
+        stepLocator.setBeanFactory(beanFactory);
+        handler.setStepLocator(stepLocator);
         return handler;
     }
+
+    @Bean
+    public IntegrationFlow workerFlow(StepExecutionRequestHandler stepExecutionRequestHandler) {
+        return IntegrationFlow.from(
+                        Kafka.messageDrivenChannelAdapter(
+                                requestsConsumerFactory(), requestsTopic))
+                .transform(Transformers.deserializer("org.springframework.batch.*", "java.util.*", "java.lang.*"))
+                .handle(stepExecutionRequestHandler)
+                .channel(new NullChannel())
+                .get();
+    }
+
+    // ── Manager Steps (builder API, polling mode) ────────────────
 
     @Bean
     public Step fileRangeManagerStep(
-            JobRepository jobRepository,
-            FileRangePartitioner fileRangePartitioner,
-            MessageChannelPartitionHandler fileRangePartitionHandler) {
-        return new StepBuilder("fileRangeManagerStep", jobRepository)
+            RemotePartitioningManagerStepBuilderFactory factory,
+            FileRangePartitioner fileRangePartitioner) {
+        return factory.get("fileRangeManagerStep")
                 .partitioner("fileRangeWorkerStep", fileRangePartitioner)
-                .partitionHandler(fileRangePartitionHandler)
+                .gridSize(partitionProperties.gridSize())
+                .outputChannel(managerRequestsChannel())
+                .timeout(60_000)
                 .build();
-    }
-
-    // --- Multi-File Job: Manager Step ---
-
-    @Bean
-    public MessageChannelPartitionHandler multiFilePartitionHandler(
-            DirectChannel outboundRequests, JobRepository jobRepository) {
-        MessageChannelPartitionHandler handler = new MessageChannelPartitionHandler();
-        handler.setStepName("multiFileWorkerStep");
-        handler.setGridSize(partitionProperties.gridSize());
-        handler.setJobRepository(jobRepository);
-
-        MessagingTemplate template = new MessagingTemplate();
-        template.setDefaultChannel(outboundRequests);
-        template.setReceiveTimeout(60_000);
-        handler.setMessagingOperations(template);
-
-        return handler;
     }
 
     @Bean
     public Step multiFileManagerStep(
-            JobRepository jobRepository,
-            MultiFilePartitioner multiFilePartitioner,
-            MessageChannelPartitionHandler multiFilePartitionHandler) {
-        return new StepBuilder("multiFileManagerStep", jobRepository)
+            RemotePartitioningManagerStepBuilderFactory factory,
+            MultiFilePartitioner multiFilePartitioner) {
+        return factory.get("multiFileManagerStep")
                 .partitioner("multiFileWorkerStep", multiFilePartitioner)
-                .partitionHandler(multiFilePartitionHandler)
+                .gridSize(partitionProperties.gridSize())
+                .outputChannel(managerRequestsChannel())
+                .timeout(60_000)
                 .build();
     }
 }

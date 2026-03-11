@@ -48,7 +48,6 @@ class PartitionDistributionIT extends AbstractBatchIntegrationTest {
 
         JobExecution execution = jobOperatorTestUtils.startJob(fileRangeJobParams(inputFile));
 
-        // Reload step executions from DB (remote partitioning workers update DB directly)
         Collection<StepExecution> freshSteps = jobRepository.getJobExecution(execution.getId()).getStepExecutions();
         boolean allWorkerStepsCompleted = freshSteps.stream()
                 .filter(s -> s.getStepName().contains("Worker"))
@@ -63,7 +62,6 @@ class PartitionDistributionIT extends AbstractBatchIntegrationTest {
 
         JobExecution execution = jobOperatorTestUtils.startJob(fileRangeJobParams(inputFile));
 
-        // Reload step executions from DB (remote partitioning workers update DB directly)
         Collection<StepExecution> freshSteps = jobRepository.getJobExecution(execution.getId()).getStepExecutions();
         long totalReadCount = freshSteps.stream()
                 .filter(s -> s.getStepName().contains("Worker"))
