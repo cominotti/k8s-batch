@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package com.cominotti.k8sbatch.web.controller;
+package com.cominotti.k8sbatch.web.adapters.launchingjobs.rest;
 
 import com.cominotti.k8sbatch.web.dto.JobExecutionResponse;
 import org.slf4j.Logger;
@@ -71,10 +71,11 @@ public class JobController {
     public ResponseEntity<JobExecutionResponse> launchJob(
             @PathVariable String jobName,
             @RequestBody(required = false) Map<String, String> parameters) {
-        log.info("Received job launch request | jobName={}", jobName);
+        String safeJobName = sanitize(jobName);
+        log.info("Received job launch request | jobName={}", safeJobName);
         Job job = jobRegistry.get(jobName);
         if (job == null) {
-            log.warn("Unknown job requested | jobName={} | available={}", jobName, jobRegistry.keySet());
+            log.warn("Unknown job requested | jobName={} | available={}", safeJobName, jobRegistry.keySet());
             return ResponseEntity.badRequest()
                     .body(new JobExecutionResponse(-1, jobName, "FAILED", "FAILED",
                             "Unknown job: " + jobName + ". Available: " + jobRegistry.keySet()));
@@ -95,10 +96,10 @@ public class JobController {
 
             JobExecutionResponse response = toResponse(executionId, jobName, execution);
             log.info("Job launch accepted | jobName={} | executionId={} | status={}",
-                    jobName, executionId, response.status());
+                    safeJobName, executionId, response.status());
             return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
         } catch (Exception e) {
-            log.error("Failed to launch job | jobName={}", jobName, e);
+            log.error("Failed to launch job | jobName={}", safeJobName, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new JobExecutionResponse(-1, jobName, "FAILED", "FAILED", e.getMessage()));
         }
@@ -127,5 +128,18 @@ public class JobController {
         String exitDescription = execution.getExitStatus().getExitDescription();
         return new JobExecutionResponse(executionId, jobName, execution.getStatus().name(),
                 exitCode, exitDescription);
+    }
+
+    /**
+     * Strips newlines and control characters from user input to prevent log injection (CWE-117).
+     *
+     * @param input raw user-controlled string
+     * @return sanitized string safe for logging
+     */
+    private static String sanitize(String input) {
+        if (input == null) {
+            return "null";
+        }
+        return input.replaceAll("[\\r\\n\\t]", "_");
     }
 }

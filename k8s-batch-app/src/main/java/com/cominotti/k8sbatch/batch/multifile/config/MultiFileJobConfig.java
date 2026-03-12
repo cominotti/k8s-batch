@@ -2,10 +2,11 @@
 
 package com.cominotti.k8sbatch.batch.multifile.config;
 
-import com.cominotti.k8sbatch.batch.common.adapters.CsvRecordReaderFactory;
-import com.cominotti.k8sbatch.batch.common.adapters.CsvRecordWriter;
-import com.cominotti.k8sbatch.batch.common.adapters.LoggingJobExecutionListener;
-import com.cominotti.k8sbatch.batch.common.adapters.LoggingStepExecutionListener;
+import com.cominotti.k8sbatch.batch.common.adapters.observingexecution.logging.LoggingJobExecutionListener;
+import com.cominotti.k8sbatch.batch.common.adapters.observingexecution.logging.LoggingStepExecutionListener;
+import com.cominotti.k8sbatch.batch.common.adapters.persistingrecords.jdbc.CsvRecordWriter;
+import com.cominotti.k8sbatch.batch.common.adapters.readingcsv.file.CsvRecordReaderFactory;
+import com.cominotti.k8sbatch.batch.common.domain.BatchFileProperties;
 import com.cominotti.k8sbatch.batch.common.domain.BatchPartitionProperties;
 import com.cominotti.k8sbatch.batch.common.domain.BatchStepNames;
 import com.cominotti.k8sbatch.batch.common.domain.CsvRecord;
@@ -46,24 +47,29 @@ public class MultiFileJobConfig {
     private static final Logger log = LoggerFactory.getLogger(MultiFileJobConfig.class);
 
     private final BatchPartitionProperties partitionProperties;
+    private final BatchFileProperties fileProperties;
     private final LoggingJobExecutionListener jobExecutionListener;
     private final LoggingStepExecutionListener stepExecutionListener;
 
     /**
      * Injects shared batch infrastructure beans.
      *
-     * @param partitionProperties grid size and chunk size configuration
-     * @param jobExecutionListener logs job start/end events
+     * @param partitionProperties   grid size and chunk size configuration
+     * @param fileProperties        allowed base directory for input directory validation
+     * @param jobExecutionListener  logs job start/end events
      * @param stepExecutionListener logs step start/end events
      */
     public MultiFileJobConfig(BatchPartitionProperties partitionProperties,
+                              BatchFileProperties fileProperties,
                               LoggingJobExecutionListener jobExecutionListener,
                               LoggingStepExecutionListener stepExecutionListener) {
         this.partitionProperties = partitionProperties;
+        this.fileProperties = fileProperties;
         this.jobExecutionListener = jobExecutionListener;
         this.stepExecutionListener = stepExecutionListener;
-        log.info("MultiFileJobConfig initialized | gridSize={} | chunkSize={}",
-                partitionProperties.gridSize(), partitionProperties.chunkSize());
+        log.info("MultiFileJobConfig initialized | gridSize={} | chunkSize={} | allowedBaseDir={}",
+                partitionProperties.gridSize(), partitionProperties.chunkSize(),
+                fileProperties.allowedBaseDir());
     }
 
     // @Qualifier is required because two Step beans exist (manager + worker) — Spring can't
@@ -84,7 +90,8 @@ public class MultiFileJobConfig {
     public MultiFilePartitioner multiFilePartitioner(
             // Supplied by the REST API caller in the POST body
             @Value("#{jobParameters['batch.multi-file.input-directory']}") String inputDirectory) {
-        return new MultiFilePartitioner(Path.of(inputDirectory));
+        String safePath = requireWithinAllowedBase(inputDirectory, fileProperties.allowedBaseDir());
+        return new MultiFilePartitioner(Path.of(safePath));
     }
 
     // @StepScope: new reader per partition, each reading a different CSV file
@@ -117,11 +124,11 @@ public class MultiFileJobConfig {
     /**
      * Worker step: reads an entire CSV file, filters invalid records, and upserts to MySQL in chunks.
      *
-     * @param jobRepository        persists step metadata (read/write/filter counts, status)
-     * @param transactionManager   wraps each chunk in a database transaction
-     * @param multiFileItemReader  {@code @StepScope} reader for this partition's CSV file
+     * @param jobRepository          persists step metadata (read/write/filter counts, status)
+     * @param transactionManager     wraps each chunk in a database transaction
+     * @param multiFileItemReader    {@code @StepScope} reader for this partition's CSV file
      * @param multiFileItemProcessor filters records with null or blank name (returns {@code null} to skip)
-     * @param multiFileItemWriter  idempotent JDBC writer using {@code ON DUPLICATE KEY UPDATE}
+     * @param multiFileItemWriter    idempotent JDBC writer using {@code ON DUPLICATE KEY UPDATE}
      * @return the configured worker {@link Step}
      */
     @Bean
@@ -139,5 +146,25 @@ public class MultiFileJobConfig {
                 .writer(multiFileItemWriter)
                 .listener(stepExecutionListener)
                 .build();
+    }
+
+    /**
+     * Validates that {@code inputPath} resolves to a location within {@code allowedBaseDir},
+     * preventing path traversal attacks (CWE-22). Returns the normalised absolute path string.
+     *
+     * @param inputPath      user-supplied directory path from job parameters
+     * @param allowedBaseDir configured base directory boundary (e.g. {@code /data})
+     * @return normalised absolute path, guaranteed to reside within {@code allowedBaseDir}
+     * @throws IllegalArgumentException if the resolved path escapes the allowed base
+     */
+    private static String requireWithinAllowedBase(String inputPath, String allowedBaseDir) {
+        Path base = Path.of(allowedBaseDir).toAbsolutePath().normalize();
+        Path resolved = base.resolve(inputPath).normalize().toAbsolutePath();
+        if (!resolved.startsWith(base)) {
+            throw new IllegalArgumentException(
+                    "Input path is not within the allowed base directory | path=" + inputPath
+                            + " | allowedBaseDir=" + allowedBaseDir);
+        }
+        return resolved.toString();
     }
 }

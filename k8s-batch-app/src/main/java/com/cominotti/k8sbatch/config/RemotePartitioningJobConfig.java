@@ -4,7 +4,7 @@ package com.cominotti.k8sbatch.config;
 
 import com.cominotti.k8sbatch.batch.common.domain.BatchPartitionProperties;
 import com.cominotti.k8sbatch.batch.common.domain.BatchStepNames;
-import com.cominotti.k8sbatch.batch.common.adapters.LoggingStepExecutionListener;
+import com.cominotti.k8sbatch.batch.common.adapters.observingexecution.logging.LoggingStepExecutionListener;
 import com.cominotti.k8sbatch.batch.filerange.domain.FileRangePartitioner;
 import com.cominotti.k8sbatch.batch.multifile.domain.MultiFilePartitioner;
 import org.apache.kafka.clients.consumer.ConsumerConfig;

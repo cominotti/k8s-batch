@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package com.cominotti.k8sbatch.batch.transaction.adapters;
+package com.cominotti.k8sbatch.batch.transaction.adapters.persistingtransactions.jdbc;
 
 import com.cominotti.k8sbatch.avro.EnrichedTransactionEvent;
 import org.slf4j.Logger;
@@ -17,7 +17,7 @@ import java.sql.Timestamp;
  * <p>Uses MySQL 8's {@code ON DUPLICATE KEY UPDATE} with row alias for idempotent writes — if a
  * transaction with the same {@code transaction_id} (primary key) already exists, it is updated
  * rather than duplicated. Follows the same factory pattern as {@link
- * com.cominotti.k8sbatch.batch.common.adapters.CsvRecordWriter CsvRecordWriter}.
+ * com.cominotti.k8sbatch.batch.common.adapters.persistingrecords.jdbc.CsvRecordWriter CsvRecordWriter}.
  */
 public final class EnrichedTransactionWriter {
 

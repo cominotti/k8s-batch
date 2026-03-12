@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package com.cominotti.k8sbatch.batch.common.adapters;
+package com.cominotti.k8sbatch.batch.common.adapters.observingexecution.logging;
 
 import java.time.Duration;
 import java.time.LocalDateTime;

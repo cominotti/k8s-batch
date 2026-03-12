@@ -22,33 +22,76 @@ These principles override pattern-matching instinct. When in doubt, favor the si
 8. **`@StepScope` and `@JobScope` are acceptable on domain classes.** These Spring Batch annotations enable partition-specific parameter injection via `@Value("#{stepExecutionContext[...]}")`. They are framework metadata, not business logic coupling — treat them like `@ConfigurationProperties`.
 9. **Every package should contain files from a single architectural zone.** If a package has files from multiple zones (e.g., controllers + `@Configuration` + DTOs), it needs sub-packages to separate them — even if the package is small today. This applies to all packages, not just bounded contexts. Driving adapter packages (REST, gRPC, CLI) are not bounded contexts but still need internal layering when they contain multiple zones.
 
+## Adapter Port-Name Convention
+
+Adapter packages are named after the port they serve, following the pattern `adapters/<portname>/<technology>/` from Garrido de Paz & Cockburn's "Hexagonal Architecture Explained", adapted to Java package naming (all-lowercase, no separators):
+
+- **Port name**: gerund+noun describing the capability (e.g., `launchingjobs`, `persistingrecords`, `streamingevents`). The verb naturally encodes direction — driving verbs (launching, managing) indicate inbound adapters; driven verbs (persisting, reading, streaming) indicate outbound adapters.
+- **Technology**: the implementation technology (`rest/`, `jdbc/`, `kafka/`, `file/`, `logging/`).
+
+Each port name maps to exactly one port interface — either a natural port (Spring Batch interface) or a custom interface in `domain/` or `ports/`. This naming removes the need for generic `in/` and `out/` markers because the port name itself communicates direction.
+
+| Port name | Direction | Technology | Maps to port |
+|-----------|-----------|------------|-------------|
+| `launchingjobs` | Driving | `rest/` | REST API → `JobOperator` |
+| `readingcsv` | Driven | `file/` | `ItemReader<CsvRecord>` (natural) |
+| `persistingrecords` | Driven | `jdbc/` | `ItemWriter<CsvRecord>` (natural) |
+| `observingexecution` | Driven | `logging/` | `JobExecutionListener`, `StepExecutionListener` (natural) |
+| `streamingevents` | Driven | `kafka/` | Kafka consumer/producer factories |
+| `persistingtransactions` | Driven | `jdbc/` | `ItemWriter<EnrichedTransactionEvent>` (natural) |
+
+## Driven Adapter Port Rule
+
+Every driven adapter must correspond to a port — an interface that the domain defines or depends on. This is the core hexagonal dependency rule: the domain never imports infrastructure; it depends on a port, and the adapter provides the implementation.
+
+**Natural ports** (preferred): Spring Batch interfaces like `ItemReader<T>`, `ItemWriter<T>`, `ItemProcessor<I,O>`, and `Partitioner` already serve as ports. Adapter factories that return objects implementing these interfaces satisfy the rule without custom interfaces. See the Natural Ports table in Step 1e.
+
+**Custom ports** (when needed): When the domain requires a capability that no framework interface provides, define a custom interface in `domain/` or `ports/`. Examples: a `RateProvider` if exchange rates came from an external API, a `NotificationSender` for alerting on batch failures.
+
+**When to flag**: A class in an adapter package that doesn't implement or produce an implementation of any port is either:
+- Framework glue misplaced in adapters → recommend moving to `config/`
+- Missing a port interface → recommend extracting one if it improves testability
+
+Do NOT flag adapter factories that produce Spring Batch interface implementations — the factory pattern is the adapter, and the Spring Batch interface is the port.
+
 ## Target Package Structure
 
-Feature-first with layer sub-packages — each feature package is a DDD Bounded Context:
+Feature-first with layer sub-packages — each feature package is a DDD Bounded Context. Adapter packages use the port-name convention (`adapters/<portname>/<technology>/`):
 
 ```
 com.cominotti.k8sbatch/
   batch/
     transaction/               # Bounded Context: Transaction Enrichment
       domain/                  # Business rules, value objects, processors
-      adapters/                # Kafka reader, JDBC writer, Avro config
+      adapters/
+        streamingevents/
+          kafka/               # Kafka consumer/producer factories
+        persistingtransactions/
+          jdbc/                # Enriched transaction JDBC writer
       config/                  # Job/step wiring, @Configuration classes
       ports/                   # ONLY when custom interfaces needed beyond Spring Batch
     filerange/                 # Bounded Context: File-Range ETL
       domain/
-      adapters/
       config/
     multifile/                 # Bounded Context: Multi-File ETL
       domain/
-      adapters/
       config/
     common/                    # Shared Kernel
       domain/                  # CsvRecord, BatchStepNames, shared value objects
-      adapters/                # Shared reader/writer factories
+      adapters/
+        readingcsv/
+          file/                # CSV file reader factory
+        persistingrecords/
+          jdbc/                # CSV record JDBC writer
+        observingexecution/
+          logging/             # Job/step execution listeners, duration utils
   config/                      # Infrastructure (cross-cutting: remote partitioning, Kafka integration)
-  web/                         # Driving Adapter (REST API)
-    # Sub-packages by zone: controllers, config, DTOs — same zone-separation
-    # principle as bounded contexts, with names appropriate to the adapter type
+  web/                         # Driving Adapter Context (REST API)
+    adapters/
+      launchingjobs/
+        rest/                  # REST controllers
+    config/                    # Async job operator config
+    dto/                       # REST response/request types
 ```
 
 ## Severity Levels
@@ -67,10 +110,10 @@ Determine which files changed using git (try `git diff --name-only`, then `--cac
 | Zone | Characteristics | Scrutiny |
 |------|----------------|----------|
 | **Domain** | Business rules, validation, calculations, processors, partitioners, value objects, constants. No I/O. | Full |
-| **Adapter** | Wraps framework interfaces for I/O. Factory methods for readers/writers. Kafka/JDBC/filesystem integration. REST controllers. | Light |
+| **Adapter (driving)** | Inbound adapter implementations in `adapters/<portname>/<tech>/`. REST controllers, gRPC services, CLI handlers. Translates external requests into domain calls. | Light |
+| **Adapter (driven)** | Outbound adapter implementations in `adapters/<portname>/<tech>/`. Factories for readers/writers, Kafka config, filesystem integration. Must correspond to a port (see Driven Adapter Port Rule). | Light |
 | **Config** | Orchestrates domain + adapters into jobs/steps. `@Configuration` classes that compose beans. | Moderate |
-| **Framework Glue** | Spring Integration channels, remote partitioning infra, cross-cutting listeners, logging utilities. | Minimal |
-| **Driving Adapter** | REST controllers, gRPC services, CLI handlers. The entry point where external actors call into the application. May contain sub-zones (adapter, config, DTO) that need sub-packages when mixed. | Light (per sub-zone) |
+| **Framework Glue** | Spring Integration channels, remote partitioning infra, cross-cutting infrastructure. | Minimal |
 | **Shared Kernel** | Code in `common/` shared across 2+ bounded contexts. Apply the scrutiny level matching its sub-zone (domain, adapter). |  |
 
 For classes that span zones (e.g., a config class containing business logic), classify by primary responsibility and flag the zone-crossing code for extraction.
@@ -131,15 +174,21 @@ Adapters may depend on domain classes and framework libraries. They must NOT con
 
 Adapters should not leak infrastructure details into return types that the domain would need to understand.
 
-### 2c. Driving Adapter Internal Structure
+### 2c. Adapter Port-Name Structure
 
-Driving adapter packages (REST controllers, gRPC services, CLI handlers, event consumers that aren't part of a bounded context) often grow to contain files from multiple zones: adapter implementations (controllers), configuration classes, and data transfer types. When a driving adapter package contains files from **2+ different zones**, it needs sub-packages to separate them.
+Apply the Adapter Port-Name Convention (see above). Severity tags:
 
-**[FLAG]** new file placed directly in a driving adapter package that already has files from a different zone — guide to a zone-appropriate sub-package.
+**[FLAG]** adapter placed directly in a flat `adapters/` package without port-name sub-package.
 
-**[RECOMMEND]** existing driving adapter package where files from different zones are mixed. Suggest sub-packages named for their role (e.g., `controller/`, `config/`, `dto/` for REST; but the exact names depend on the project's conventions).
+**[RECOMMEND]** driving adapter in a `controller/` or `controllers/` package — rename to follow the port-name convention.
 
-**Do NOT flag** a driving adapter package that only contains files from one zone — flat is fine when cohesive.
+### 2d. Driven Adapter Port Correspondence
+
+Apply the Driven Adapter Port Rule (see above). `@Configuration` classes that wire adapter beans (e.g., `TransactionKafkaConfig` producing `ConsumerFactory`/`ProducerFactory`) satisfy the rule — they are the adapter's wiring, not misplaced glue. Severity tags:
+
+**[FLAG]** class in a driven adapter package with no port correspondence and no `@Configuration` bean-wiring role.
+
+**[GOOD]** adapter factory or `@Configuration` that produces a natural port implementation.
 
 ## Step 3: Config/Application Zone Review (Moderate Scrutiny)
 
@@ -159,11 +208,11 @@ Only check: framework glue must not contain business rules. Listeners should onl
 
 ## Step 5: Package Structure Review (Gradual Migration)
 
-**For files IN the current diff** that are not in their target sub-package: recommend moving to the correct `domain/`, `adapters/`, or `config/` sub-package as a [RECOMMEND] or [CONSIDER].
+**For files IN the current diff** that are not in their target sub-package: recommend moving to the correct `domain/`, `adapters/<portname>/<tech>/`, or `config/` sub-package as a [RECOMMEND] or [CONSIDER].
 
-**For NEW files**: Guide to the correct feature + layer sub-package directly.
+**For NEW files**: Guide to the correct feature + layer sub-package directly, using the port-name convention for adapters.
 
-**Driving adapter rule**: Driving adapter packages (REST, gRPC, CLI) follow the same zone-separation principle as bounded contexts. When a driving adapter package contains files from multiple zones, recommend sub-packages to separate them. For new files, guide to the correct sub-package.
+**Adapter convention checks**: Apply Steps 2c (port-name structure) and 2d (port correspondence) to files in the current diff that are in adapter packages.
 
 **Do NOT recommend moves for files NOT in the current diff.**
 
@@ -213,8 +262,9 @@ Imports `org.springframework.kafka.SomeClass`, coupling domain to Kafka infrastr
 | Term | Explanation |
 |------|------------|
 | **Hexagonal Architecture** | Business logic has zero dependencies on frameworks or I/O — external access goes through ports implemented by adapters. |
-| **Port** | An interface the domain defines or depends on. *Driving ports* are called by external actors. *Driven ports* are called by the domain to reach infrastructure. |
-| **Adapter** | Concrete implementation of a port connecting to real infrastructure (Kafka, JDBC, filesystem). |
+| **Port** | An interface the domain defines or depends on. *Driving ports*: called by driving adapters to enter the domain. *Driven ports*: called by the domain to reach infrastructure, implemented by driven adapters. Spring Batch interfaces serve as natural ports. |
+| **Driving Adapter** | Inbound adapter — translates external requests (HTTP, CLI, events) into calls on the domain. Package: `adapters/<portname>/<tech>/` where the verb is an action verb (launching, managing). |
+| **Driven Adapter** | Outbound adapter — implements a port to reach infrastructure (database, messaging, filesystem). Package: `adapters/<portname>/<tech>/` where the verb is an infrastructure verb (persisting, reading, streaming). Must correspond to a port. |
 | **Value Object** | Immutable, identity-free, equality by attributes. Best as Java `record` classes. |
 | **Entity** | Object with unique identity that persists over time. Two entities with same attributes but different IDs are different. |
 | **CQS** | Every method either changes state (command, returns void) or returns data (query, no side effects) — never both. |

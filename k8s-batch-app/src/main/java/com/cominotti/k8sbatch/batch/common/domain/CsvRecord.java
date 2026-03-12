@@ -9,7 +9,7 @@ import java.time.LocalDate;
  * Data transfer object for one CSV row. Column order matches the file header:
  * {@code id, name, email, amount, recordDate}. The {@code id} field is the natural key used for
  * upsert deduplication in
- * {@link com.cominotti.k8sbatch.batch.common.adapters.CsvRecordWriter CsvRecordWriter}.
+ * {@link com.cominotti.k8sbatch.batch.common.adapters.persistingrecords.jdbc.CsvRecordWriter CsvRecordWriter}.
  */
 public record CsvRecord(
         Long id,
