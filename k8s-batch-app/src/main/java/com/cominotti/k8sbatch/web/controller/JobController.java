@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package com.cominotti.k8sbatch.web;
+package com.cominotti.k8sbatch.web.controller;
 
+import com.cominotti.k8sbatch.web.dto.JobExecutionResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.job.Job;
@@ -45,7 +46,8 @@ public class JobController {
      * Creates the controller with an async {@link JobOperator} so that {@code POST} returns
      * immediately while the job runs in a background thread.
      *
-     * @param asyncJobOperator async operator defined in {@link AsyncJobOperatorConfig}
+     * @param asyncJobOperator async operator defined in
+     *                         {@link com.cominotti.k8sbatch.web.config.AsyncJobOperatorConfig}
      * @param jobRepository    repository used to poll execution status
      * @param jobRegistry      all {@link Job} beans, auto-wired by Spring as a map keyed by bean name
      */

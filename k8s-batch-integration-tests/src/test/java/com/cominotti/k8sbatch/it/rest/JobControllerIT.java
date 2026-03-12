@@ -4,7 +4,7 @@ package com.cominotti.k8sbatch.it.rest;
 
 import com.cominotti.k8sbatch.it.AbstractIntegrationTest;
 import com.cominotti.k8sbatch.it.config.BatchTestJobConfig;
-import com.cominotti.k8sbatch.web.JobExecutionResponse;
+import com.cominotti.k8sbatch.web.dto.JobExecutionResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.batch.test.JobRepositoryTestUtils;

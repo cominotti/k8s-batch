@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package com.cominotti.k8sbatch.web;
+package com.cominotti.k8sbatch.web.config;
 
 import org.springframework.batch.core.launch.support.JobOperatorFactoryBean;
 import org.springframework.batch.core.repository.JobRepository;
@@ -13,7 +13,8 @@ import org.springframework.core.task.SimpleAsyncTaskExecutor;
  *
  * <p>The default auto-configured {@code JobOperator} is synchronous — {@code start()} blocks until
  * the job completes. This config creates a second operator backed by a
- * {@link SimpleAsyncTaskExecutor} so that {@link JobController}'s POST returns HTTP 202 immediately
+ * {@link SimpleAsyncTaskExecutor} so that
+ * {@link com.cominotti.k8sbatch.web.controller.JobController}'s POST returns HTTP 202 immediately
  * while the job runs in a background thread.
  */
 @Configuration(proxyBeanMethods = false)
