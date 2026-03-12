@@ -72,8 +72,19 @@ public class MultiFileJobConfig {
                 fileProperties.allowedBaseDir());
     }
 
-    // @Qualifier is required because two Step beans exist (manager + worker) — Spring can't
-    // resolve by type alone. The constant must match the bean name in the manager config.
+    /**
+     * Assembles the multi-file ETL job by wiring the manager step contributed by the active
+     * profile's partition config into a {@link Job} with {@link LoggingJobExecutionListener}.
+     *
+     * <p>{@code @Qualifier} is required because two {@link Step} beans exist (manager + worker) —
+     * Spring cannot resolve by type alone.
+     *
+     * @param jobRepository        persists job metadata (start time, status, parameters)
+     * @param multiFileManagerStep manager step injected by
+     *     {@link com.cominotti.k8sbatch.config.RemotePartitioningJobConfig RemotePartitioningJobConfig}
+     *     or {@link com.cominotti.k8sbatch.config.StandaloneJobConfig StandaloneJobConfig}
+     * @return the fully configured {@code multiFileEtlJob}
+     */
     @Bean
     public Job multiFileEtlJob(JobRepository jobRepository, @Qualifier(BatchStepNames.MULTI_FILE_MANAGER_STEP) Step multiFileManagerStep) {
         return new JobBuilder(BatchStepNames.MULTI_FILE_ETL_JOB, jobRepository)
@@ -94,7 +105,14 @@ public class MultiFileJobConfig {
         return new MultiFilePartitioner(Path.of(safePath));
     }
 
-    // @StepScope: new reader per partition, each reading a different CSV file
+    /**
+     * Creates a partition-scoped CSV reader for this partition's assigned file.
+     *
+     * @param filePath file path from the partition's
+     *     {@link org.springframework.batch.infrastructure.item.ExecutionContext ExecutionContext},
+     *     populated by {@link MultiFilePartitioner}
+     * @return reader for the full CSV file (all data lines)
+     */
     @Bean
     @StepScope
     public FlatFileItemReader<CsvRecord> multiFileItemReader(
@@ -103,15 +121,26 @@ public class MultiFileJobConfig {
         return CsvRecordReaderFactory.create(filePath);
     }
 
-    // @StepScope: new processor per partition (stateless, but scope matches reader/writer)
+    /**
+     * Creates a partition-scoped processor that filters records with null or blank names.
+     *
+     * @return stateless processor (scoped to match reader/writer lifecycle)
+     */
     @Bean
     @StepScope
     public CsvRecordProcessor multiFileItemProcessor() {
         return new CsvRecordProcessor();
     }
 
-    // @StepScope: new writer per partition, tagged with just the file name (not full path)
-    // for traceability in the source_file column
+    /**
+     * Creates a partition-scoped JDBC writer tagged with the file name for traceability.
+     * The {@code fileName} (not full path) is written to the {@code source_file} column.
+     *
+     * @param dataSource MySQL data source
+     * @param fileName   file name from this partition's
+     *     {@link org.springframework.batch.infrastructure.item.ExecutionContext ExecutionContext}
+     * @return idempotent writer using {@code ON DUPLICATE KEY UPDATE}
+     */
     @Bean
     @StepScope
     public JdbcBatchItemWriter<CsvRecord> multiFileItemWriter(

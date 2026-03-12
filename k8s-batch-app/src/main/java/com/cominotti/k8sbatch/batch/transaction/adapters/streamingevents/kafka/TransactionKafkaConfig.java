@@ -186,6 +186,15 @@ public class TransactionKafkaConfig {
         return factory;
     }
 
+    /**
+     * Creates a {@link KafkaTemplate} for publishing enriched transaction events. The default
+     * topic is pre-configured because
+     * {@link org.springframework.batch.infrastructure.item.kafka.KafkaItemWriter KafkaItemWriter}
+     * sends messages to the template's default topic when no per-item topic is specified.
+     *
+     * @param transactionProducerFactory Avro-serializing producer factory (optionally transactional)
+     * @return template with the output topic pre-configured
+     */
     @Bean
     public KafkaTemplate<String, EnrichedTransactionEvent> transactionKafkaTemplate(
             ProducerFactory<String, EnrichedTransactionEvent> transactionProducerFactory) {

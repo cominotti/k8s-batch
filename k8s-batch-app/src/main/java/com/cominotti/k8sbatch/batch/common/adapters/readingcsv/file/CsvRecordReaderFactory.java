@@ -61,12 +61,19 @@ public final class CsvRecordReaderFactory {
     }
 
     /**
-     * Creates a reader constrained to a line range within the CSV file, used by file-range
+     * Creates a reader constrained to an item range within the CSV file, used by file-range
      * partitioning to split one file across multiple workers.
      *
+     * <p><strong>Index semantics:</strong> {@code startLine} and {@code endLine} are 0-based
+     * item counts <em>after header skip</em>, not raw file line numbers. The CSV header line is
+     * already excluded by {@code linesToSkip(1)} in the base reader, so index 0 refers to the
+     * first data row (file line 2). Internally, these map to
+     * {@link FlatFileItemReader#setCurrentItemCount(int)} and
+     * {@link FlatFileItemReader#setMaxItemCount(int)}.
+     *
      * @param resource  Spring {@link Resource} pointing to the CSV file
-     * @param startLine 0-based start item index (after header skip)
-     * @param endLine   exclusive end item index
+     * @param startLine 0-based start item index (inclusive, after header skip)
+     * @param endLine   0-based end item index (exclusive, after header skip)
      * @return reader that reads only items in {@code [startLine, endLine)}
      */
     public static FlatFileItemReader<CsvRecord> createWithLineRange(

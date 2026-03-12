@@ -88,6 +88,13 @@ public class RemotePartitioningJobConfig {
 
     // ── Builder Factory ──────────────────────────────────────────
 
+    /**
+     * Creates the factory for building remote partitioning manager steps. Used by both
+     * {@link #fileRangeManagerStep} and {@link #multiFileManagerStep}.
+     *
+     * @param jobRepository repository for persisting step execution metadata
+     * @return factory for building manager steps with remote partitioning support
+     */
     @Bean
     public RemotePartitioningManagerStepBuilderFactory managerStepBuilderFactory(
             JobRepository jobRepository) {
@@ -96,15 +103,26 @@ public class RemotePartitioningJobConfig {
 
     // ── Channels ─────────────────────────────────────────────────
 
+    /**
+     * Spring Integration channel that receives {@code StepExecutionRequest} messages from the
+     * manager step and routes them to the Kafka outbound flow.
+     *
+     * @return direct channel (synchronous — processes messages on the caller's thread)
+     */
     @Bean
     public DirectChannel managerRequestsChannel() {
         return new DirectChannel();
     }
 
-    // ── Kafka Factories (Java serialization, not JSON) ────────────
-    // StepExecutionRequest is serialized as a byte[] via Java object serialization,
-    // which is why ByteArraySerializer/Deserializer is used instead of JSON serializers.
+    // ── Kafka Factories ────────────────────────────────────────────
 
+    /**
+     * Kafka producer factory for publishing serialized partition requests. Uses
+     * {@code ByteArraySerializer} because {@code StepExecutionRequest} objects are serialized
+     * via Java object serialization by the outbound flow, not as JSON or Avro.
+     *
+     * @return producer factory for the partition requests topic
+     */
     @Bean
     public ProducerFactory<String, byte[]> partitionProducerFactory() {
         return new DefaultKafkaProducerFactory<>(Map.of(
@@ -114,6 +132,13 @@ public class RemotePartitioningJobConfig {
         ));
     }
 
+    /**
+     * Kafka consumer factory for receiving serialized partition requests on worker pods. All
+     * workers share a single consumer group so Kafka load-balances requests across them.
+     * {@code earliest} offset reset ensures restarted workers pick up unprocessed requests.
+     *
+     * @return consumer factory with the shared worker consumer group
+     */
     @Bean
     public ConsumerFactory<String, byte[]> requestsConsumerFactory() {
         return new DefaultKafkaConsumerFactory<>(Map.of(
@@ -127,8 +152,13 @@ public class RemotePartitioningJobConfig {
     }
 
     // ── Manager: Outbound requests to Kafka ──────────────────────
-    // Serializes StepExecutionRequest → byte[] and publishes to Kafka
 
+    /**
+     * Spring Integration flow that serializes {@code StepExecutionRequest} objects to byte arrays
+     * (Java serialization) and publishes them to the Kafka requests topic.
+     *
+     * @return integration flow: managerRequestsChannel -> Java serialization -> Kafka producer
+     */
     @Bean
     public IntegrationFlow managerOutboundRequestsFlow() {
         log.info("Configuring manager outbound flow | topic={}", requestsTopic);
@@ -140,8 +170,17 @@ public class RemotePartitioningJobConfig {
     }
 
     // ── Worker: Inbound requests from Kafka → handler ────────────
-    // Deserializes byte[] → StepExecutionRequest, looks up the Step by name, executes it
 
+    /**
+     * Worker-side handler that receives deserialized {@code StepExecutionRequest} messages,
+     * resolves the target {@link org.springframework.batch.core.step.Step Step} bean by name via
+     * {@link BeanFactoryStepLocator}, and executes it. Step names must match bean names defined
+     * in {@link com.cominotti.k8sbatch.batch.common.domain.BatchStepNames BatchStepNames}.
+     *
+     * @param jobRepository repository for persisting step execution status
+     * @param beanFactory   Spring bean factory for resolving step beans by name
+     * @return configured handler for worker-side step execution
+     */
     @Bean
     public StepExecutionRequestHandler stepExecutionRequestHandler(
             JobRepository jobRepository, BeanFactory beanFactory) {
@@ -156,6 +195,15 @@ public class RemotePartitioningJobConfig {
         return handler;
     }
 
+    /**
+     * Spring Integration flow that consumes serialized partition requests from Kafka, deserializes
+     * them (with a whitelist restricted to Spring Batch and JDK classes), and dispatches them to
+     * the {@link StepExecutionRequestHandler}. Results are discarded via {@link NullChannel}
+     * because the manager detects completion by polling {@link JobRepository}.
+     *
+     * @param stepExecutionRequestHandler handler that resolves and executes the target step
+     * @return integration flow: Kafka consumer -> deserialization -> step handler -> NullChannel
+     */
     @Bean
     public IntegrationFlow workerFlow(StepExecutionRequestHandler stepExecutionRequestHandler) {
         log.info("Configuring worker inbound flow | topic={} | consumerGroup={}", requestsTopic, WORKER_CONSUMER_GROUP);
@@ -172,8 +220,15 @@ public class RemotePartitioningJobConfig {
     }
 
     // ── Manager Steps (builder API, polling mode) ────────────────
-    // The manager polls JobRepository until all workers complete or timeout expires
 
+    /**
+     * Remote partitioning manager step for the file-range ETL job. Publishes partition requests
+     * to Kafka and polls {@link JobRepository} until all workers complete or timeout expires.
+     *
+     * @param factory              builder factory for remote manager steps
+     * @param fileRangePartitioner splits the CSV file into line-range partitions
+     * @return configured manager step with Kafka outbound channel and polling timeout
+     */
     @Bean
     public Step fileRangeManagerStep(
             RemotePartitioningManagerStepBuilderFactory factory,
@@ -182,6 +237,14 @@ public class RemotePartitioningJobConfig {
                 BatchStepNames.FILE_RANGE_WORKER_STEP, fileRangePartitioner);
     }
 
+    /**
+     * Remote partitioning manager step for the multi-file ETL job. Publishes partition requests
+     * to Kafka and polls {@link JobRepository} until all workers complete or timeout expires.
+     *
+     * @param factory              builder factory for remote manager steps
+     * @param multiFilePartitioner assigns one CSV file per partition
+     * @return configured manager step with Kafka outbound channel and polling timeout
+     */
     @Bean
     public Step multiFileManagerStep(
             RemotePartitioningManagerStepBuilderFactory factory,
@@ -190,6 +253,12 @@ public class RemotePartitioningJobConfig {
                 BatchStepNames.MULTI_FILE_WORKER_STEP, multiFilePartitioner);
     }
 
+    /**
+     * Shared builder for remote manager steps. Configures partitioning, grid size, Kafka output
+     * channel, polling timeout, and the step execution listener. No reply channel is used —
+     * the manager detects worker completion by polling {@link JobRepository}, which avoids
+     * fragile {@code StepExecution} serialization through Kafka.
+     */
     private Step buildRemoteManagerStep(
             RemotePartitioningManagerStepBuilderFactory factory,
             String managerStepName, String workerStepName,

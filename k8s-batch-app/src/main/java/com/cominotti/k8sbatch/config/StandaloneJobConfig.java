@@ -50,7 +50,15 @@ public class StandaloneJobConfig {
         this.stepExecutionListener = stepExecutionListener;
     }
 
-    // @Qualifier is required because two Step beans exist (manager + worker)
+    /**
+     * Manager step for file-range partitioning in standalone mode. Distributes partitions across
+     * local threads instead of Kafka-connected worker pods.
+     *
+     * @param jobRepository         persists step execution metadata
+     * @param fileRangePartitioner  splits the CSV file into line-range partitions
+     * @param fileRangeWorkerStep   worker step that processes one partition
+     * @return configured manager step using {@link TaskExecutorPartitionHandler}
+     */
     @Bean
     public Step fileRangeManagerStep(
             JobRepository jobRepository,
@@ -61,7 +69,15 @@ public class StandaloneJobConfig {
                 fileRangeWorkerStep, "file-range-");
     }
 
-    // @Qualifier is required because two Step beans exist (manager + worker)
+    /**
+     * Manager step for multi-file partitioning in standalone mode. Distributes partitions across
+     * local threads instead of Kafka-connected worker pods.
+     *
+     * @param jobRepository          persists step execution metadata
+     * @param multiFilePartitioner   assigns one CSV file per partition
+     * @param multiFileWorkerStep    worker step that processes one partition's file
+     * @return configured manager step using {@link TaskExecutorPartitionHandler}
+     */
     @Bean
     public Step multiFileManagerStep(
             JobRepository jobRepository,
@@ -72,9 +88,14 @@ public class StandaloneJobConfig {
                 multiFileWorkerStep, "multi-file-");
     }
 
-    // Note: TaskExecutorPartitionHandler does not expose a timeout API.
-    // In integration tests, the JUnit @Timeout annotation serves as the backstop
-    // to prevent indefinite hangs if a worker step blocks.
+    /**
+     * Builds a standalone manager step using {@link TaskExecutorPartitionHandler} to run worker
+     * steps in parallel threads within the same JVM.
+     *
+     * <p><strong>Note:</strong> {@code TaskExecutorPartitionHandler} does not expose a timeout
+     * API. In integration tests, JUnit's {@code @Timeout} annotation serves as the backstop to
+     * prevent indefinite hangs if a worker step deadlocks.
+     */
     private Step buildStandaloneManagerStep(
             JobRepository jobRepository, String managerStepName, String workerStepName,
             org.springframework.batch.core.partition.Partitioner partitioner,
@@ -94,8 +115,11 @@ public class StandaloneJobConfig {
                 .build();
     }
 
-    // Creates a new executor per call (not a shared bean) so each job gets a distinct thread
-    // name prefix for log correlation — e.g., "file-range-1" vs "multi-file-1"
+    /**
+     * Creates a new thread pool per call (not a shared bean) so each job gets a distinct thread
+     * name prefix for log correlation (e.g. {@code file-range-1} vs {@code multi-file-1}).
+     * Pool size equals grid size so all partitions can execute concurrently.
+     */
     private ThreadPoolTaskExecutor partitionTaskExecutor(String threadNamePrefix) {
         log.info("Creating partition thread pool | prefix={} | poolSize={}",
                 threadNamePrefix, partitionProperties.gridSize());

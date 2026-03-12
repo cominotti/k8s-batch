@@ -36,6 +36,9 @@ public final class EnrichedTransactionWriter {
     public static JdbcBatchItemWriter<EnrichedTransactionEvent> create(DataSource dataSource) {
         log.debug("Creating enriched transaction JDBC batch writer");
         return new JdbcBatchItemWriterBuilder<EnrichedTransactionEvent>()
+                // MySQL 8 row alias: "VALUES (...) AS new_row" names the incoming row so the
+                // ON DUPLICATE KEY UPDATE clause can reference new values without the deprecated
+                // VALUES() function syntax (deprecated in MySQL 8.0.20).
                 .sql("""
                         INSERT INTO enriched_transactions
                             (transaction_id, account_id, amount, currency, exchange_rate,
@@ -51,6 +54,7 @@ public final class EnrichedTransactionWriter {
                             original_timestamp = new_row.original_timestamp,
                             processed_at = new_row.processed_at
                         """)
+                // Parameter indices must match the VALUES placeholder order above
                 .itemPreparedStatementSetter((item, ps) -> {
                     ps.setString(1, item.getTransactionId());
                     ps.setString(2, item.getAccountId());

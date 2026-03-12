@@ -39,7 +39,8 @@ public class JobController {
 
     private final JobOperator asyncJobOperator;
     private final JobRepository jobRepository;
-    // Spring auto-wires all Job beans into a map keyed by bean name
+    /** All {@link Job} beans auto-wired by Spring as a map keyed by bean name. Used to
+     *  validate that requested job names exist before launching. */
     private final Map<String, Job> jobRegistry;
 
     /**
@@ -86,7 +87,8 @@ public class JobController {
             if (parameters != null) {
                 parameters.forEach(builder::addString);
             }
-            // Timestamp makes each launch unique — Spring Batch rejects duplicate JobParameters
+            // Spring Batch requires unique JobParameters per launch — without a unique parameter,
+            // re-launching the same job with the same params throws JobInstanceAlreadyCompleteException
             builder.addLong("timestamp", System.currentTimeMillis());
             JobParameters jobParameters = builder.toJobParameters();
 

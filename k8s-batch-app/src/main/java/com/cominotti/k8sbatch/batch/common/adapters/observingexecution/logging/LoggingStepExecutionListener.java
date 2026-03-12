@@ -32,6 +32,12 @@ public class LoggingStepExecutionListener implements StepExecutionListener {
                 stepExecution.getJobExecutionId());
     }
 
+    /**
+     * Logs step completion metrics and returns {@code null} to preserve the step's original
+     * {@link ExitStatus}. A non-null return would override the step's exit status, which is not
+     * appropriate for a logging-only listener — this is a key Spring Batch convention for
+     * observational listeners.
+     */
     @Override
     public ExitStatus afterStep(StepExecution stepExecution) {
         String stepName = stepExecution.getStepName();
@@ -60,8 +66,7 @@ public class LoggingStepExecutionListener implements StepExecutionListener {
                     duration, thread);
         }
 
-        // Returning null means "don't override the step's ExitStatus" — a non-null return
-        // would replace the step's outcome, which is not desired for a logging-only listener
+        // null = don't override ExitStatus (see method JavaDoc)
         return null;
     }
 }

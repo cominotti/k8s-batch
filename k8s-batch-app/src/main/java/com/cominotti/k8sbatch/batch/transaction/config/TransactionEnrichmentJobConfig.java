@@ -84,9 +84,22 @@ public class TransactionEnrichmentJobConfig {
 
     // ── Reader ───────────────────────────────────────────────────────
 
-    // @StepScope enables late binding of job parameters for partition selection.
-    // KafkaItemReader requires explicit partition-to-offset mappings — it does not use
-    // the consumer group protocol for partition assignment.
+    /**
+     * Creates a partition-scoped Kafka reader for consuming {@link TransactionEvent} messages.
+     *
+     * <p>{@link KafkaItemReader} uses manual partition assignment ({@code assign()}) rather than
+     * the consumer group protocol ({@code subscribe()}), so it requires explicit
+     * partition-to-offset mappings. Kafka's automatic rebalancing is bypassed — the job parameter
+     * {@code kafka.partitions} controls which partitions this instance reads. Offset 0 means
+     * "start from the beginning" (overridden by saved state if {@code saveState=true} and a
+     * previous execution checkpoint exists).
+     *
+     * @param consumerFactory Avro-deserializing consumer factory from
+     *     {@link com.cominotti.k8sbatch.batch.transaction.adapters.streamingevents.kafka.TransactionKafkaConfig
+     *     TransactionKafkaConfig}
+     * @param partitions      comma-separated partition indices from job parameters (defaults to "0")
+     * @return reader configured for the specified Kafka partitions
+     */
     @Bean
     @StepScope
     public KafkaItemReader<String, TransactionEvent> transactionEventReader(
@@ -132,6 +145,17 @@ public class TransactionEnrichmentJobConfig {
         return EnrichedTransactionWriter.create(dataSource);
     }
 
+    /**
+     * Creates a partition-scoped Kafka writer that publishes enriched events to the output topic.
+     * Uses {@link EnrichedTransactionEvent#getTransactionId()} as the Kafka message key for
+     * deterministic partition assignment. {@code setDelete(false)} ensures items are appended,
+     * not tombstoned, on the topic.
+     *
+     * @param kafkaTemplate template configured with the output topic in
+     *     {@link com.cominotti.k8sbatch.batch.transaction.adapters.streamingevents.kafka.TransactionKafkaConfig
+     *     TransactionKafkaConfig}
+     * @return configured Kafka writer
+     */
     @Bean
     @StepScope
     public KafkaItemWriter<String, EnrichedTransactionEvent> enrichedTransactionKafkaWriter(
@@ -143,6 +167,15 @@ public class TransactionEnrichmentJobConfig {
         return writer;
     }
 
+    /**
+     * Combines the JDBC and Kafka writers into a single {@link CompositeItemWriter} so that each
+     * enriched event is written to both MySQL and the Kafka output topic within the same chunk
+     * transaction boundary. Delegates are invoked in order: DB write first, then Kafka publish.
+     *
+     * @param enrichedTransactionDbWriter    MySQL upsert writer
+     * @param enrichedTransactionKafkaWriter Kafka output writer
+     * @return composite writer that delegates to both writers in order
+     */
     @Bean
     @StepScope
     public CompositeItemWriter<EnrichedTransactionEvent> enrichedTransactionCompositeWriter(
@@ -155,6 +188,17 @@ public class TransactionEnrichmentJobConfig {
 
     // ── Step & Job ──────────────────────────────────────────────────
 
+    /**
+     * Single chunk step that reads, enriches, and writes transaction events. Not partitioned —
+     * parallelism comes from Kafka partition assignment across pod replicas.
+     *
+     * @param jobRepository                       persists step metadata
+     * @param transactionManager                  wraps each chunk in a database transaction
+     * @param transactionEventReader              reads Avro events from the input Kafka topic
+     * @param transactionEnrichmentProcessor      enriches with exchange rate and risk score
+     * @param enrichedTransactionCompositeWriter  writes to both MySQL and Kafka output topic
+     * @return the configured enrichment step
+     */
     @Bean
     public Step transactionEnrichmentStep(
             JobRepository jobRepository,
@@ -172,6 +216,14 @@ public class TransactionEnrichmentJobConfig {
                 .build();
     }
 
+    /**
+     * Assembles the transaction enrichment job as a simple one-step job with
+     * {@link LoggingJobExecutionListener}.
+     *
+     * @param jobRepository              persists job metadata
+     * @param transactionEnrichmentStep  the single enrichment chunk step
+     * @return the fully configured {@code transactionEnrichmentJob}
+     */
     @Bean
     public Job transactionEnrichmentJob(
             JobRepository jobRepository,

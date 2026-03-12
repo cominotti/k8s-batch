@@ -74,8 +74,19 @@ public class FileRangeJobConfig {
                 fileProperties.allowedBaseDir());
     }
 
-    // @Qualifier is required because two Step beans exist (manager + worker) — Spring can't
-    // resolve by type alone. The constant must match the bean name in the manager config.
+    /**
+     * Assembles the file-range ETL job by wiring the manager step contributed by the active
+     * profile's partition config into a {@link Job} with {@link LoggingJobExecutionListener}.
+     *
+     * <p>{@code @Qualifier} is required because two {@link Step} beans exist (manager + worker) —
+     * Spring cannot resolve by type alone.
+     *
+     * @param jobRepository         persists job metadata (start time, status, parameters)
+     * @param fileRangeManagerStep  manager step injected by
+     *     {@link com.cominotti.k8sbatch.config.RemotePartitioningJobConfig RemotePartitioningJobConfig}
+     *     or {@link com.cominotti.k8sbatch.config.StandaloneJobConfig StandaloneJobConfig}
+     * @return the fully configured {@code fileRangeEtlJob}
+     */
     @Bean
     public Job fileRangeEtlJob(JobRepository jobRepository, @Qualifier(BatchStepNames.FILE_RANGE_MANAGER_STEP) Step fileRangeManagerStep) {
         return new JobBuilder(BatchStepNames.FILE_RANGE_ETL_JOB, jobRepository)
@@ -96,7 +107,16 @@ public class FileRangeJobConfig {
         return new FileRangePartitioner(new FileSystemResource(safePath));
     }
 
-    // @StepScope: new reader per partition with its own line range from the ExecutionContext
+    /**
+     * Creates a partition-scoped CSV reader constrained to the line range assigned by
+     * {@link FileRangePartitioner}. Each partition reads a different slice of the same file.
+     *
+     * @param resourcePath CSV file path from the partition's
+     *     {@link org.springframework.batch.infrastructure.item.ExecutionContext ExecutionContext}
+     * @param startLine    0-based start item index (inclusive, after header skip)
+     * @param endLine      0-based end item index (exclusive, after header skip)
+     * @return reader for the assigned line range
+     */
     @Bean
     @StepScope
     public FlatFileItemReader<CsvRecord> fileRangeItemReader(
@@ -108,14 +128,27 @@ public class FileRangeJobConfig {
         return CsvRecordReaderFactory.createWithLineRange(resource, startLine, endLine);
     }
 
-    // @StepScope: new processor per partition (stateless, but scope matches reader/writer)
+    /**
+     * Creates a partition-scoped processor that filters records with null or blank names.
+     *
+     * @return stateless processor (scoped to match reader/writer lifecycle)
+     */
     @Bean
     @StepScope
     public CsvRecordProcessor fileRangeItemProcessor() {
         return new CsvRecordProcessor();
     }
 
-    // @StepScope: new writer per partition, tagged with the partition's source file for traceability
+    /**
+     * Creates a partition-scoped JDBC writer tagged with the source file path for traceability.
+     * The {@code resourcePath} is written to the {@code source_file} column, enabling queries
+     * to trace which partition wrote each row.
+     *
+     * @param dataSource    MySQL data source
+     * @param resourcePath  file path from this partition's
+     *     {@link org.springframework.batch.infrastructure.item.ExecutionContext ExecutionContext}
+     * @return idempotent writer using {@code ON DUPLICATE KEY UPDATE}
+     */
     @Bean
     @StepScope
     public JdbcBatchItemWriter<CsvRecord> fileRangeItemWriter(

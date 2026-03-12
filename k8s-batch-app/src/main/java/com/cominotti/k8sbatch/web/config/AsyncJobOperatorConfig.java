@@ -11,11 +11,16 @@ import org.springframework.core.task.SimpleAsyncTaskExecutor;
 /**
  * Provides an async {@link org.springframework.batch.core.launch.JobOperator} for the REST API.
  *
- * <p>The default auto-configured {@code JobOperator} is synchronous — {@code start()} blocks until
- * the job completes. This config creates a second operator backed by a
- * {@link SimpleAsyncTaskExecutor} so that
- * {@link com.cominotti.k8sbatch.web.adapters.launchingjobs.rest.JobController}'s POST returns HTTP 202 immediately
- * while the job runs in a background thread.
+ * <p>Spring Batch 6 replaces the deprecated {@code JobLauncher} with {@code JobOperator}, which
+ * combines job launching, stopping, and restart capabilities in a single interface. The default
+ * auto-configured {@code JobOperator} is synchronous — {@code start()} blocks until the job
+ * completes. This config creates a second operator backed by a {@link SimpleAsyncTaskExecutor}
+ * so that {@link com.cominotti.k8sbatch.web.adapters.launchingjobs.rest.JobController}'s POST
+ * returns HTTP 202 immediately while the job runs in a background thread.
+ *
+ * <p>Both operators coexist: the synchronous auto-configured one is used by tests (via
+ * {@code JobOperatorTestUtils}), while this async one is used by the REST API via
+ * {@code @Qualifier("asyncJobOperator")}.
  */
 @Configuration(proxyBeanMethods = false)
 class AsyncJobOperatorConfig {

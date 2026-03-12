@@ -51,18 +51,30 @@ management:
     readinessstate:
       enabled: true
 
+# ── Batch Job Configuration ─────────────────────────────────────────────────
+# Application-specific batch properties (not Spring's spring.batch.* namespace).
+# Bound to: BatchFileProperties (batch.file.*), BatchPartitionProperties (batch.partition.*),
+# TransactionJobProperties (batch.transaction.*).
 batch:
   file:
-    # Base directory that all job input file paths must reside in (path traversal guard).
-    # Override with the actual data volume mount path in production (e.g. BATCH_FILE_ALLOWED_BASE_DIR=/data).
-    # Defaults to / (system root), which allows any valid absolute path.
+    # Path-traversal guard (CWE-22): all job input file paths are validated to reside within
+    # this directory. Override with the actual data volume mount path in production
+    # (e.g. BATCH_FILE_ALLOWED_BASE_DIR=/data). Defaults to / (system root), which allows
+    # any valid absolute path — suitable for local development and integration testing only.
     allowed-base-dir: ${BATCH_FILE_ALLOWED_BASE_DIR:/}
+  # ── Partitioning ─────────────────────────────────────────────────────────
+  # Controls how CSV ETL jobs split work across workers. In remote mode, partitions are
+  # distributed to worker pods via Kafka. In standalone mode, partitions run as local threads.
   partition:
     grid-size: ${BATCH_PARTITION_GRID_SIZE:4}
     chunk-size: ${BATCH_PARTITION_CHUNK_SIZE:100}
     # Remote partitioning manager polling timeout. Standalone mode ignores this
     # (TaskExecutorPartitionHandler has no timeout API — JUnit @Timeout is the backstop).
     timeout-ms: ${BATCH_PARTITION_TIMEOUT_MS:60000}
+  # ── Transaction Enrichment Job ───────────────────────────────────────────
+  # Kafka-to-MySQL enrichment pipeline (remote-partitioning profile only). Reads Avro
+  # TransactionEvent messages, enriches with exchange rate + risk score, writes to both
+  # MySQL (idempotent upsert) and a Kafka output topic via CompositeItemWriter.
   transaction:
     input-topic: ${BATCH_TRANSACTION_INPUT_TOPIC:transaction-events}
     output-topic: ${BATCH_TRANSACTION_OUTPUT_TOPIC:enriched-transaction-events}

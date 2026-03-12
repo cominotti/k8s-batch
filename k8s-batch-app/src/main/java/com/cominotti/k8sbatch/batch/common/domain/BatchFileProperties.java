@@ -21,9 +21,10 @@ public record BatchFileProperties(String allowedBaseDir) {
 
     /**
      * Normalises the configured base directory. Falls back to {@code /} when the property is
-     * absent or blank, ensuring the validation logic always has a non-null base to compare against.
+     * absent or blank, ensuring the path-traversal validation logic always has a non-null base
+     * to compare against.
      *
-     * @param allowedBaseDir raw value from application configuration
+     * @param allowedBaseDir raw value from application configuration (may be {@code null} or blank)
      */
     public BatchFileProperties {
         if (allowedBaseDir == null || allowedBaseDir.isBlank()) {
