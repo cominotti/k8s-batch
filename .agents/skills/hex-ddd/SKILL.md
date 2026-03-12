@@ -20,6 +20,7 @@ These principles override pattern-matching instinct. When in doubt, favor the si
 6. **Domain purity matters more in growing domains.** The transaction enrichment pipeline (exchange rates, risk scoring) has more domain potential than CSV ETL (read, filter blanks, write). Calibrate scrutiny accordingly.
 7. **Testability is the practical test of architecture.** If a class can be unit-tested without Spring context, its architecture is good enough — regardless of whether it formally follows hex arch naming conventions.
 8. **`@StepScope` and `@JobScope` are acceptable on domain classes.** These Spring Batch annotations enable partition-specific parameter injection via `@Value("#{stepExecutionContext[...]}")`. They are framework metadata, not business logic coupling — treat them like `@ConfigurationProperties`.
+9. **Every package should contain files from a single architectural zone.** If a package has files from multiple zones (e.g., controllers + `@Configuration` + DTOs), it needs sub-packages to separate them — even if the package is small today. This applies to all packages, not just bounded contexts. Driving adapter packages (REST, gRPC, CLI) are not bounded contexts but still need internal layering when they contain multiple zones.
 
 ## Target Package Structure
 
@@ -46,6 +47,8 @@ com.cominotti.k8sbatch/
       adapters/                # Shared reader/writer factories
   config/                      # Infrastructure (cross-cutting: remote partitioning, Kafka integration)
   web/                         # Driving Adapter (REST API)
+    # Sub-packages by zone: controllers, config, DTOs — same zone-separation
+    # principle as bounded contexts, with names appropriate to the adapter type
 ```
 
 ## Severity Levels
@@ -67,6 +70,7 @@ Determine which files changed using git (try `git diff --name-only`, then `--cac
 | **Adapter** | Wraps framework interfaces for I/O. Factory methods for readers/writers. Kafka/JDBC/filesystem integration. REST controllers. | Light |
 | **Config** | Orchestrates domain + adapters into jobs/steps. `@Configuration` classes that compose beans. | Moderate |
 | **Framework Glue** | Spring Integration channels, remote partitioning infra, cross-cutting listeners, logging utilities. | Minimal |
+| **Driving Adapter** | REST controllers, gRPC services, CLI handlers. The entry point where external actors call into the application. May contain sub-zones (adapter, config, DTO) that need sub-packages when mixed. | Light (per sub-zone) |
 | **Shared Kernel** | Code in `common/` shared across 2+ bounded contexts. Apply the scrutiny level matching its sub-zone (domain, adapter). |  |
 
 For classes that span zones (e.g., a config class containing business logic), classify by primary responsibility and flag the zone-crossing code for extraction.
@@ -127,6 +131,16 @@ Adapters may depend on domain classes and framework libraries. They must NOT con
 
 Adapters should not leak infrastructure details into return types that the domain would need to understand.
 
+### 2c. Driving Adapter Internal Structure
+
+Driving adapter packages (REST controllers, gRPC services, CLI handlers, event consumers that aren't part of a bounded context) often grow to contain files from multiple zones: adapter implementations (controllers), configuration classes, and data transfer types. When a driving adapter package contains files from **2+ different zones**, it needs sub-packages to separate them.
+
+**[FLAG]** new file placed directly in a driving adapter package that already has files from a different zone — guide to a zone-appropriate sub-package.
+
+**[RECOMMEND]** existing driving adapter package where files from different zones are mixed. Suggest sub-packages named for their role (e.g., `controller/`, `config/`, `dto/` for REST; but the exact names depend on the project's conventions).
+
+**Do NOT flag** a driving adapter package that only contains files from one zone — flat is fine when cohesive.
+
 ## Step 3: Config/Application Zone Review (Moderate Scrutiny)
 
 ### 3a. Orchestration Only
@@ -148,6 +162,8 @@ Only check: framework glue must not contain business rules. Listeners should onl
 **For files IN the current diff** that are not in their target sub-package: recommend moving to the correct `domain/`, `adapters/`, or `config/` sub-package as a [RECOMMEND] or [CONSIDER].
 
 **For NEW files**: Guide to the correct feature + layer sub-package directly.
+
+**Driving adapter rule**: Driving adapter packages (REST, gRPC, CLI) follow the same zone-separation principle as bounded contexts. When a driving adapter package contains files from multiple zones, recommend sub-packages to separate them. For new files, guide to the correct sub-package.
 
 **Do NOT recommend moves for files NOT in the current diff.**
 

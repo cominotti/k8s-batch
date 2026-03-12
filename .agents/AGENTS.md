@@ -244,7 +244,9 @@ k8s-batch-app/src/main/java/com/cominotti/k8sbatch/
   batch/transaction/adapters/ — EnrichedTransactionWriter, TransactionKafkaConfig
   batch/transaction/config/   — TransactionEnrichmentJobConfig
   config/             — RemotePartitioningJobConfig, StandaloneJobConfig
-  web/                — REST controller
+  web/controller/     — JobController, HelloController
+  web/config/         — AsyncJobOperatorConfig
+  web/dto/            — JobExecutionResponse
 
 k8s-batch-integration-tests/src/test/java/com/cominotti/k8sbatch/it/
   config/             — ContainerHolder, SharedContainersConfig, MysqlOnlyContainersConfig, BatchTestJobConfig

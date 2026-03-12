@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package com.cominotti.k8sbatch.web;
+package com.cominotti.k8sbatch.web.dto;
 
 /**
  * DTO returned by the job REST API. {@code status} is the {@code BatchStatus} name (STARTING,
