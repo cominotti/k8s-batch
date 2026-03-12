@@ -166,6 +166,17 @@ mvn verify -DskipE2E=true
 | `StandaloneProfileE2E` | 3 | Standalone profile (no Kafka pods), both jobs |
 | `PartitionDistributionE2E` | 1 | Verifies partitions distribute across workers |
 
+### Cluster Lifecycle
+
+The K3s cluster is started **once** and shared across all test classes — it is never restarted between tests. `K3sClusterManager` follows the same singleton pattern as `ContainerHolder` in integration tests:
+
+- **K3s container**: started on first access, reused for the entire test suite
+- **Docker images**: loaded into K3s once (`docker save` → `ctr images import`), tracked by a `loadedImages` set to avoid redundant loads
+- **Helm deployments**: reused when the values file matches. Tests sharing the same profile (e.g., `e2e-remote.yaml`) skip redeployment entirely. A profile change (e.g., remote → standalone) triggers a teardown + redeploy
+- **Test data isolation**: only application data is reset — `@BeforeEach cleanTestData()` deletes rows from `target_records` between test methods
+
+This means the ~9 minute E2E runtime is dominated by one-time setup (K3s boot, image loading, initial deployment) rather than per-test overhead.
+
 ### Fast Failure Detection
 
 The `DeploymentWaiter` provides intelligent pod readiness polling that fails fast instead of waiting for timeout:
