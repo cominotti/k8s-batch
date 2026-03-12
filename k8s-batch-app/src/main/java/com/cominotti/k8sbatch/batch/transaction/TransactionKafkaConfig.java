@@ -83,6 +83,13 @@ public class TransactionKafkaConfig {
     private final String bootstrapServers;
     private final String schemaRegistryUrl;
 
+    /**
+     * Injects Kafka connection properties and job configuration.
+     *
+     * @param jobProperties    topic names, consumer group, and transaction settings
+     * @param bootstrapServers Kafka broker addresses
+     * @param schemaRegistryUrl Confluent Schema Registry URL for Avro serialization
+     */
     public TransactionKafkaConfig(
             TransactionJobProperties jobProperties,
             @Value("${spring.kafka.bootstrap-servers:localhost:9092}") String bootstrapServers,
@@ -108,6 +115,8 @@ public class TransactionKafkaConfig {
      * <p>This isolation level is important for downstream consumers of the output topic, but we
      * also apply it to the input consumer for consistency — if the input topic is fed by another
      * transactional producer, we want the same read-committed guarantee.
+     *
+     * @return consumer factory configured with Avro deserialization and Schema Registry
      */
     @Bean
     public ConsumerFactory<String, TransactionEvent> transactionConsumerFactory() {
@@ -145,6 +154,8 @@ public class TransactionKafkaConfig {
      * <p>Performance note: transactional producers add ~30% overhead due to extra broker
      * round-trips ({@code InitProducerId}, {@code AddPartitionsToTxn}, {@code EndTxn}).
      * For high-throughput batch jobs, this is generally acceptable given the consistency guarantee.
+     *
+     * @return producer factory, optionally transactional based on {@code kafkaTransactionsEnabled}
      */
     @Bean
     public ProducerFactory<String, EnrichedTransactionEvent> transactionProducerFactory() {

@@ -17,6 +17,11 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 @ConfigurationPropertiesScan
 public class K8sBatchApplication {
 
+    /**
+     * Application entry point.
+     *
+     * @param args command-line arguments forwarded to Spring Boot
+     */
     public static void main(String[] args) {
         SpringApplication.run(K8sBatchApplication.class, args);
     }

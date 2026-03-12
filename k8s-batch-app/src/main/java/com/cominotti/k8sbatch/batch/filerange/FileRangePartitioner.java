@@ -31,6 +31,11 @@ public class FileRangePartitioner implements Partitioner {
 
     private final Resource resource;
 
+    /**
+     * Creates a partitioner for the given CSV file resource.
+     *
+     * @param resource the CSV file to split into line-range partitions
+     */
     public FileRangePartitioner(Resource resource) {
         this.resource = resource;
     }

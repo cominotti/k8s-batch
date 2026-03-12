@@ -43,6 +43,13 @@ public class JobController {
     // Spring auto-wires all Job beans into a map keyed by bean name
     private final Map<String, Job> jobRegistry;
 
+    /**
+     * Creates the controller with an internal async {@link TaskExecutorJobLauncher} so that
+     * {@code POST} returns immediately while the job runs in a background thread.
+     *
+     * @param jobRepository repository used by the async launcher to persist job metadata
+     * @param jobRegistry   all {@link Job} beans, auto-wired by Spring as a map keyed by bean name
+     */
     public JobController(JobRepository jobRepository, Map<String, Job> jobRegistry) {
         this.jobRepository = jobRepository;
         this.jobRegistry = jobRegistry;
@@ -56,6 +63,13 @@ public class JobController {
         log.info("JobController initialized | registeredJobs={}", jobRegistry.keySet());
     }
 
+    /**
+     * Launches the named job asynchronously and returns HTTP 202 with the initial execution status.
+     *
+     * @param jobName    Spring bean name of the job (must match a key in the auto-wired job registry)
+     * @param parameters optional key-value pairs forwarded as {@link JobParameters}
+     * @return HTTP 202 with execution ID on success, HTTP 400 if the job name is unknown
+     */
     @PostMapping("/{jobName}")
     public ResponseEntity<JobExecutionResponse> launchJob(
             @PathVariable String jobName,
@@ -93,6 +107,13 @@ public class JobController {
         }
     }
 
+    /**
+     * Polls the current status of a previously launched job execution.
+     *
+     * @param jobName     job name (used only for the response payload, not for lookup)
+     * @param executionId execution ID returned by the launch endpoint
+     * @return HTTP 200 with current status, or HTTP 404 if the execution ID does not exist
+     */
     @GetMapping("/{jobName}/executions/{executionId}")
     public ResponseEntity<JobExecutionResponse> getExecution(
             @PathVariable String jobName,

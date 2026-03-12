@@ -65,6 +65,14 @@ public class RemotePartitioningJobConfig {
     private final String bootstrapServers;
     private final String requestsTopic;
 
+    /**
+     * Injects Kafka connection properties and shared batch infrastructure.
+     *
+     * @param partitionProperties   grid size, chunk size, and polling timeout for manager steps
+     * @param stepExecutionListener logs step start/end events on manager steps
+     * @param bootstrapServers      Kafka broker addresses
+     * @param requestsTopic         Kafka topic for publishing partition requests to workers
+     */
     public RemotePartitioningJobConfig(
             BatchPartitionProperties partitionProperties,
             LoggingStepExecutionListener stepExecutionListener,

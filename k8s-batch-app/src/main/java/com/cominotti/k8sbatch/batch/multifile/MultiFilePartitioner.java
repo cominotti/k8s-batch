@@ -30,6 +30,11 @@ public class MultiFilePartitioner implements Partitioner {
 
     private final Path directory;
 
+    /**
+     * Creates a partitioner that scans the given directory for CSV files.
+     *
+     * @param directory directory containing {@code *.csv} files (no subdirectory recursion)
+     */
     public MultiFilePartitioner(Path directory) {
         this.directory = directory;
     }

@@ -49,6 +49,13 @@ public class FileRangeJobConfig {
     private final LoggingJobExecutionListener jobExecutionListener;
     private final LoggingStepExecutionListener stepExecutionListener;
 
+    /**
+     * Injects shared batch infrastructure beans.
+     *
+     * @param partitionProperties grid size and chunk size configuration
+     * @param jobExecutionListener logs job start/end events
+     * @param stepExecutionListener logs step start/end events
+     */
     public FileRangeJobConfig(BatchPartitionProperties partitionProperties,
                               LoggingJobExecutionListener jobExecutionListener,
                               LoggingStepExecutionListener stepExecutionListener) {
@@ -108,7 +115,16 @@ public class FileRangeJobConfig {
         return CsvRecordWriter.create(dataSource, resourcePath);
     }
 
-    /** Worker step: reads CSV lines → filters invalid records → upserts to MySQL, in chunks. */
+    /**
+     * Worker step: reads CSV lines, filters invalid records, and upserts to MySQL in chunks.
+     *
+     * @param jobRepository        persists step metadata (read/write/filter counts, status)
+     * @param transactionManager   wraps each chunk in a database transaction
+     * @param fileRangeItemReader  {@code @StepScope} reader constrained to this partition's line range
+     * @param fileRangeItemProcessor filters records with null or blank name (returns {@code null} to skip)
+     * @param fileRangeItemWriter  idempotent JDBC writer using {@code ON DUPLICATE KEY UPDATE}
+     * @return the configured worker {@link Step}
+     */
     @Bean
     public Step fileRangeWorkerStep(
             JobRepository jobRepository,

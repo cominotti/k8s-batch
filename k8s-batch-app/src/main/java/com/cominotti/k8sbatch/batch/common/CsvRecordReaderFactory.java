@@ -26,6 +26,12 @@ public final class CsvRecordReaderFactory {
     private CsvRecordReaderFactory() {
     }
 
+    /**
+     * Creates a reader for the full CSV file (header skipped, all data lines).
+     *
+     * @param resource Spring {@link Resource} pointing to the CSV file
+     * @return configured reader with column mapping for {@link CsvRecord} fields
+     */
     public static FlatFileItemReader<CsvRecord> create(Resource resource) {
         return new FlatFileItemReaderBuilder<CsvRecord>()
                 .name("csvRecordReader")
@@ -43,10 +49,25 @@ public final class CsvRecordReaderFactory {
                 .build();
     }
 
+    /**
+     * Convenience overload that accepts a filesystem path instead of a {@link Resource}.
+     *
+     * @param filePath absolute path to the CSV file
+     * @return configured reader with column mapping for {@link CsvRecord} fields
+     */
     public static FlatFileItemReader<CsvRecord> create(String filePath) {
         return create(new FileSystemResource(filePath));
     }
 
+    /**
+     * Creates a reader constrained to a line range within the CSV file, used by file-range
+     * partitioning to split one file across multiple workers.
+     *
+     * @param resource  Spring {@link Resource} pointing to the CSV file
+     * @param startLine 0-based start item index (after header skip)
+     * @param endLine   exclusive end item index
+     * @return reader that reads only items in {@code [startLine, endLine)}
+     */
     public static FlatFileItemReader<CsvRecord> createWithLineRange(
             Resource resource, int startLine, int endLine) {
         log.debug("Creating CSV reader with line range: startLine={} | endLine={} | resource={}",

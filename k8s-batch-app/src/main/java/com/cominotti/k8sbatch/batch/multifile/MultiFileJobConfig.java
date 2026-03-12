@@ -48,6 +48,13 @@ public class MultiFileJobConfig {
     private final LoggingJobExecutionListener jobExecutionListener;
     private final LoggingStepExecutionListener stepExecutionListener;
 
+    /**
+     * Injects shared batch infrastructure beans.
+     *
+     * @param partitionProperties grid size and chunk size configuration
+     * @param jobExecutionListener logs job start/end events
+     * @param stepExecutionListener logs step start/end events
+     */
     public MultiFileJobConfig(BatchPartitionProperties partitionProperties,
                               LoggingJobExecutionListener jobExecutionListener,
                               LoggingStepExecutionListener stepExecutionListener) {
@@ -106,7 +113,16 @@ public class MultiFileJobConfig {
         return CsvRecordWriter.create(dataSource, fileName);
     }
 
-    /** Worker step: reads entire CSV file → filters invalid records → upserts to MySQL, in chunks. */
+    /**
+     * Worker step: reads an entire CSV file, filters invalid records, and upserts to MySQL in chunks.
+     *
+     * @param jobRepository        persists step metadata (read/write/filter counts, status)
+     * @param transactionManager   wraps each chunk in a database transaction
+     * @param multiFileItemReader  {@code @StepScope} reader for this partition's CSV file
+     * @param multiFileItemProcessor filters records with null or blank name (returns {@code null} to skip)
+     * @param multiFileItemWriter  idempotent JDBC writer using {@code ON DUPLICATE KEY UPDATE}
+     * @return the configured worker {@link Step}
+     */
     @Bean
     public Step multiFileWorkerStep(
             JobRepository jobRepository,

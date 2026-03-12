@@ -306,4 +306,4 @@ Deterministic JavaDoc gap detection via `maven-checkstyle-plugin` (Checkstyle 10
 
 **Build behavior**: Fails the build by default. Use `-Dcheckstyle.failOnViolation=false` for report-only mode, or `-Dskip.checkstyle=true` to skip entirely.
 
-**XML report**: `target/checkstyle-javadoc.xml` — consumed by the `/doc-review` skill as a deterministic baseline.
+**XML report**: `<module>/target/checkstyle-javadoc.xml` per module — consumed by the `/doc-review` skill as a deterministic baseline.

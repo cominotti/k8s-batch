@@ -11,6 +11,11 @@ import java.util.Map;
 @RestController
 public class HelloController {
 
+    /**
+     * Returns a simple greeting message.
+     *
+     * @return single-entry map with key {@code "message"}
+     */
     @GetMapping("/hello")
     public Map<String, String> hello() {
         return Map.of("message", "Hello from k8s-batch!");

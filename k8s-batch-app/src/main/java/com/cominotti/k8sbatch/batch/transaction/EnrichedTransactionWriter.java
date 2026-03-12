@@ -26,6 +26,13 @@ public final class EnrichedTransactionWriter {
     private EnrichedTransactionWriter() {
     }
 
+    /**
+     * Creates an idempotent JDBC writer that upserts enriched transactions into the
+     * {@code enriched_transactions} table using {@code ON DUPLICATE KEY UPDATE}.
+     *
+     * @param dataSource MySQL data source
+     * @return configured writer ready to be used in a chunk step
+     */
     public static JdbcBatchItemWriter<EnrichedTransactionEvent> create(DataSource dataSource) {
         log.debug("Creating enriched transaction JDBC batch writer");
         return new JdbcBatchItemWriterBuilder<EnrichedTransactionEvent>()

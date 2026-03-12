@@ -38,6 +38,12 @@ public class StandaloneJobConfig {
     private final BatchPartitionProperties partitionProperties;
     private final LoggingStepExecutionListener stepExecutionListener;
 
+    /**
+     * Injects partition properties and the step listener used by the manager steps.
+     *
+     * @param partitionProperties grid size configuration (also used as thread pool size)
+     * @param stepExecutionListener logs step start/end events
+     */
     public StandaloneJobConfig(BatchPartitionProperties partitionProperties,
                                LoggingStepExecutionListener stepExecutionListener) {
         this.partitionProperties = partitionProperties;

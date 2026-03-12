@@ -23,6 +23,14 @@ public final class CsvRecordWriter {
     private CsvRecordWriter() {
     }
 
+    /**
+     * Creates an idempotent JDBC writer that upserts CSV records into the {@code target_records}
+     * table using {@code ON DUPLICATE KEY UPDATE}.
+     *
+     * @param dataSource MySQL data source
+     * @param sourceFile identifier written to the {@code source_file} column for partition traceability
+     * @return configured writer ready to be used in a chunk step
+     */
     public static JdbcBatchItemWriter<CsvRecord> create(DataSource dataSource, String sourceFile) {
         log.debug("Creating JDBC batch writer | sourceFile={}", sourceFile);
         return new JdbcBatchItemWriterBuilder<CsvRecord>()

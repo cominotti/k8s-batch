@@ -130,6 +130,7 @@ public final class BatchAppClient {
                 node.has("exitDescription") ? node.get("exitDescription").asText() : "");
     }
 
+    /** Parsed JSON response from the batch job REST API. */
     public record JobResponse(long executionId, String jobName, String status,
                                 String exitCode, String exitDescription) {
     }

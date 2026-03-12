@@ -61,6 +61,13 @@ public class TransactionEnrichmentJobConfig {
     private final LoggingJobExecutionListener jobExecutionListener;
     private final LoggingStepExecutionListener stepExecutionListener;
 
+    /**
+     * Injects job-specific properties and shared batch listeners.
+     *
+     * @param jobProperties        topic names, chunk size, and poll timeout for this job
+     * @param jobExecutionListener logs job start/end events
+     * @param stepExecutionListener logs step start/end events
+     */
     public TransactionEnrichmentJobConfig(
             TransactionJobProperties jobProperties,
             LoggingJobExecutionListener jobExecutionListener,
