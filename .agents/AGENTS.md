@@ -25,7 +25,7 @@ mvn package -DskipTests                        # build JAR without tests
 docker build -t k8s-batch:e2e .                # build Docker image for E2E tests
 docker-compose up -d                           # local stack (app + MySQL + Kafka)
 helm lint helm/k8s-batch                       # validate Helm chart
-helm unittest helm/k8s-batch                   # run Helm unit tests (46 tests, ~60ms)
+helm unittest helm/k8s-batch                   # run Helm unit tests (49 tests, ~60ms)
 mvn validate                                   # verify Apache-2.0 SPDX headers
 mvn -Plicense-fix validate                     # auto-apply missing SPDX headers
 ```
@@ -152,10 +152,12 @@ Both jobs follow the same pattern: **Partitioner → Manager Step → Worker Ste
 - **Prerequisites**: Docker daemon (K3s needs privileged containers — Podman rootless won't work), `helm` CLI on PATH
 - **`K3sClusterManager`** singleton manages K3s lifecycle, follows `ContainerHolder` pattern
 - **Image loading**: `docker save` → `copyFileToContainer` → `ctr images import`; guarded by `loadedImages` set to avoid redundant loads
-- **`PodUtils.isReady(Pod)`** — shared pod readiness check (don't duplicate in each class)
+- **`PodUtils`** — stateless pod inspection utilities: `isReady()`, `findTerminalError()`, `isUnschedulable()`, `describeInitProgress()`, `hasRunningMainContainer()`
+- **`DeploymentWaiter`** — fast-failure polling loop (package-private, used by `K3sClusterManager`). Detects terminal errors (ImagePullBackOff, CrashLoopBackOff, OOMKilled) immediately, tracks progress stall (120s), streams container logs for stuck pods (after 60s). Delegates to `PodDiagnostics` on failure.
 - **`AbstractE2ETest`** base class provides `@BeforeEach cleanTestData()`, `requiresKafka()` override, port-forward setup
 - **Helm rendering**: `HelmRenderer` shells out to `helm template`; uses `redirectErrorStream(true)` to avoid deadlock
 - **Rendered manifests are cached** in `K3sClusterManager` for reuse during teardown
+- **E2E test data isolation**: When querying `BATCH_STEP_EXECUTION`, always scope by `JOB_EXECUTION_ID` — use `MysqlVerifier.countStepExecutionsForJob()`, not the unscoped query. Multiple test methods run the same job, and step executions accumulate across runs.
 
 ## Image and Version Constants Rule
 
@@ -196,7 +198,7 @@ log.info("Starting Redpanda container (redpanda:v25.1.9)...");
 - App Deployment omits `replicas` when HPA is enabled (prevents Helm/HPA conflicts)
 - `checksum/config` annotation on Deployment triggers rolling restart on ConfigMap changes
 - Init containers gate app startup until MySQL, Kafka, and Schema Registry (when enabled) are reachable
-- Kafka runs in **KRaft mode** (no Zookeeper)
+- Kafka runs in **KRaft mode** (no Zookeeper). Internal topic replication factors (`KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR`, `KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR`, `KAFKA_TRANSACTION_STATE_LOG_MIN_ISR`) are derived from `min(kafka.replicaCount, 3)` in the StatefulSet template — required for single-broker deployments (E2E uses `replicaCount: 1`)
 - **Schema Registry** uses a `Deployment` (stateless — stores schemas in `_schemas` Kafka topic). Gated on `schemaRegistry.enabled AND features.schemaRegistry`. Schema Registry URL wired to app via `SPRING_KAFKA_PROPERTIES_SCHEMA_REGISTRY_URL` env var.
 - **Init container image** (`busybox`) is parameterized via `global.initImage` in `values.yaml` — never hardcode it in templates
 - **Helm unit tests**: `helm/k8s-batch/tests/*_test.yaml` using `helm-unittest` plugin. Run with `helm unittest helm/k8s-batch`
@@ -230,7 +232,7 @@ helm/k8s-batch/
   tests/              — helm-unittest YAML tests (*_test.yaml)
 
 k8s-batch-e2e-tests/src/test/java/com/cominotti/k8sbatch/e2e/
-  cluster/            — K3sClusterManager, HelmRenderer, PortForwardManager, PodUtils
+  cluster/            — K3sClusterManager, DeploymentWaiter, HelmRenderer, PortForwardManager, PodUtils
   client/             — BatchAppClient (HTTP), MysqlVerifier (JDBC)
   diagnostics/        — PodDiagnostics (failure dump)
   deploy/             — DeployHealthCheckE2E
