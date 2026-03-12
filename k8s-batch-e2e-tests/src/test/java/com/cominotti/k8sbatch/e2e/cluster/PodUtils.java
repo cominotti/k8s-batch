@@ -14,6 +14,8 @@ import java.util.Set;
  */
 public final class PodUtils {
 
+    // ErrImagePull is intentionally absent — it's a transient pull failure that the kubelet retries,
+    // eventually escalating to ImagePullBackOff (which IS terminal)
     private static final Set<String> TERMINAL_WAITING_REASONS = Set.of(
             "ImagePullBackOff", "ErrImageNeverPull", "CrashLoopBackOff", "InvalidImageName");
 

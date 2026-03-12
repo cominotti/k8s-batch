@@ -16,6 +16,7 @@ RUN mvn dependency:go-offline -B -pl k8s-batch-app -am
 COPY scripts/license scripts/license
 COPY k8s-batch-app/src k8s-batch-app/src
 RUN mvn package -DskipTests -B -pl k8s-batch-app -am && \
+    # Spring Boot layertools: splits JAR into layers ordered by change frequency for Docker cache optimization
     java -Djarmode=tools -jar k8s-batch-app/target/*-exec.jar extract --layers --launcher --destination extracted
 
 # ============================================================
@@ -41,5 +42,6 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=60s \
   CMD ["wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
 
+# JarLauncher is required when the JAR is extracted into layers (a regular java -jar uses the embedded launcher)
 ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", \
             "org.springframework.boot.loader.launch.JarLauncher"]

@@ -1,6 +1,8 @@
+# Integration test profile: overrides for Testcontainers-based testing.
 spring:
   batch:
     jdbc:
+      # "always" because Testcontainers starts a fresh MySQL with no Spring Batch tables
       initialize-schema: always
     job:
       enabled: false
@@ -9,6 +11,7 @@ spring:
     locations: classpath:db/migration
     fail-on-missing-locations: true
   main:
+    # Explicit false prevents lazy init from masking missing beans in tests
     lazy-initialization: false
 
 management:
@@ -24,8 +27,11 @@ batch:
   partition:
     grid-size: 4
     chunk-size: 25
+    # Reduced from production's 60s so tests fail fast instead of hanging
     timeout-ms: 15000
   file-range:
+    # Empty defaults — required to satisfy @ConfigurationProperties binding;
+    # tests override these per-test via JobParameters
     input-file: ""
   multi-file:
     input-directory: ""

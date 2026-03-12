@@ -11,6 +11,13 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 
+/**
+ * Logs job lifecycle events (start, completion, failure) with structured key=value fields.
+ *
+ * <p>{@code @Component} makes this bean available for dependency injection, but it must also be
+ * explicitly registered on {@code JobBuilder.listener()} — Spring Batch does not auto-register
+ * {@code @Component} listeners on jobs.
+ */
 @Component
 public class LoggingJobExecutionListener implements JobExecutionListener {
 
@@ -37,6 +44,7 @@ public class LoggingJobExecutionListener implements JobExecutionListener {
             case FAILED -> log.error("Job '{}' FAILED | jobExecutionId={} | duration={} | exitDescription={}",
                     jobName, executionId, duration,
                     jobExecution.getExitStatus().getExitDescription());
+            // Covers STOPPED, ABANDONED, UNKNOWN — unusual but not failures
             default -> log.warn("Job '{}' ended with status {} | jobExecutionId={} | duration={}",
                     jobName, status, executionId, duration);
         }

@@ -11,6 +11,14 @@ import org.springframework.core.io.Resource;
 
 import java.time.LocalDate;
 
+/**
+ * Factory for creating {@link FlatFileItemReader} instances configured for the CSV format used by
+ * both ETL jobs. Centralizes reader configuration so that the file-range and multi-file jobs share
+ * the same column mapping and header-skip logic.
+ *
+ * <p>A factory is used instead of a shared {@code @Bean} because {@code @StepScope} reader beans
+ * are partition-specific and cannot be reused across job configurations.
+ */
 public final class CsvRecordReaderFactory {
 
     private static final Logger log = LoggerFactory.getLogger(CsvRecordReaderFactory.class);
@@ -44,6 +52,8 @@ public final class CsvRecordReaderFactory {
         log.debug("Creating CSV reader with line range: startLine={} | endLine={} | resource={}",
                 startLine, endLine, resource.getDescription());
         FlatFileItemReader<CsvRecord> reader = create(resource);
+        // These are 0-based item counts (after header skip), not raw line numbers.
+        // The header line is already excluded by linesToSkip(1) in the base reader.
         reader.setCurrentItemCount(startLine);
         reader.setMaxItemCount(endLine);
         return reader;

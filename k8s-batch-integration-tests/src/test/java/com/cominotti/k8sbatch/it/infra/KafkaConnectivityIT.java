@@ -18,6 +18,10 @@ import java.util.concurrent.TimeoutException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Smoke test for Kafka (Redpanda) connectivity. Confirms that the {@code System.setProperty}
+ * Kafka wiring in {@link com.cominotti.k8sbatch.it.config.ContainerHolder} worked correctly.
+ */
 class KafkaConnectivityIT extends AbstractIntegrationTest {
 
     @Value("${spring.kafka.bootstrap-servers:}")

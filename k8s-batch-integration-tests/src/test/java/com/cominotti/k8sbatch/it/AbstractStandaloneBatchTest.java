@@ -12,6 +12,13 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Base class for standalone-mode batch tests using in-process {@code TaskExecutorPartitionHandler}
+ * (no Kafka). Uses {@link MysqlOnlyContainersConfig} to skip Redpanda startup entirely.
+ *
+ * <p>The 30-second timeout (vs 120s for remote tests) reflects that standalone partitioning is
+ * synchronous and much faster than Kafka-based remote partitioning.
+ */
 @SpringBootTest(classes = K8sBatchApplication.class)
 @Import({MysqlOnlyContainersConfig.class, BatchTestJobConfig.class})
 @ActiveProfiles({"integration-test", "standalone"})

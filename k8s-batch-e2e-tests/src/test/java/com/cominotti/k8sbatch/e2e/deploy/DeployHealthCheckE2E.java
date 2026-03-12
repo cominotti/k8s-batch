@@ -16,8 +16,10 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Verifies that the Helm chart deploys successfully in K3s
- * and all pods reach ready state with healthy actuator endpoint.
+ * Infrastructure smoke test that validates the Helm chart deploys correctly into a K3s cluster.
+ * Checks that all pods (app, MySQL, Kafka) reach ready state, the Spring Boot actuator health
+ * endpoint returns UP, and the MySQL target table is accessible. This test runs before any batch
+ * job tests to catch deployment-level issues early.
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class DeployHealthCheckE2E extends AbstractE2ETest {

@@ -24,6 +24,14 @@ import org.springframework.core.task.SimpleAsyncTaskExecutor;
 
 import java.util.Map;
 
+/**
+ * REST API for launching and polling batch jobs asynchronously.
+ *
+ * <p>{@code POST /api/jobs/{jobName}} launches a job in a background thread and returns HTTP 202
+ * immediately. {@code GET /api/jobs/{jobName}/executions/{executionId}} polls execution status.
+ * Job names must exactly match Spring bean names defined in {@link com.cominotti.k8sbatch.batch.common.BatchStepNames
+ * BatchStepNames}.
+ */
 @RestController
 @RequestMapping("/api/jobs")
 public class JobController {
@@ -32,6 +40,7 @@ public class JobController {
 
     private final JobLauncher asyncJobLauncher;
     private final JobRepository jobRepository;
+    // Spring auto-wires all Job beans into a map keyed by bean name
     private final Map<String, Job> jobRegistry;
 
     public JobController(JobRepository jobRepository, Map<String, Job> jobRegistry) {
@@ -65,6 +74,7 @@ public class JobController {
             if (parameters != null) {
                 parameters.forEach(builder::addString);
             }
+            // Timestamp makes each launch unique — Spring Batch rejects duplicate JobParameters
             builder.addLong("timestamp", System.currentTimeMillis());
             JobParameters jobParameters = builder.toJobParameters();
 

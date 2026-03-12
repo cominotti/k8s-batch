@@ -23,6 +23,11 @@ final class HelmRenderer {
         return executeHelm(releaseName, chartPath, valuesFile, false);
     }
 
+    /**
+     * Renders only Helm hooks (pre-install Jobs like the Kafka topic-creation Job). Hooks are
+     * rendered separately because the E2E test applies raw manifests via kubectl-equivalent,
+     * bypassing Helm's hook lifecycle semantics.
+     */
     static String renderHooks(String releaseName, String chartPath, String valuesFile) throws Exception {
         return executeHelm(releaseName, chartPath, valuesFile, true);
     }

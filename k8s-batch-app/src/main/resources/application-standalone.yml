@@ -1,3 +1,7 @@
+# Standalone profile: in-process partitioning via TaskExecutorPartitionHandler (no Kafka needed).
+# KafkaAutoConfiguration must be explicitly excluded because it's on the classpath transitively
+# via spring-batch-integration and spring-integration-kafka — simply not having a Kafka broker
+# is not enough to prevent auto-configuration from failing.
 spring:
   autoconfigure:
     exclude:

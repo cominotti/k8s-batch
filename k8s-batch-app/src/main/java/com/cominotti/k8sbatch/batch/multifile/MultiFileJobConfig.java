@@ -29,6 +29,16 @@ import org.springframework.transaction.PlatformTransactionManager;
 import javax.sql.DataSource;
 import java.nio.file.Path;
 
+/**
+ * Defines the {@code multiFileEtlJob} and its worker step for multi-file partitioned CSV-to-DB ETL.
+ *
+ * <p>Each CSV file in a directory becomes one partition via {@link MultiFilePartitioner}. Each
+ * partition's worker step reads its entire file, filters invalid records, and upserts to MySQL.
+ * The manager step is <strong>not</strong> defined here — it is contributed by either
+ * {@link com.cominotti.k8sbatch.config.RemotePartitioningJobConfig RemotePartitioningJobConfig}
+ * (Kafka) or {@link com.cominotti.k8sbatch.batch.standalone.StandaloneJobConfig StandaloneJobConfig}
+ * (local threads), depending on the active Spring profile.
+ */
 @Configuration
 public class MultiFileJobConfig {
 
@@ -48,6 +58,8 @@ public class MultiFileJobConfig {
                 partitionProperties.gridSize(), partitionProperties.chunkSize());
     }
 
+    // @Qualifier is required because two Step beans exist (manager + worker) — Spring can't
+    // resolve by type alone. The constant must match the bean name in the manager config.
     @Bean
     public Job multiFileEtlJob(JobRepository jobRepository, @Qualifier(BatchStepNames.MULTI_FILE_MANAGER_STEP) Step multiFileManagerStep) {
         return new JobBuilder(BatchStepNames.MULTI_FILE_ETL_JOB, jobRepository)
@@ -56,34 +68,45 @@ public class MultiFileJobConfig {
                 .build();
     }
 
+    // @StepScope defers bean creation until step execution time, enabling SpEL resolution of
+    // #{jobParameters[...]} — without it, the expression would be evaluated at context startup
+    // when no job parameters are available yet.
     @Bean
     @StepScope
     public MultiFilePartitioner multiFilePartitioner(
+            // Supplied by the REST API caller in the POST body
             @Value("#{jobParameters['batch.multi-file.input-directory']}") String inputDirectory) {
         return new MultiFilePartitioner(Path.of(inputDirectory));
     }
 
+    // @StepScope: new reader per partition, each reading a different CSV file
     @Bean
     @StepScope
     public FlatFileItemReader<CsvRecord> multiFileItemReader(
+            // Key populated by MultiFilePartitioner — name must match exactly
             @Value("#{stepExecutionContext['filePath']}") String filePath) {
         return CsvRecordReaderFactory.create(filePath);
     }
 
+    // @StepScope: new processor per partition (stateless, but scope matches reader/writer)
     @Bean
     @StepScope
     public CsvRecordProcessor multiFileItemProcessor() {
         return new CsvRecordProcessor();
     }
 
+    // @StepScope: new writer per partition, tagged with just the file name (not full path)
+    // for traceability in the source_file column
     @Bean
     @StepScope
     public JdbcBatchItemWriter<CsvRecord> multiFileItemWriter(
             DataSource dataSource,
+            // Uses 'fileName' (just the name) while reader uses 'filePath' (full path)
             @Value("#{stepExecutionContext['fileName']}") String fileName) {
         return CsvRecordWriter.create(dataSource, fileName);
     }
 
+    /** Worker step: reads entire CSV file → filters invalid records → upserts to MySQL, in chunks. */
     @Bean
     public Step multiFileWorkerStep(
             JobRepository jobRepository,

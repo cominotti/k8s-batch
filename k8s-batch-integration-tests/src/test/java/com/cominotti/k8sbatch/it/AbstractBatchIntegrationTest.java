@@ -23,6 +23,15 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Base class for direct {@link org.springframework.batch.core.launch.JobOperator}-driven batch
+ * tests (no HTTP layer). Subclasses add either the {@code remote-partitioning} or {@code standalone}
+ * profile to select which manager step config is loaded.
+ *
+ * <p>Provides schema verification, batch metadata cleanup, application data cleanup, and
+ * convenience methods for building {@code JobParameters}. The 120-second timeout is a backstop
+ * for remote partitioning operations.
+ */
 @SpringBootTest(classes = K8sBatchApplication.class)
 @Import(BatchTestJobConfig.class)
 @ActiveProfiles("integration-test")
@@ -40,6 +49,7 @@ public abstract class AbstractBatchIntegrationTest {
     @Autowired
     protected JdbcTemplate jdbcTemplate;
 
+    /** Fails fast with a clear message if the Flyway migration didn't create the target table. */
     @BeforeEach
     void verifySchemaReady() {
         log.debug("Verifying target_records table exists...");
@@ -50,6 +60,7 @@ public abstract class AbstractBatchIntegrationTest {
         log.debug("Schema verification passed: target_records table exists");
     }
 
+    /** Removes all batch metadata (cascades through all BATCH_* tables). */
     @AfterEach
     void cleanupBatchMetadata() {
         log.debug("Cleaning up batch job execution metadata");
@@ -69,6 +80,7 @@ public abstract class AbstractBatchIntegrationTest {
     protected static JobParameters fileRangeJobParams(String inputFile) {
         return new JobParametersBuilder()
                 .addString("batch.file-range.input-file", inputFile)
+                // Timestamp makes each launch unique — Spring Batch rejects duplicate JobParameters
                 .addLong("timestamp", System.currentTimeMillis())
                 .toJobParameters();
     }

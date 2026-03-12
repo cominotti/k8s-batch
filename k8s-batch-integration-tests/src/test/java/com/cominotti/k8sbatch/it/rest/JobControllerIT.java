@@ -22,6 +22,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 import static java.time.Duration.ofSeconds;
 
+/**
+ * Validates the async job REST API: POST launches a job (HTTP 202), GET polls until completion,
+ * and unknown job names return HTTP 400.
+ *
+ * <p>{@code @Import(BatchTestJobConfig.class)} provides {@code JobRepositoryTestUtils} for cleanup.
+ * This class extends {@code AbstractIntegrationTest} (not {@code AbstractBatchIntegrationTest})
+ * because it tests the HTTP layer, not direct {@code JobOperator} invocation.
+ */
 @Import(BatchTestJobConfig.class)
 class JobControllerIT extends AbstractIntegrationTest {
 
@@ -71,7 +79,7 @@ class JobControllerIT extends AbstractIntegrationTest {
                 .body(Map.of())
                 .retrieve()
                 .body(String.class))
-                .isInstanceOf(HttpClientErrorException.class);
+                .isInstanceOf(HttpClientErrorException.class); // HTTP 400 Bad Request
     }
 
     private String testResourcePath(String relativePath) {

@@ -29,7 +29,9 @@ final class DeploymentWaiter {
 
     private static final Duration POLL_INTERVAL = Duration.ofSeconds(5);
     private static final Duration INITIAL_WAIT = Duration.ofSeconds(2);
+    // 120s matches the remote partitioning @Timeout in integration tests
     private static final Duration STALL_TIMEOUT = Duration.ofSeconds(120);
+    // Start streaming logs after 60s to help diagnose stuck pods without overwhelming output
     private static final Duration LOG_STREAM_THRESHOLD = Duration.ofSeconds(60);
     private static final int LOG_STREAM_LINES = 50;
 
@@ -37,6 +39,13 @@ final class DeploymentWaiter {
     private final String namespace;
     private final String releaseLabel;
     private final PodDiagnostics diagnostics;
+
+    // Detection features tracked by numbered comments in waitForPodsReady():
+    //   #1 Terminal waiting errors (ImagePullBackOff, CrashLoopBackOff, etc.)
+    //   #2 Unschedulable pods
+    //   #3 Init container progress logging (deduped)
+    //   #4 Progress stall detection (no new ready pods or init completions within STALL_TIMEOUT)
+    //   #5 Log streaming for pods stuck beyond LOG_STREAM_THRESHOLD
 
     // Progress stall tracking (#4)
     private int lastReadyCount;

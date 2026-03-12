@@ -9,6 +9,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/** Validates Spring Boot Actuator health endpoint reports UP with expected components. */
 class ActuatorHealthIT extends AbstractIntegrationTest {
 
     @SuppressWarnings("unchecked")
@@ -31,6 +32,8 @@ class ActuatorHealthIT extends AbstractIntegrationTest {
         Map<String, Object> health = getHealth();
         assertThat(health).containsKey("components");
         Map<String, Object> components = (Map<String, Object>) health.get("components");
+        // "db" is the Spring Boot auto-configured DataSourceHealthIndicator
+        // Note: no Kafka health indicator exists in Spring Boot 4.0.3
         assertThat(components).containsKey("db");
     }
 

@@ -11,6 +11,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/** Validates that Flyway-managed application schema (target_records table) is correctly created. */
 class AppSchemaIT extends AbstractIntegrationTest {
 
     @Test

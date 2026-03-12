@@ -18,6 +18,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Test configuration for remote-partitioning tests. Starts MySQL + Redpanda (Kafka-compatible
+ * broker) and creates the Kafka topics needed for partition request messaging.
+ *
+ * <p>Container startup and topic creation happen in the static initializer (before the Spring
+ * context loads) to ensure Kafka is ready when Spring Batch integration beans are created.
+ */
 @TestConfiguration(proxyBeanMethods = false)
 public class SharedContainersConfig {
 
@@ -33,6 +40,7 @@ public class SharedContainersConfig {
     private static void createAndVerifyKafkaTopics() {
         try (AdminClient admin = AdminClient.create(
                 Map.of(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, ContainerHolder.REDPANDA.getBootstrapServers()))) {
+            // Topic names must match the production application config
             admin.createTopics(List.of(
                     new NewTopic("batch-partition-requests", 1, (short) 1),
                     new NewTopic("batch-partition-replies", 1, (short) 1)
@@ -59,6 +67,8 @@ public class SharedContainersConfig {
         return ContainerHolder.MYSQL;
     }
 
+    // No @ServiceConnection — Kafka properties are set via System.setProperty in ContainerHolder
+    // because spring-boot-kafka auto-config conflicts with manual KafkaIntegrationConfig
     @Bean
     RedpandaContainer redpandaContainer() {
         return ContainerHolder.REDPANDA;

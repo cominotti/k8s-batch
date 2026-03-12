@@ -54,6 +54,8 @@ final class ContainerHolder {
         if (mysqlStarted && redpandaStarted) {
             return;
         }
+        // Two branches: (1) both containers need starting, (2) MySQL already started by a
+        // standalone test suite and only Redpanda needs to be added
         if (!mysqlStarted && !redpandaStarted) {
             log.info("Starting MySQL and Redpanda containers in parallel...");
             Startables.deepStart(Stream.of(MYSQL, REDPANDA)).join();
@@ -70,6 +72,10 @@ final class ContainerHolder {
             log.info("Redpanda container started | bootstrapServers={} | schemaRegistryUrl={}",
                     REDPANDA.getBootstrapServers(), REDPANDA.getSchemaRegistryAddress());
         }
+        // Kafka properties are set via System.setProperty instead of @ServiceConnection because
+        // spring-boot-kafka auto-config conflicts with the manual KafkaIntegrationConfig used
+        // for remote partitioning channels. @ServiceConnection requires spring-boot-kafka, which
+        // would create duplicate consumer/producer factories.
         String bootstrapServers = REDPANDA.getBootstrapServers();
         String schemaRegistryUrl = REDPANDA.getSchemaRegistryAddress();
         System.setProperty("spring.kafka.bootstrap-servers", bootstrapServers);

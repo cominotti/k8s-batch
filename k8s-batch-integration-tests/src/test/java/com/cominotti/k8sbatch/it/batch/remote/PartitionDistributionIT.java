@@ -18,6 +18,10 @@ import java.util.Collection;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Validates partition distribution mechanics under remote partitioning: manager/worker step counts,
+ * partition completion, and per-partition read/write counts.
+ */
 @Import(SharedContainersConfig.class)
 @ActiveProfiles({"integration-test", "remote-partitioning"})
 class PartitionDistributionIT extends AbstractBatchIntegrationTest {
@@ -50,6 +54,8 @@ class PartitionDistributionIT extends AbstractBatchIntegrationTest {
 
         JobExecution execution = jobOperatorTestUtils.startJob(fileRangeJobParams(inputFile));
 
+        // Re-fetch from JobRepository because the JobExecution returned by startJob() may have
+        // stale step data — workers complete asynchronously and write results to the JobRepository
         Collection<StepExecution> freshSteps = jobRepository.getJobExecution(execution.getId()).getStepExecutions();
         boolean allWorkerStepsCompleted = freshSteps.stream()
                 .filter(s -> s.getStepName().contains("Worker"))

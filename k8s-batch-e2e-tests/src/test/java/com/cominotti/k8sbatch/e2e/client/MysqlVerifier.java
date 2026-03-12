@@ -28,6 +28,8 @@ public final class MysqlVerifier {
 
     public MysqlVerifier(int localPort, String database, String username, String password) {
         this.jdbcUrl = "jdbc:mysql://localhost:" + localPort + "/" + database
+                // allowPublicKeyRetrieval=true is required for MySQL 8 when not using SSL —
+                // the connector needs the RSA public key for password authentication
                 + "?useSSL=false&allowPublicKeyRetrieval=true";
         this.username = username;
         this.password = password;
@@ -121,6 +123,7 @@ public final class MysqlVerifier {
         }
     }
 
+    // Opens a new connection per call (no pooling needed for test verification)
     private Connection getConnection() throws SQLException {
         return DriverManager.getConnection(jdbcUrl, username, password);
     }

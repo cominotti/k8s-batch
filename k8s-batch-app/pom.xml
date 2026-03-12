@@ -82,6 +82,7 @@
                     <execution>
                         <id>repackage</id>
                         <configuration>
+                            <!-- Without this, the fat JAR replaces the original, breaking dependency resolution in test modules -->
                             <classifier>exec</classifier>
                         </configuration>
                     </execution>

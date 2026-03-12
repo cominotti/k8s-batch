@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/** Validates the multi-file ETL job under standalone in-process partitioning (no Kafka). */
 class MultiFilePartitionStandaloneIT extends AbstractStandaloneBatchTest {
 
     @Autowired

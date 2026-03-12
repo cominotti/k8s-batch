@@ -12,6 +12,13 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 
+/**
+ * Logs step lifecycle events (start, completion, failure) with structured key=value fields.
+ *
+ * <p>{@code @Component} makes this bean available for dependency injection, but it must also be
+ * explicitly registered on {@code StepBuilder.listener()} — Spring Batch does not auto-register
+ * {@code @Component} listeners on steps.
+ */
 @Component
 public class LoggingStepExecutionListener implements StepExecutionListener {
 
@@ -53,6 +60,8 @@ public class LoggingStepExecutionListener implements StepExecutionListener {
                     duration, thread);
         }
 
+        // Returning null means "don't override the step's ExitStatus" — a non-null return
+        // would replace the step's outcome, which is not desired for a logging-only listener
         return null;
     }
 }

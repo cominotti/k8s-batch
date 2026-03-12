@@ -15,6 +15,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/** Validates the file-range ETL job under Kafka-based remote partitioning (Redpanda). */
 @Import(SharedContainersConfig.class)
 @ActiveProfiles({"integration-test", "remote-partitioning"})
 class FileRangePartitionRemoteIT extends AbstractBatchIntegrationTest {

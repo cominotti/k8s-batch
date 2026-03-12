@@ -37,11 +37,27 @@ import org.springframework.kafka.core.ProducerFactory;
 
 import java.util.Map;
 
+/**
+ * Configures Kafka-based remote partitioning for horizontally-scaled batch processing.
+ *
+ * <p>Architecture: the manager step serializes {@code StepExecutionRequest} objects via Java
+ * serialization, publishes them to the {@code batch-partition-requests} Kafka topic. Worker pods
+ * consume these requests, resolve the corresponding {@link org.springframework.batch.core.step.Step}
+ * bean by name via {@link BeanFactoryStepLocator}, and execute it locally. The manager detects
+ * worker completion by polling the {@link JobRepository} — no reply channel is used, which avoids
+ * fragile {@code StepExecution} serialization through Kafka.
+ *
+ * <p>Activated only under the {@code remote-partitioning} profile (the default). When the
+ * {@code standalone} profile is active, {@link com.cominotti.k8sbatch.batch.standalone.StandaloneJobConfig
+ * StandaloneJobConfig} provides the manager steps instead — the two configs are mutually exclusive.
+ */
 @Configuration
 @Profile("remote-partitioning")
 public class RemotePartitioningJobConfig {
 
     private static final Logger log = LoggerFactory.getLogger(RemotePartitioningJobConfig.class);
+
+    // All worker pods share one consumer group so Kafka distributes partition requests among them
     private static final String WORKER_CONSUMER_GROUP = "k8s-batch-workers";
 
     private final BatchPartitionProperties partitionProperties;
@@ -77,7 +93,9 @@ public class RemotePartitioningJobConfig {
         return new DirectChannel();
     }
 
-    // ── Kafka Factories (Java serialization) ─────────────────────
+    // ── Kafka Factories (Java serialization, not JSON) ────────────
+    // StepExecutionRequest is serialized as a byte[] via Java object serialization,
+    // which is why ByteArraySerializer/Deserializer is used instead of JSON serializers.
 
     @Bean
     public ProducerFactory<String, byte[]> partitionProducerFactory() {
@@ -93,6 +111,7 @@ public class RemotePartitioningJobConfig {
         return new DefaultKafkaConsumerFactory<>(Map.of(
                 ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers,
                 ConsumerConfig.GROUP_ID_CONFIG, WORKER_CONSUMER_GROUP,
+                // "earliest" so restarted workers pick up any unprocessed partition requests
                 ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest",
                 ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class,
                 ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class
@@ -100,18 +119,20 @@ public class RemotePartitioningJobConfig {
     }
 
     // ── Manager: Outbound requests to Kafka ──────────────────────
+    // Serializes StepExecutionRequest → byte[] and publishes to Kafka
 
     @Bean
     public IntegrationFlow managerOutboundRequestsFlow() {
         log.info("Configuring manager outbound flow | topic={}", requestsTopic);
         return IntegrationFlow.from(managerRequestsChannel())
-                .transform(Transformers.serializer())
+                .transform(Transformers.serializer()) // Java serialization → byte[]
                 .handle(Kafka.outboundChannelAdapter(partitionProducerFactory())
                         .topic(requestsTopic))
                 .get();
     }
 
     // ── Worker: Inbound requests from Kafka → handler ────────────
+    // Deserializes byte[] → StepExecutionRequest, looks up the Step by name, executes it
 
     @Bean
     public StepExecutionRequestHandler stepExecutionRequestHandler(
@@ -119,6 +140,8 @@ public class RemotePartitioningJobConfig {
         log.info("Configuring StepExecutionRequestHandler for worker-side processing");
         StepExecutionRequestHandler handler = new StepExecutionRequestHandler();
         handler.setJobRepository(jobRepository);
+        // BeanFactoryStepLocator resolves Step beans by name (e.g., "fileRangeWorkerStep").
+        // The step name in the request must match a bean name defined via BatchStepNames constants.
         BeanFactoryStepLocator stepLocator = new BeanFactoryStepLocator();
         stepLocator.setBeanFactory(beanFactory);
         handler.setStepLocator(stepLocator);
@@ -131,13 +154,17 @@ public class RemotePartitioningJobConfig {
         return IntegrationFlow.from(
                         Kafka.messageDrivenChannelAdapter(
                                 requestsConsumerFactory(), requestsTopic))
+                // Deserialization whitelist: only allow Spring Batch and JDK classes
                 .transform(Transformers.deserializer("org.springframework.batch.*", "java.util.*", "java.lang.*"))
                 .handle(stepExecutionRequestHandler)
+                // NullChannel discards the handler result — the manager detects completion by
+                // polling JobRepository, not by receiving a reply message through Kafka
                 .channel(new NullChannel())
                 .get();
     }
 
     // ── Manager Steps (builder API, polling mode) ────────────────
+    // The manager polls JobRepository until all workers complete or timeout expires
 
     @Bean
     public Step fileRangeManagerStep(

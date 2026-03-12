@@ -20,6 +20,14 @@ import org.springframework.web.client.RestClient;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Base class for integration tests that need the full remote-partitioning stack with a web server.
+ *
+ * <p>Starts a Spring Boot context with MySQL + Redpanda containers, both the
+ * {@code integration-test} and {@code remote-partitioning} profiles active, and a web server on a
+ * random port. Uses {@link RestClient} (replaces {@code TestRestTemplate}, which was removed in
+ * Spring Boot 4.x). The 120-second timeout is a backstop for remote partitioning operations.
+ */
 @SpringBootTest(classes = K8sBatchApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(SharedContainersConfig.class)
 @ActiveProfiles({"integration-test", "remote-partitioning"})

@@ -9,7 +9,7 @@ metadata:
 spec:
   serviceName: {{ include "k8s-batch.fullname" . }}-kafka-headless
   replicas: {{ .Values.kafka.replicaCount }}
-  podManagementPolicy: Parallel
+  podManagementPolicy: Parallel  # Speeds up KRaft quorum formation by not serializing pod creation
   selector:
     matchLabels:
       {{- include "k8s-batch.selectorLabels" . | nindent 6 }}
@@ -95,7 +95,8 @@ spec:
             - name: KAFKA_ADVERTISED_LISTENERS
               value: "PLAINTEXT://$(POD_NAME).{{ include "k8s-batch.fullname" . }}-kafka-headless:9092"
             - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
-              value: "false"
+              value: "false"  # Topics created by post-install Job with correct partition/replication settings
+            # Cap at 3: Kafka's recommended ceiling; must not exceed broker count
             - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
               value: {{ min (int .Values.kafka.replicaCount) 3 | quote }}
             - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR

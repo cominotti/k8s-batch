@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
+/** Simple health-check endpoint used by E2E tests to verify the deployment is reachable. */
 @RestController
 public class HelloController {
 

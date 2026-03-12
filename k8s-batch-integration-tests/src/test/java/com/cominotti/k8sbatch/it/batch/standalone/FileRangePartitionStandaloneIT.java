@@ -15,6 +15,7 @@ import java.util.Collection;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/** Validates the file-range ETL job under standalone in-process partitioning (no Kafka). */
 class FileRangePartitionStandaloneIT extends AbstractStandaloneBatchTest {
 
     @Autowired

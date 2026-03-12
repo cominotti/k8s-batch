@@ -12,9 +12,10 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * E2E test for the file-range ETL job.
- * Triggers the job via REST API with a CSV mounted into the pod via ConfigMap,
- * then verifies data was written to MySQL.
+ * E2E test for the file-range ETL job deployed via Helm into a K3s cluster with Kafka-based
+ * remote partitioning. The job splits a single CSV file by line ranges, distributes partitions
+ * to workers through Kafka, and writes records to MySQL. Validates both small (10-row) and
+ * large (100-row, multi-partition) inputs to ensure correct data throughput and worker scaling.
  */
 class FileRangeJobE2E extends AbstractE2ETest {
 

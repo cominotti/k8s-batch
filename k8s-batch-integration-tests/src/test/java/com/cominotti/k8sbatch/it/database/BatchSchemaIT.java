@@ -9,6 +9,10 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Validates that the Spring Batch 6 metadata schema (9 BATCH_* tables) is created by
+ * {@code spring-boot-starter-batch-jdbc} auto-configuration, not Flyway.
+ */
 class BatchSchemaIT extends AbstractIntegrationTest {
 
     @Test

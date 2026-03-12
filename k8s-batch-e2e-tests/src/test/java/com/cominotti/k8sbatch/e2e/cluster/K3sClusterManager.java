@@ -45,7 +45,10 @@ public final class K3sClusterManager {
     private static volatile KubernetesClient kubernetesClient;
     private static volatile boolean clusterReady = false;
     private static volatile String currentProfile;
+    // Manifests are cached so teardownDeployment() can delete the same resources it created
+    // (we use raw kubectl-equivalent apply, not helm install, so there's no helm release to uninstall)
     private static volatile String cachedManifests;
+    // Deduplication set: loading the same image twice wastes minutes of tar-file copy
     private static final Set<String> loadedImages = new HashSet<>();
 
     private K3sClusterManager() {
@@ -192,6 +195,7 @@ public final class K3sClusterManager {
     private static void startK3s() {
         log.info("Starting K3s container...");
         k3sContainer = new K3sContainer(DockerImageName.parse(E2EContainerImages.K3S_IMAGE))
+                // Traefik disabled — the Helm chart uses NodePort/ClusterIP, not Ingress
                 .withCommand("server", "--disable=traefik");
         k3sContainer.start();
         log.info("K3s container started");
@@ -275,11 +279,11 @@ public final class K3sClusterManager {
     }
 
     static String resolveChartPath() {
-        // Chart is at project root: helm/k8s-batch
+        // First path: running from the e2e-tests submodule directory (parent = project root)
         Path projectRoot = Path.of(System.getProperty("user.dir")).getParent();
         Path chartPath = projectRoot.resolve("helm/k8s-batch");
         if (!Files.isDirectory(chartPath)) {
-            // Try from project root directly (if running from root)
+            // Second path: running from the project root directly
             chartPath = Path.of(System.getProperty("user.dir"), "helm/k8s-batch");
         }
         if (!Files.isDirectory(chartPath)) {

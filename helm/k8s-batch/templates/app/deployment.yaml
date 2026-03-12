@@ -7,6 +7,7 @@ metadata:
     app.kubernetes.io/component: app
 spec:
   {{- if not .Values.hpa.enabled }}
+  # Omit replicas when HPA is enabled to prevent Helm/HPA conflicts
   replicas: {{ .Values.app.replicaCount }}
   {{- end }}
   selector:
@@ -19,6 +20,7 @@ spec:
         {{- include "k8s-batch.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: app
       annotations:
+        # Triggers rolling restart when ConfigMap content changes
         checksum/config: {{ include (print .Template.BasePath "/app/configmap.yaml") . | sha256sum }}
         {{- with .Values.app.podAnnotations }}
         {{- toYaml . | nindent 8 }}
@@ -43,6 +45,8 @@ spec:
                 sleep 3
               done
         {{- if and .Values.kafka.enabled .Values.features.kafka }}
+        # Uses headless service DNS (kafka-0.kafka-headless) instead of ClusterIP because the
+        # ClusterIP service may not be ready before at least one Kafka pod passes readiness
         - name: wait-for-kafka
           image: "{{ .Values.global.initImage.repository }}:{{ .Values.global.initImage.tag }}"
           command:

@@ -8,6 +8,7 @@ metadata:
   annotations:
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-weight": "0"
+    # Deletes previous Job before creating a new one (avoids 'already exists' on upgrade)
     "helm.sh/hook-delete-policy": before-hook-creation
 spec:
   backoffLimit: 5

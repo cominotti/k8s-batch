@@ -18,8 +18,10 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * E2E test for standalone profile (no Kafka).
- * Deploys with standalone Helm values and verifies batch jobs work without Kafka.
+ * E2E test for the standalone profile, which deploys only the app and MySQL (no Kafka).
+ * Partitioning is handled in-process via {@code TaskExecutorPartitionHandler} instead of
+ * Kafka-based remote partitioning. Verifies that no Kafka pods are created, and that both
+ * the file-range and multi-file ETL jobs complete successfully without messaging infrastructure.
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class StandaloneProfileE2E extends AbstractE2ETest {

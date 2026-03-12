@@ -14,6 +14,15 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 
+/**
+ * Provides test utilities for launching and cleaning up batch jobs in integration tests.
+ *
+ * <p>Two {@link JobOperatorTestUtils} beans are needed (one per job) because each instance is
+ * bound to a single {@code Job} via {@code setJob()} — this is the Spring Batch 6.x API
+ * (replaces the deprecated {@code JobLauncherTestUtils}).
+ * {@link org.springframework.batch.test.JobRepositoryTestUtils} handles metadata cleanup
+ * via {@code removeJobExecutions()}, which cascades through all {@code BATCH_*} tables.
+ */
 @TestConfiguration(proxyBeanMethods = false)
 public class BatchTestJobConfig {
 

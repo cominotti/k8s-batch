@@ -30,6 +30,16 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 import javax.sql.DataSource;
 
+/**
+ * Defines the {@code fileRangeEtlJob} and its worker step for file-range partitioned CSV-to-DB ETL.
+ *
+ * <p>A single CSV file is split into line-range partitions by {@link FileRangePartitioner}. Each
+ * partition's worker step reads its assigned line range, filters invalid records, and upserts to
+ * MySQL. The manager step is <strong>not</strong> defined here — it is contributed by either
+ * {@link com.cominotti.k8sbatch.config.RemotePartitioningJobConfig RemotePartitioningJobConfig}
+ * (Kafka) or {@link com.cominotti.k8sbatch.batch.standalone.StandaloneJobConfig StandaloneJobConfig}
+ * (local threads), depending on the active Spring profile.
+ */
 @Configuration
 public class FileRangeJobConfig {
 
@@ -49,6 +59,8 @@ public class FileRangeJobConfig {
                 partitionProperties.gridSize(), partitionProperties.chunkSize());
     }
 
+    // @Qualifier is required because two Step beans exist (manager + worker) — Spring can't
+    // resolve by type alone. The constant must match the bean name in the manager config.
     @Bean
     public Job fileRangeEtlJob(JobRepository jobRepository, @Qualifier(BatchStepNames.FILE_RANGE_MANAGER_STEP) Step fileRangeManagerStep) {
         return new JobBuilder(BatchStepNames.FILE_RANGE_ETL_JOB, jobRepository)
@@ -57,16 +69,22 @@ public class FileRangeJobConfig {
                 .build();
     }
 
+    // @StepScope defers bean creation until step execution time, enabling SpEL resolution of
+    // #{jobParameters[...]} — without it, the expression would be evaluated at context startup
+    // when no job parameters are available yet.
     @Bean
     @StepScope
     public FileRangePartitioner fileRangePartitioner(
+            // Supplied by the REST API caller in the POST body
             @Value("#{jobParameters['batch.file-range.input-file']}") String inputFile) {
         return new FileRangePartitioner(new FileSystemResource(inputFile));
     }
 
+    // @StepScope: new reader per partition with its own line range from the ExecutionContext
     @Bean
     @StepScope
     public FlatFileItemReader<CsvRecord> fileRangeItemReader(
+            // These keys are populated by FileRangePartitioner — names must match exactly
             @Value("#{stepExecutionContext['resourcePath']}") String resourcePath,
             @Value("#{stepExecutionContext['startLine']}") int startLine,
             @Value("#{stepExecutionContext['endLine']}") int endLine) {
@@ -74,12 +92,14 @@ public class FileRangeJobConfig {
         return CsvRecordReaderFactory.createWithLineRange(resource, startLine, endLine);
     }
 
+    // @StepScope: new processor per partition (stateless, but scope matches reader/writer)
     @Bean
     @StepScope
     public CsvRecordProcessor fileRangeItemProcessor() {
         return new CsvRecordProcessor();
     }
 
+    // @StepScope: new writer per partition, tagged with the partition's source file for traceability
     @Bean
     @StepScope
     public JdbcBatchItemWriter<CsvRecord> fileRangeItemWriter(
@@ -88,6 +108,7 @@ public class FileRangeJobConfig {
         return CsvRecordWriter.create(dataSource, resourcePath);
     }
 
+    /** Worker step: reads CSV lines → filters invalid records → upserts to MySQL, in chunks. */
     @Bean
     public Step fileRangeWorkerStep(
             JobRepository jobRepository,

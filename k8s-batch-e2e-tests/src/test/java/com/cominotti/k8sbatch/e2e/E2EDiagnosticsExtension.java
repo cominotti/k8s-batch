@@ -9,6 +9,10 @@ import org.junit.jupiter.api.extension.TestWatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * JUnit 5 {@link TestWatcher} that automatically dumps pod diagnostics (status, logs, events) when
+ * a test fails. Registered on {@link AbstractE2ETest} via {@code @ExtendWith}.
+ */
 public class E2EDiagnosticsExtension implements TestWatcher {
 
     private static final Logger log = LoggerFactory.getLogger(E2EDiagnosticsExtension.class);

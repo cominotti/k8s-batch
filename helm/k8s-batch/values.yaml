@@ -75,7 +75,7 @@ app:
 
   config:
     serverPort: 8080
-    batchInitializeSchema: never
+    batchInitializeSchema: never  # DDL created by the MySQL init ConfigMap, not Spring Batch auto-config
     extra: {}
 
 # ======================================================================
@@ -114,7 +114,7 @@ hpa:
           averageUtilization: 80
   behavior:
     scaleDown:
-      stabilizationWindowSeconds: 300
+      stabilizationWindowSeconds: 300  # 5-minute cooldown prevents HPA thrashing during batch bursts
       policies:
         - type: Pods
           value: 1
@@ -198,13 +198,13 @@ kafka:
     port: 9092
 
   kraft:
-    clusterId: ""
+    clusterId: ""  # Empty = auto-generated UUID. First pod generates it, shares via /shared emptyDir volume
 
   topics:
     partitionRequests:
       name: batch-partition-requests
       partitions: 10
-      replicationFactor: 2
+      replicationFactor: 2  # Must be <= kafka.replicaCount (E2E overrides to 1 for single-broker)
     partitionReplies:
       name: batch-partition-replies
       partitions: 10
@@ -222,7 +222,7 @@ schemaRegistry:
     tag: "7.9.0"
     pullPolicy: IfNotPresent
 
-  replicaCount: 1
+  replicaCount: 1  # Stateless (schemas stored in _schemas Kafka topic); scale for availability only
 
   resources:
     requests:

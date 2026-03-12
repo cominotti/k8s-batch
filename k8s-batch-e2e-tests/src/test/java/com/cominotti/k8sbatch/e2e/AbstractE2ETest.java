@@ -17,6 +17,17 @@ import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Base class for E2E tests that deploy the Helm chart into a K3s cluster and verify behavior
+ * through port-forwarded HTTP and JDBC connections.
+ *
+ * <p>{@code @TestInstance(PER_CLASS)} prevents re-running Helm deploy per test method — setup
+ * happens once in {@code @BeforeAll}. Subclasses specify which Helm values file to deploy via
+ * {@link #valuesFile()}, which determines the infrastructure (Kafka vs standalone). Override
+ * {@link #requiresKafka()} to load Kafka/Schema Registry images (skipped by default since they
+ * are large and slow). Test data is cleaned before each test (not after) so that failing tests
+ * leave data visible for post-mortem analysis.
+ */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(value = 10, unit = TimeUnit.MINUTES)
 @ExtendWith(E2EDiagnosticsExtension.class)
@@ -49,6 +60,7 @@ public abstract class AbstractE2ETest {
         int mysqlPort = portForwardManager.forwardToMysql(3306);
 
         appClient = new BatchAppClient(appPort);
+        // Credentials must match the Helm values file (mysql.auth.database/username/password)
         mysqlVerifier = new MysqlVerifier(mysqlPort, "k8sbatch", "k8sbatch", "e2e_pass");
 
         log.info("E2E test setup complete | appPort={} | mysqlPort={}", appPort, mysqlPort);

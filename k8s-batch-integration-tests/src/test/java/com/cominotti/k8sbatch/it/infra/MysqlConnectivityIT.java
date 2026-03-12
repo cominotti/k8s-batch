@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/** Smoke test for MySQL connectivity via the Testcontainers {@code @ServiceConnection}. */
 class MysqlConnectivityIT extends AbstractIntegrationTest {
 
     @Test
@@ -24,6 +25,7 @@ class MysqlConnectivityIT extends AbstractIntegrationTest {
     @Test
     void shouldHaveExpectedMysqlVersion() {
         String version = jdbcTemplate.queryForObject("SELECT VERSION()", String.class);
+        // Must match TestContainerImages.MYSQL_IMAGE version
         assertThat(version).startsWith("8.0");
     }
 }

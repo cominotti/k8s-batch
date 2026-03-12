@@ -1,7 +1,10 @@
+# Remote partitioning profile (default): Kafka-based partition distribution.
 spring:
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
 
 batch:
   kafka:
+    # Only a requests topic is needed — the manager detects completion by polling JobRepository,
+    # not by receiving reply messages through Kafka
     requests-topic: ${BATCH_KAFKA_REQUESTS_TOPIC:batch-partition-requests}

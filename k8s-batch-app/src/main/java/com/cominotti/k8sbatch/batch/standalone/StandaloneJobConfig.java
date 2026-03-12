@@ -19,6 +19,16 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
+/**
+ * Provides in-process parallel partition execution as an alternative to Kafka-based remote
+ * partitioning. Uses {@link TaskExecutorPartitionHandler} with a thread pool to run worker steps
+ * locally — no Kafka dependency required.
+ *
+ * <p>Activated only under the {@code standalone} profile. When absent, the default
+ * {@code remote-partitioning} profile activates
+ * {@link com.cominotti.k8sbatch.config.RemotePartitioningJobConfig RemotePartitioningJobConfig}
+ * instead — the two configs are mutually exclusive.
+ */
 @Configuration
 @Profile("standalone")
 public class StandaloneJobConfig {
@@ -34,6 +44,7 @@ public class StandaloneJobConfig {
         this.stepExecutionListener = stepExecutionListener;
     }
 
+    // @Qualifier is required because two Step beans exist (manager + worker)
     @Bean
     public Step fileRangeManagerStep(
             JobRepository jobRepository,
@@ -44,6 +55,7 @@ public class StandaloneJobConfig {
                 fileRangeWorkerStep, "file-range-");
     }
 
+    // @Qualifier is required because two Step beans exist (manager + worker)
     @Bean
     public Step multiFileManagerStep(
             JobRepository jobRepository,
@@ -76,6 +88,8 @@ public class StandaloneJobConfig {
                 .build();
     }
 
+    // Creates a new executor per call (not a shared bean) so each job gets a distinct thread
+    // name prefix for log correlation — e.g., "file-range-1" vs "multi-file-1"
     private ThreadPoolTaskExecutor partitionTaskExecutor(String threadNamePrefix) {
         log.info("Creating partition thread pool | prefix={} | poolSize={}",
                 threadNamePrefix, partitionProperties.gridSize());

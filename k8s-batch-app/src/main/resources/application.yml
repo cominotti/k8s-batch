@@ -5,6 +5,8 @@ spring:
   application:
     name: k8s-batch
   profiles:
+    # Default profile — loads RemotePartitioningJobConfig (Kafka-based).
+    # Use --spring.profiles.active=standalone to switch to TaskExecutorPartitionHandler (no Kafka).
     default: remote-partitioning
 
   datasource:
@@ -15,13 +17,18 @@ spring:
 
   batch:
     jdbc:
+      # Default: always (for local dev). Helm overrides to "never" because the MySQL init
+      # ConfigMap creates the Spring Batch DDL before the app starts.
       initialize-schema: ${SPRING_BATCH_JDBC_INITIALIZE_SCHEMA:always}
     job:
+      # Prevent auto-launching jobs at startup — jobs are triggered via the REST API
       enabled: false
 
   flyway:
     enabled: true
     locations: classpath:db/migration
+    # baseline-on-migrate is needed because the Spring Batch tables are created by the MySQL
+    # init script (not Flyway), so Flyway must treat the pre-existing schema as baseline
     baseline-on-migrate: true
     baseline-version: 0
 
@@ -35,6 +42,8 @@ management:
       show-details: always
       show-components: always
       probes:
+        # Enables separate /actuator/health/liveness and /actuator/health/readiness endpoints
+        # for Kubernetes liveness/readiness probes
         enabled: true
   health:
     livenessstate:
@@ -46,4 +55,6 @@ batch:
   partition:
     grid-size: ${BATCH_PARTITION_GRID_SIZE:4}
     chunk-size: ${BATCH_PARTITION_CHUNK_SIZE:100}
+    # Remote partitioning manager polling timeout. Standalone mode ignores this
+    # (TaskExecutorPartitionHandler has no timeout API — JUnit @Timeout is the backstop).
     timeout-ms: ${BATCH_PARTITION_TIMEOUT_MS:60000}

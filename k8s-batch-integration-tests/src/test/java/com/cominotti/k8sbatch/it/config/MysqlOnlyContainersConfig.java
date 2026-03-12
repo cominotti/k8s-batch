@@ -9,6 +9,10 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.context.annotation.Bean;
 import org.testcontainers.mysql.MySQLContainer;
 
+/**
+ * Test configuration for standalone tests that only need MySQL (no Kafka/Redpanda). Skips
+ * Redpanda startup entirely, significantly reducing test infrastructure time.
+ */
 @TestConfiguration(proxyBeanMethods = false)
 public class MysqlOnlyContainersConfig {
 

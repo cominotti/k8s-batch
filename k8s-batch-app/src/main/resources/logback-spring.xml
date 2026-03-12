@@ -10,7 +10,8 @@
         </encoder>
     </appender>
 
-    <!-- Default / remote-partitioning -->
+    <!-- Default / remote-partitioning: suppress per-chunk SQL (batch) and consumer
+         group rebalancing noise (kafka) to keep production logs readable -->
     <springProfile name="default | remote-partitioning">
         <logger name="com.cominotti.k8sbatch" level="INFO"/>
         <logger name="org.springframework.batch" level="WARN"/>
@@ -21,7 +22,8 @@
         </root>
     </springProfile>
 
-    <!-- Standalone -->
+    <!-- Standalone: DEBUG on the standalone subpackage for TaskExecutorPartitionHandler
+         thread diagnostics (partition execution, thread pool activity) -->
     <springProfile name="standalone">
         <logger name="com.cominotti.k8sbatch" level="INFO"/>
         <logger name="com.cominotti.k8sbatch.batch.standalone" level="DEBUG"/>

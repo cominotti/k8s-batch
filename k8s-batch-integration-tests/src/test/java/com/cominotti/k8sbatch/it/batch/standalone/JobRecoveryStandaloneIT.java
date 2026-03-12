@@ -12,6 +12,10 @@ import org.springframework.beans.factory.annotation.Qualifier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Validates that Spring Batch metadata (job and step executions) is correctly persisted to the
+ * {@code JobRepository} after a successful job run. Verifies tracking, not restart/recovery.
+ */
 class JobRecoveryStandaloneIT extends AbstractStandaloneBatchTest {
 
     @Autowired

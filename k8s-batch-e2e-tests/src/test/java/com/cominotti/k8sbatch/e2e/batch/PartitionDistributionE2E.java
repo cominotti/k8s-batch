@@ -13,9 +13,10 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * E2E test that verifies partition metadata in BATCH_STEP_EXECUTION.
- * Runs a 100-row file-range job and checks that the manager created
- * multiple worker partitions with correct read counts.
+ * E2E test that validates the partition distribution metadata stored in Spring Batch's
+ * {@code BATCH_STEP_EXECUTION} table. Deploys the full Kafka-based stack into K3s, runs
+ * a 100-row file-range job, and queries MySQL to verify that the manager step created
+ * multiple worker partitions whose total read counts sum to exactly 100 rows.
  */
 class PartitionDistributionE2E extends AbstractE2ETest {
 

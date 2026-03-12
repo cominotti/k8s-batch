@@ -8,6 +8,7 @@ import org.springframework.http.MediaType;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/** Validates the /hello smoke-test endpoint returns a JSON response. */
 class HelloEndpointIT extends AbstractIntegrationTest {
 
     @Test

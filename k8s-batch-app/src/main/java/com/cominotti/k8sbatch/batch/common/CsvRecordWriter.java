@@ -9,6 +9,13 @@ import org.springframework.batch.infrastructure.item.database.builder.JdbcBatchI
 
 import javax.sql.DataSource;
 
+/**
+ * Factory for creating a {@link JdbcBatchItemWriter} that upserts CSV records into MySQL.
+ *
+ * <p>Uses MySQL 8's {@code ON DUPLICATE KEY UPDATE} with row alias for idempotent writes — if a
+ * record with the same {@code id} (primary key) already exists, it is updated rather than
+ * duplicated. The {@code source_file} column tracks which partition wrote each row.
+ */
 public final class CsvRecordWriter {
 
     private static final Logger log = LoggerFactory.getLogger(CsvRecordWriter.class);

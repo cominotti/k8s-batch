@@ -12,9 +12,10 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * E2E test for the multi-file ETL job.
- * Processes multiple CSV files from a directory mounted via ConfigMap.
- * Expected: file-a.csv (30 rows) + file-b.csv (40 rows) + file-c.csv (50 rows) = 120 rows.
+ * E2E test for the multi-file ETL job deployed via Helm into K3s with Kafka remote partitioning.
+ * Unlike the file-range job which splits one file by line ranges, this job assigns one partition
+ * per CSV file (file-a: 30, file-b: 40, file-c: 50 rows). Verifies that all 120 records are
+ * written to MySQL and that exactly three worker step executions are created (one per file).
  */
 class MultiFileJobE2E extends AbstractE2ETest {
 

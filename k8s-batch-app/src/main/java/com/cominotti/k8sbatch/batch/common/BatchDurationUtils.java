@@ -5,6 +5,11 @@ package com.cominotti.k8sbatch.batch.common;
 import java.time.Duration;
 import java.time.LocalDateTime;
 
+/**
+ * Null-safe duration calculation for batch listener logging. Spring Batch's
+ * {@code JobExecution.getEndTime()} returns {@code null} if a job crashes before completion,
+ * which would cause {@code Duration.between()} to throw a {@code NullPointerException}.
+ */
 final class BatchDurationUtils {
 
     private BatchDurationUtils() {

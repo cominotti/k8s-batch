@@ -110,7 +110,9 @@
                     </includes>
                     <forkCount>1</forkCount>
                     <reuseForks>true</reuseForks>
+                    <!-- Prevents silent pass when test discovery fails (e.g., naming pattern mismatch) -->
                     <failIfNoTests>true</failIfNoTests>
+                    <!-- 5-minute safety net for stuck Testcontainer processes -->
                     <forkedProcessTimeoutInSeconds>300</forkedProcessTimeoutInSeconds>
                 </configuration>
             </plugin>
