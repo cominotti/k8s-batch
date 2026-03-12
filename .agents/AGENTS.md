@@ -287,7 +287,7 @@ config/checkstyle/
 ## Claude Code Automations
 
 - **`/helm-validate`** — runs helm lint, unittest, and template render
-- **`/run-integration-tests`** — Docker prerequisite check + `mvn verify` for integration tests
+- **`/run-integration-tests`** — Docker + Helm prerequisite checks, Docker image build, then runs both integration tests and E2E tests
 - **`/doc-review`** — reviews documentation quality (JavaDoc, comments, README) for changed files after code changes. Uses Checkstyle XML report as deterministic baseline, then applies AI-driven semantic review
 - **`helm-reviewer`** subagent — reviews Helm changes against project conventions (invoked automatically during PR reviews)
 - **`/spring-migration`** — reviews Java code for deprecated Spring, Spring Batch, Spring Boot, and Fabric8 APIs; checks imports, method calls, and configuration against current non-deprecated alternatives
