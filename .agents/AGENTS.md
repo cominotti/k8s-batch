@@ -272,6 +272,7 @@ scripts/license/
 
 - **`/helm-validate`** — runs helm lint, unittest, and template render
 - **`/run-integration-tests`** — Docker prerequisite check + `mvn verify` for integration tests
+- **`/doc-review`** — reviews documentation quality (JavaDoc, comments, README) for changed files after code changes
 - **`helm-reviewer`** subagent — reviews Helm changes against project conventions (invoked automatically during PR reviews)
 - **`.mcp.json`** — shares context7 MCP server config with collaborators
 
