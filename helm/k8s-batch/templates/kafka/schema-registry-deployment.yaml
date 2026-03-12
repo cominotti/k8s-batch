@@ -45,13 +45,15 @@ spec:
               value: {{ include "k8s-batch.kafka.bootstrapServers" . | quote }}
             - name: SCHEMA_REGISTRY_LISTENERS
               value: "http://0.0.0.0:{{ .Values.schemaRegistry.service.port }}"
+            - name: SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR
+              value: {{ min (int .Values.kafka.replicaCount) 3 | quote }}
           resources:
             {{- toYaml .Values.schemaRegistry.resources | nindent 12 }}
           livenessProbe:
             httpGet:
               path: /
               port: http
-            initialDelaySeconds: 30
+            initialDelaySeconds: 90
             periodSeconds: 15
           readinessProbe:
             httpGet:

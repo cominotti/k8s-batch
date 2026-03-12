@@ -26,54 +26,23 @@ public final class PodDiagnostics {
         this.namespace = namespace;
     }
 
+    /**
+     * Dumps diagnostics for all pods in the namespace.
+     */
     public void dumpAll() {
-        dumpAllPodStatus();
-        dumpPodLogs();
+        dumpForPods(allPods());
+    }
+
+    /**
+     * Dumps diagnostics for the specified pods (status, logs, events).
+     */
+    public void dumpForPods(List<Pod> pods) {
+        dumpPodStatus(pods);
+        dumpPodLogs(pods);
         dumpEvents();
     }
 
-    public void dumpAllPodStatus() {
-        log.error("=== POD STATUS DUMP ===");
-        List<Pod> pods = client.pods().inNamespace(namespace).list().getItems();
-        for (Pod pod : pods) {
-            String phase = pod.getStatus() != null ? pod.getStatus().getPhase() : "Unknown";
-            String conditions = "";
-            if (pod.getStatus() != null && pod.getStatus().getConditions() != null) {
-                conditions = pod.getStatus().getConditions().stream()
-                        .map(c -> c.getType() + "=" + c.getStatus())
-                        .reduce((a, b) -> a + ", " + b)
-                        .orElse("none");
-            }
-            log.error("Pod | name={} | phase={} | conditions=[{}]",
-                    pod.getMetadata().getName(), phase, conditions);
-
-            // Dump container statuses
-            if (pod.getStatus() != null && pod.getStatus().getContainerStatuses() != null) {
-                pod.getStatus().getContainerStatuses().forEach(cs ->
-                        log.error("  Container | name={} | ready={} | restarts={} | state={}",
-                                cs.getName(), cs.getReady(), cs.getRestartCount(), cs.getState()));
-            }
-        }
-    }
-
-    public void dumpPodLogs() {
-        log.error("=== POD LOGS DUMP ===");
-        List<Pod> pods = client.pods().inNamespace(namespace).list().getItems();
-        for (Pod pod : pods) {
-            String podName = pod.getMetadata().getName();
-            try {
-                String logs = client.pods().inNamespace(namespace)
-                        .withName(podName)
-                        .tailingLines(MAX_LOG_LINES)
-                        .getLog();
-                log.error("--- Logs for pod {} (last {} lines) ---\n{}", podName, MAX_LOG_LINES, logs);
-            } catch (Exception e) {
-                log.error("Cannot get logs for pod {} : {}", podName, e.getMessage());
-            }
-        }
-    }
-
-    public void dumpEvents() {
+    private void dumpEvents() {
         log.error("=== EVENTS DUMP ===");
         try {
             List<Event> events = client.v1().events().inNamespace(namespace).list().getItems();
@@ -89,6 +58,53 @@ public final class PodDiagnostics {
                             event.getMessage()));
         } catch (Exception e) {
             log.error("Cannot dump events: {}", e.getMessage());
+        }
+    }
+
+    private List<Pod> allPods() {
+        return client.pods().inNamespace(namespace).list().getItems();
+    }
+
+    private void dumpPodStatus(List<Pod> pods) {
+        log.error("=== POD STATUS DUMP ===");
+        for (Pod pod : pods) {
+            String phase = pod.getStatus() != null ? pod.getStatus().getPhase() : "Unknown";
+            String conditions = "";
+            if (pod.getStatus() != null && pod.getStatus().getConditions() != null) {
+                conditions = pod.getStatus().getConditions().stream()
+                        .map(c -> c.getType() + "=" + c.getStatus())
+                        .reduce((a, b) -> a + ", " + b)
+                        .orElse("none");
+            }
+            log.error("Pod | name={} | phase={} | conditions=[{}]",
+                    pod.getMetadata().getName(), phase, conditions);
+
+            if (pod.getStatus() != null && pod.getStatus().getInitContainerStatuses() != null) {
+                pod.getStatus().getInitContainerStatuses().forEach(cs ->
+                        log.error("  InitContainer | name={} | ready={} | restarts={} | state={}",
+                                cs.getName(), cs.getReady(), cs.getRestartCount(), cs.getState()));
+            }
+            if (pod.getStatus() != null && pod.getStatus().getContainerStatuses() != null) {
+                pod.getStatus().getContainerStatuses().forEach(cs ->
+                        log.error("  Container | name={} | ready={} | restarts={} | state={}",
+                                cs.getName(), cs.getReady(), cs.getRestartCount(), cs.getState()));
+            }
+        }
+    }
+
+    private void dumpPodLogs(List<Pod> pods) {
+        log.error("=== POD LOGS DUMP ===");
+        for (Pod pod : pods) {
+            String podName = pod.getMetadata().getName();
+            try {
+                String logs = client.pods().inNamespace(namespace)
+                        .withName(podName)
+                        .tailingLines(MAX_LOG_LINES)
+                        .getLog();
+                log.error("--- Logs for pod {} (last {} lines) ---\n{}", podName, MAX_LOG_LINES, logs);
+            } catch (Exception e) {
+                log.error("Cannot get logs for pod {} : {}", podName, e.getMessage());
+            }
         }
     }
 }

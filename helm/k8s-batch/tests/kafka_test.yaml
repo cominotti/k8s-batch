@@ -75,3 +75,47 @@ tests:
           content:
             name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
             value: "false"
+
+  - it: should set internal topic replication factors from replica count
+    set:
+      kafka.enabled: true
+      features.kafka: true
+      kafka.replicaCount: 1
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+            value: "1"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
+            value: "1"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
+            value: "1"
+
+  - it: should cap internal topic replication factors at 3
+    set:
+      kafka.enabled: true
+      features.kafka: true
+      kafka.replicaCount: 5
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+            value: "3"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
+            value: "3"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
+            value: "2"

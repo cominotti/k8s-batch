@@ -2,10 +2,10 @@
 
 package com.cominotti.k8sbatch.e2e.cluster;
 
+import com.cominotti.k8sbatch.e2e.diagnostics.PodDiagnostics;
 import io.fabric8.kubernetes.api.model.ConfigMap;
 import io.fabric8.kubernetes.api.model.ConfigMapBuilder;
 import io.fabric8.kubernetes.api.model.HasMetadata;
-import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.client.Config;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientBuilder;
@@ -136,7 +136,8 @@ public final class K3sClusterManager {
         // Save the image to a tar file on the host
         Path tempTar = Files.createTempFile("k3s-image-", ".tar");
         try {
-            ProcessBuilder pb = new ProcessBuilder("docker", "save", "-o", tempTar.toString(), imageName);
+            ProcessBuilder pb = new ProcessBuilder(
+                    "docker", "save", "--platform", "linux/amd64", "-o", tempTar.toString(), imageName);
             pb.inheritIO();
             Process process = pb.start();
             int exitCode = process.waitFor();
@@ -148,7 +149,8 @@ public final class K3sClusterManager {
             k3sContainer.copyFileToContainer(
                     org.testcontainers.utility.MountableFile.forHostPath(tempTar),
                     "/tmp/image.tar");
-            var result = k3sContainer.execInContainer("ctr", "images", "import", "/tmp/image.tar");
+            var result = k3sContainer.execInContainer(
+                    "ctr", "--namespace", "k8s.io", "images", "import", "/tmp/image.tar");
             if (result.getExitCode() != 0) {
                 log.warn("ctr images import stderr: {}", result.getStderr());
                 throw new RuntimeException("Failed to import image into K3s: " + result.getStderr());
@@ -266,50 +268,10 @@ public final class K3sClusterManager {
     }
 
     private static void waitForPodsReady() {
-        log.info("Waiting for pods to become ready (timeout={})...", POD_READY_TIMEOUT);
-        long deadline = System.currentTimeMillis() + POD_READY_TIMEOUT.toMillis();
-
-        while (System.currentTimeMillis() < deadline) {
-            List<Pod> pods = kubernetesClient.pods().inNamespace(NAMESPACE)
-                    .withLabel("app.kubernetes.io/instance", RELEASE_NAME)
-                    .list().getItems();
-
-            if (pods.isEmpty()) {
-                sleep(2000);
-                continue;
-            }
-
-            boolean allReady = pods.stream().allMatch(PodUtils::isReady);
-            if (allReady && !pods.isEmpty()) {
-                log.info("All {} pods are ready", pods.size());
-                return;
-            }
-
-            for (Pod pod : pods) {
-                String phase = pod.getStatus() != null ? pod.getStatus().getPhase() : "Unknown";
-                log.debug("Pod {} phase={} ready={}", pod.getMetadata().getName(), phase, PodUtils.isReady(pod));
-            }
-            sleep(5000);
-        }
-
-        // Timeout — dump pod status for diagnostics
-        List<Pod> pods = kubernetesClient.pods().inNamespace(NAMESPACE)
-                .withLabel("app.kubernetes.io/instance", RELEASE_NAME)
-                .list().getItems();
-        for (Pod pod : pods) {
-            String phase = pod.getStatus() != null ? pod.getStatus().getPhase() : "Unknown";
-            log.error("Pod not ready at timeout | name={} | phase={}", pod.getMetadata().getName(), phase);
-        }
-        throw new RuntimeException("Pods did not become ready within " + POD_READY_TIMEOUT);
-    }
-
-    private static void sleep(long millis) {
-        try {
-            Thread.sleep(millis);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Interrupted while waiting", e);
-        }
+        PodDiagnostics diagnostics = new PodDiagnostics(kubernetesClient, NAMESPACE);
+        DeploymentWaiter waiter = new DeploymentWaiter(
+                kubernetesClient, NAMESPACE, RELEASE_NAME, diagnostics);
+        waiter.waitForPodsReady(POD_READY_TIMEOUT);
     }
 
     static String resolveChartPath() {

@@ -14,17 +14,18 @@ A reference project demonstrating **Spring Batch horizontal scaling on Kubernete
          +---------+   +---------+   +---------+
               |              |              |
      +--------v--------------v--------------v--------+
-     |                   Kafka (KRaft)                |
-     |  requests topic  ←→  replies topic             |
+     |           Kafka (Confluent, KRaft mode)        |
+     |        requests topic → worker pods            |
      +------------------------------------------------+
-              |
-     +--------v-----------------------------------------+
-     |                   MySQL 8.0                       |
-     |  Spring Batch JobRepository + Application tables  |
-     +---------------------------------------------------+
+              |                           |
+     +--------v-----------+   +-----------v-----------+
+     |     MySQL 8.0      |   |   Schema Registry     |
+     |  JobRepository +   |   |  (Confluent, stores   |
+     |  Application data  |   |   in _schemas topic)  |
+     +--------------------+   +-----------------------+
 ```
 
-Every pod runs the same image and can act as both **manager** (partitions work) and **worker** (processes partitions). MySQL JobRepository provides distributed locking to prevent duplicate job execution.
+Every pod runs the same image and can act as both **manager** (partitions work) and **worker** (processes partitions). The manager uses **JobRepository polling** (not Kafka reply channels) to detect worker completion. MySQL provides distributed locking to prevent duplicate job execution.
 
 ## Tech Stack
 
@@ -34,7 +35,8 @@ Every pod runs the same image and can act as both **manager** (partitions work) 
 | Spring Boot | 4.0.3 |
 | Spring Batch | 6.0.2 |
 | MySQL | 8.0 |
-| Kafka | 3.7 (KRaft, no Zookeeper) |
+| Kafka | Confluent Platform 7.9.0 (KRaft, no Zookeeper) |
+| Schema Registry | Confluent 7.9.0 |
 | Helm | 3 |
 | Testcontainers | 2.0.3 |
 
@@ -58,8 +60,10 @@ Both jobs: read CSV → process/validate → write to MySQL `target_records` tab
 
 | Endpoint | Description |
 |----------|-------------|
+| `POST /api/jobs/{jobName}` | Launch a batch job (async, returns HTTP 202) |
+| `GET /api/jobs/{jobName}/executions/{id}` | Poll job execution status |
 | `GET /hello` | Hello-world health check |
-| `GET /actuator/health` | Actuator health (DB + Kafka indicators) |
+| `GET /actuator/health` | Actuator health |
 | `GET /actuator/health/liveness` | Kubernetes liveness probe |
 | `GET /actuator/health/readiness` | Kubernetes readiness probe |
 
@@ -67,8 +71,8 @@ Both jobs: read CSV → process/validate → write to MySQL `target_records` tab
 
 - Java 21+
 - Maven 3.9+
-- Docker (for integration tests and local development)
-- Helm 3 + kubectl (for Kubernetes deployment)
+- Docker (for integration tests, E2E tests, and local development)
+- Helm 3 + kubectl (for Kubernetes deployment and E2E tests)
 
 ## Build
 
@@ -80,6 +84,10 @@ mvn clean compile
 mvn package -DskipTests
 
 # Full build with integration tests (requires Docker)
+mvn verify -DskipE2E=true
+
+# Full build with all tests including E2E
+docker build -t k8s-batch:e2e .
 mvn verify
 ```
 
@@ -99,7 +107,7 @@ SPRING_PROFILES_ACTIVE=standalone docker-compose up -d app
 
 ## Integration Tests
 
-Tests use Testcontainers to spin up MySQL and Kafka automatically. Docker must be running.
+Tests use Testcontainers to spin up MySQL and **Redpanda** (Kafka-compatible broker with built-in Schema Registry) automatically. Docker must be running.
 
 ```bash
 # Run all integration tests
@@ -107,12 +115,9 @@ mvn -pl k8s-batch-integration-tests -am verify
 
 # Run a specific test class
 mvn -pl k8s-batch-integration-tests -am verify -Dit.test=FileRangePartitionStandaloneIT
-
-# Skip integration tests
-mvn install -DskipITs
 ```
 
-### Test Categories (40 tests)
+### Test Categories (42 tests)
 
 | Category | Tests | Description |
 |----------|-------|-------------|
@@ -126,7 +131,7 @@ mvn install -DskipITs
 
 Container lifecycle is managed by `ContainerHolder` with decoupled startup:
 - **Standalone tests** start only MySQL (via `MysqlOnlyContainersConfig` → `ContainerHolder.startMysqlOnly()`)
-- **Remote tests** start MySQL + Kafka in parallel (via `SharedContainersConfig` → `ContainerHolder.startAll()` using `Startables.deepStart()`)
+- **Remote tests** start MySQL + Redpanda in parallel (via `SharedContainersConfig` → `ContainerHolder.startAll()` using `Startables.deepStart()`)
 
 ### Timeout Layering
 
@@ -136,17 +141,53 @@ Tests are protected by multiple timeout layers:
 - **Spring Batch partition timeout**: 15s in tests (production: 60s)
 - **Kafka/JDBC/HTTP**: bounded timeouts on all external calls
 
-## Helm Chart Testing
+## E2E Tests
+
+E2E tests deploy the full Helm chart into a real **K3s** Kubernetes cluster (via Testcontainers) and validate the application end-to-end against **Confluent Kafka** and **Schema Registry**.
+
+```bash
+# Build Docker image first
+docker build -t k8s-batch:e2e .
+
+# Run E2E tests
+mvn -pl k8s-batch-e2e-tests -am verify
+
+# Skip E2E tests
+mvn verify -DskipE2E=true
+```
+
+### E2E Test Suite (11 tests)
+
+| Test Class | Tests | Description |
+|------------|-------|-------------|
+| `DeployHealthCheckE2E` | 3 | Pod readiness, actuator health, MySQL connectivity |
+| `FileRangeJobE2E` | 2 | File-range job execution + worker step validation |
+| `MultiFileJobE2E` | 2 | Multi-file job execution + one-worker-per-file validation |
+| `StandaloneProfileE2E` | 3 | Standalone profile (no Kafka pods), both jobs |
+| `PartitionDistributionE2E` | 1 | Verifies partitions distribute across workers |
+
+### Fast Failure Detection
+
+The `DeploymentWaiter` provides intelligent pod readiness polling that fails fast instead of waiting for timeout:
+
+- **Terminal errors** (ImagePullBackOff, CrashLoopBackOff, OOMKilled): detected and reported within seconds
+- **Unschedulable pods**: detected immediately when K8s can't place a pod
+- **Init container progress**: logged at each polling interval so you can see exactly where startup is blocked (e.g., "2/3 done | running=wait-for-kafka")
+- **Progress stall detection**: if no pod makes forward progress for 120s, fails early with diagnostics
+- **Container log streaming**: after 60s of a pod being not-ready with its main container running, streams container logs for immediate visibility into Spring Boot startup failures
+- **Full diagnostics dump**: on any failure, `PodDiagnostics` dumps pod status (including init containers), container logs, and Kubernetes events
+
+## Helm Chart
 
 ### Unit Tests (`helm-unittest`)
 
-34 YAML-based tests validate template rendering: conditionals (HPA, Kafka, init containers), values substitution, probes, and security contexts.
+49 YAML-based tests validate template rendering: conditionals (HPA, Kafka, Schema Registry, init containers), values substitution, probes, replication factors, and security contexts.
 
 ```bash
 # Install plugin (one-time)
 helm plugin install https://github.com/helm-unittest/helm-unittest
 
-# Run tests (~40ms)
+# Run tests (~60ms)
 helm unittest helm/k8s-batch
 ```
 
@@ -202,6 +243,8 @@ Key `values.yaml` parameters:
 | `mysql.persistence.size` | `10Gi` | MySQL storage |
 | `kafka.replicaCount` | `3` | Kafka broker count |
 | `kafka.enabled` | `true` | Deploy Kafka |
+| `schemaRegistry.enabled` | `true` | Deploy Schema Registry |
+| `features.schemaRegistry` | `true` | Enable Schema Registry integration |
 | `ingress.enabled` | `false` | Expose via Ingress |
 
 ### Standalone Mode (no Kafka)
@@ -232,20 +275,29 @@ k8s-batch/
 │       └── resources/
 │           ├── application*.yml     # Config per profile
 │           └── db/migration/        # Flyway SQL migrations
-├── k8s-batch-integration-tests/     # Integration tests
+├── k8s-batch-integration-tests/     # Integration tests (Redpanda + MySQL)
 │   ├── pom.xml
 │   └── src/test/
-│       ├── java/.../it/             # 13 test classes
+│       ├── java/.../it/             # 13 test classes, 42 tests
 │       │   └── config/              # ContainerHolder, SharedContainersConfig, etc.
 │       └── resources/test-data/     # CSV fixtures
+├── k8s-batch-e2e-tests/             # E2E tests (K3s + Confluent Kafka)
+│   ├── pom.xml
+│   └── src/test/
+│       ├── java/.../e2e/            # 5 test classes, 11 tests
+│       │   ├── cluster/             # K3sClusterManager, DeploymentWaiter, PodUtils
+│       │   ├── client/              # BatchAppClient (HTTP), MysqlVerifier (JDBC)
+│       │   └── diagnostics/         # PodDiagnostics (failure dump)
+│       └── resources/
+│           └── helm-values/         # E2E Helm values overrides
 ├── helm/k8s-batch/                  # Helm 3 chart
 │   ├── Chart.yaml
 │   ├── values.yaml
-│   ├── tests/                       # helm-unittest YAML tests (34 tests)
+│   ├── tests/                       # helm-unittest YAML tests (49 tests)
 │   └── templates/
 │       ├── app/                     # Deployment, Service, HPA, Ingress
 │       ├── mysql/                   # StatefulSet, init schema
-│       └── kafka/                   # KRaft StatefulSet, topic init Job
+│       └── kafka/                   # KRaft StatefulSet, Schema Registry, topic init Job
 └── .github/workflows/               # CI pipelines
     └── helm-validate.yml            # Helm lint, unittest, kubeconform, K3s smoke test
 ```
@@ -256,11 +308,11 @@ k8s-batch/
 2. The manager's `Partitioner` splits work into N partitions
 3. Partition requests are sent to Kafka topic `batch-partition-requests`
 4. **All pods** (including the manager) consume partitions via Kafka consumer group
-5. Each worker processes its partition and sends a reply to `batch-partition-replies`
-6. The manager collects replies and marks the job complete
+5. Each worker processes its partition independently
+6. The manager **polls the JobRepository** (MySQL) to detect when all partitions are complete
 7. MySQL `JobRepository` uses pessimistic locking to prevent duplicate job execution
 8. HPA scales pods based on CPU/memory; new pods join the Kafka consumer group automatically
 
 ## License
 
-MIT
+Apache-2.0

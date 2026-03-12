@@ -93,3 +93,17 @@ tests:
       - equal:
           path: spec.replicas
           value: 3
+
+  - it: should set topic replication factor from kafka replica count
+    set:
+      kafka.enabled: true
+      features.kafka: true
+      schemaRegistry.enabled: true
+      features.schemaRegistry: true
+      kafka.replicaCount: 1
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR
+            value: "1"

@@ -53,8 +53,9 @@ class MultiFileJobE2E extends AbstractE2ETest {
 
         assertThat(result.status()).isEqualTo("COMPLETED");
 
-        // Should have 3 worker step executions (one per file)
-        int workerSteps = mysqlVerifier.countStepExecutions("multiFileWorkerStep%");
+        // Should have 3 worker step executions (one per file) within this job execution
+        int workerSteps = mysqlVerifier.countStepExecutionsForJob(
+                result.executionId(), "multiFileWorkerStep%");
         assertThat(workerSteps).isEqualTo(3);
     }
 }

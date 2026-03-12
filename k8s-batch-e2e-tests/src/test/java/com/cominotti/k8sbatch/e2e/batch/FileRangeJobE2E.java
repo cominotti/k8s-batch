@@ -59,7 +59,8 @@ class FileRangeJobE2E extends AbstractE2ETest {
         assertThat(recordCount).isEqualTo(100);
 
         // Verify worker steps were created (pattern: fileRangeWorkerStep:partition%)
-        int workerSteps = mysqlVerifier.countStepExecutions("fileRangeWorkerStep%");
+        int workerSteps = mysqlVerifier.countStepExecutionsForJob(
+                result.executionId(), "fileRangeWorkerStep%");
         assertThat(workerSteps).as("Should have multiple worker step executions").isGreaterThan(1);
     }
 }

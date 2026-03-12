@@ -42,13 +42,14 @@ public final class MysqlVerifier {
     }
 
     /**
-     * Counts step executions matching a name pattern.
+     * Counts step executions matching a name pattern within a specific job execution.
      */
-    public int countStepExecutions(String stepNamePattern) throws SQLException {
+    public int countStepExecutionsForJob(long jobExecutionId, String stepNamePattern) throws SQLException {
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(
-                     "SELECT COUNT(*) FROM BATCH_STEP_EXECUTION WHERE STEP_NAME LIKE ?")) {
-            ps.setString(1, stepNamePattern);
+                     "SELECT COUNT(*) FROM BATCH_STEP_EXECUTION WHERE JOB_EXECUTION_ID = ? AND STEP_NAME LIKE ?")) {
+            ps.setLong(1, jobExecutionId);
+            ps.setString(2, stepNamePattern);
             try (ResultSet rs = ps.executeQuery()) {
                 rs.next();
                 return rs.getInt(1);
