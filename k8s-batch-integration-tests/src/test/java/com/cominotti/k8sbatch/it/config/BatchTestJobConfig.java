@@ -13,6 +13,7 @@ import org.springframework.batch.test.JobRepositoryTestUtils;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Profile;
 
 /**
  * Provides test utilities for launching and cleaning up batch jobs in integration tests.
@@ -47,6 +48,20 @@ public class BatchTestJobConfig {
         log.debug("Creating JobOperatorTestUtils for multiFileEtlJob");
         JobOperatorTestUtils utils = new JobOperatorTestUtils(jobOperator, jobRepository);
         utils.setJob(multiFileEtlJob);
+        return utils;
+    }
+
+    // Only created under remote-partitioning profile — standalone tests don't load the
+    // transactionEnrichmentJob bean, so this must be profile-gated to avoid NoSuchBeanException.
+    @Bean
+    @Profile("remote-partitioning")
+    public JobOperatorTestUtils transactionJobOperatorTestUtils(
+            JobOperator jobOperator,
+            JobRepository jobRepository,
+            @Qualifier(BatchStepNames.TRANSACTION_ENRICHMENT_JOB) Job transactionEnrichmentJob) {
+        log.debug("Creating JobOperatorTestUtils for transactionEnrichmentJob");
+        JobOperatorTestUtils utils = new JobOperatorTestUtils(jobOperator, jobRepository);
+        utils.setJob(transactionEnrichmentJob);
         return utils;
     }
 

@@ -1,0 +1,17 @@
+{
+  "type": "record",
+  "name": "EnrichedTransactionEvent",
+  "namespace": "com.cominotti.k8sbatch.avro",
+  "doc": "Enriched transaction event with exchange rate, USD amount, and risk score.",
+  "fields": [
+    {"name": "transactionId", "type": "string", "doc": "UUID of the transaction"},
+    {"name": "accountId", "type": "string", "doc": "UUID of the account"},
+    {"name": "amount", "type": "double", "doc": "Transaction amount in original currency"},
+    {"name": "currency", "type": "string", "doc": "ISO 4217 currency code"},
+    {"name": "timestamp", "type": "long", "doc": "Original event timestamp in millis since epoch", "logicalType": "timestamp-millis"},
+    {"name": "exchangeRate", "type": "double", "doc": "Exchange rate from original currency to USD"},
+    {"name": "amountUsd", "type": "double", "doc": "Transaction amount converted to USD"},
+    {"name": "riskScore", "type": "string", "doc": "Risk assessment: LOW, MEDIUM, or HIGH"},
+    {"name": "processedAt", "type": "long", "doc": "Processing timestamp in millis since epoch", "logicalType": "timestamp-millis"}
+  ]
+}

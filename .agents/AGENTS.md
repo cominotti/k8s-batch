@@ -2,13 +2,14 @@
 
 ## Project Overview
 
-Spring Boot 4.0.3 + Spring Batch 6.x reference project for horizontally-scalable batch processing on Kubernetes. Two CSV-to-DB ETL jobs demonstrate remote partitioning via Kafka and standalone (in-process) execution as fallback.
+Spring Boot 4.0.3 + Spring Batch 6.x reference project for horizontally-scalable batch processing on Kubernetes. Three batch jobs demonstrate different patterns: two CSV-to-DB ETL jobs use remote partitioning via Kafka (with standalone fallback), and a transaction enrichment job reads Avro events from Kafka, enriches them, and writes to both MySQL and a Kafka output topic.
 
 ## Tech Stack
 
 - **Java 21**, **Spring Boot 4.0.3**, **Spring Batch 6.0.2**
 - **MySQL 8.0** — JobRepository + application data
-- **Kafka (Confluent Platform 7.9.0, KRaft mode)** — remote partitioning messaging
+- **Kafka (Confluent Platform 7.9.0, KRaft mode)** — remote partitioning messaging + event streaming
+- **Avro 1.12 + Confluent Schema Registry** — event serialization for transaction enrichment job
 - **Helm 3** — Kubernetes deployment
 - **Testcontainers 2.0.3** — integration tests
 - **Flyway** — database migrations
@@ -129,12 +130,25 @@ Use `JacksonJsonSerializer` / `JacksonJsonDeserializer` for Kafka partition requ
 
 ## Batch Job Design
 
-Both jobs follow the same pattern: **Partitioner → Manager Step → Worker Steps**
+### CSV ETL Jobs (fileRangeEtlJob, multiFileEtlJob)
+
+Both CSV jobs follow the same pattern: **Partitioner → Manager Step → Worker Steps**
 
 - `FileRangePartitioner` — splits a CSV by line ranges
 - `MultiFilePartitioner` — assigns one CSV file per partition
 - Manager step: `RemotePartitioningJobConfig` (Kafka) or `StandaloneJobConfig` (local threads)
 - Worker step: `FlatFileItemReader` → `CsvRecordProcessor` → `JdbcBatchItemWriter`
+
+### Transaction Enrichment Job (transactionEnrichmentJob)
+
+Single chunk step (not partitioned) — reads Avro `TransactionEvent` from Kafka, enriches with exchange rate + risk score, writes to both MySQL and Kafka output topic via `CompositeItemWriter`.
+
+- **Config**: `TransactionEnrichmentJobConfig` + `TransactionKafkaConfig` (both `@Profile("remote-partitioning")`)
+- **Properties**: `TransactionJobProperties` bound to `batch.transaction.*`
+- **Avro schemas**: `k8s-batch-app/src/main/avro/` (generates Java classes via `avro-maven-plugin`)
+- **DB writer**: `EnrichedTransactionWriter` — upsert via `ON DUPLICATE KEY UPDATE` for idempotency
+- **Kafka transactions**: `batch.transaction.kafka-transactions-enabled` (default: `false`). When `true`, `ProducerFactory` gets a `transactionIdPrefix`, enabling best-effort 1PC coordination with `DataSourceTransactionManager` via Spring's `TransactionSynchronizationManager`. Consumer uses `read_committed` isolation.
+- **Parallelism**: comes from Kafka partition assignment across pod replicas, not Spring Batch partitioning
 - `@StepScope` is mandatory on reader/processor/writer/partitioner beans to enable partition-specific `ExecutionContext` and job parameter injection
 - **Remote partitioning manager** uses `JobRepository` polling (not reply channels) to detect worker completion — avoids `StepExecution` serialization issues through Kafka
 - **Worker-side processing**: `StepExecutionRequestHandler` + `BeanFactoryStepLocator` in `KafkaIntegrationConfig` handles incoming partition requests
@@ -207,6 +221,7 @@ log.info("Starting Redpanda container (redpanda:v25.1.9)...");
 - Init containers gate app startup until MySQL, Kafka, and Schema Registry (when enabled) are reachable
 - Kafka runs in **KRaft mode** (no Zookeeper). Internal topic replication factors (`KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR`, `KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR`, `KAFKA_TRANSACTION_STATE_LOG_MIN_ISR`) are derived from `min(kafka.replicaCount, 3)` in the StatefulSet template — required for single-broker deployments (E2E uses `replicaCount: 1`)
 - **Schema Registry** uses a `Deployment` (stateless — stores schemas in `_schemas` Kafka topic). Gated on `schemaRegistry.enabled AND features.schemaRegistry`. Schema Registry URL wired to app via `SPRING_KAFKA_PROPERTIES_SCHEMA_REGISTRY_URL` env var.
+- **Topic creation**: `job-create-topics.yaml` uses `range $key, $val` over `kafka.topics` map (skipping `extra` list). Adding a new topic is a values-only change — no template editing needed
 - **Init container image** (`busybox`) is parameterized via `global.initImage` in `values.yaml` — never hardcode it in templates
 - **Helm unit tests**: `helm/k8s-batch/tests/*_test.yaml` using `helm-unittest` plugin. Run with `helm unittest helm/k8s-batch`
 - **Template dependencies**: when a template references another (e.g., deployment includes configmap for checksum), both must be listed in `templates:` in the test file, and use `documentSelector` with `skipEmptyTemplates: true` to target the correct document
@@ -219,6 +234,7 @@ k8s-batch-app/src/main/java/com/cominotti/k8sbatch/
   batch/common/       — shared data model, reader factory, writer, processor, batch listeners
   batch/filerange/    — file-range partitioning job
   batch/multifile/    — multi-file partitioning job
+  batch/transaction/  — transaction enrichment job (Kafka→DB+Kafka with Avro)
   batch/standalone/   — standalone (no Kafka) manager step config
   config/             — Kafka integration channels, remote partitioning config
   web/                — REST controller

@@ -24,6 +24,10 @@ public final class BatchStepNames {
     public static final String FILE_RANGE_WORKER_STEP = "fileRangeWorkerStep";
     public static final String MULTI_FILE_WORKER_STEP = "multiFileWorkerStep";
 
+    // Transaction enrichment job — single chunk step (not partitioned), requires Kafka
+    public static final String TRANSACTION_ENRICHMENT_JOB = "transactionEnrichmentJob";
+    public static final String TRANSACTION_ENRICHMENT_STEP = "transactionEnrichmentStep";
+
     private BatchStepNames() {
     }
 }

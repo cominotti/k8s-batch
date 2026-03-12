@@ -209,6 +209,14 @@ kafka:
       name: batch-partition-replies
       partitions: 10
       replicationFactor: 2
+    transactionEvents:
+      name: transaction-events
+      partitions: 10
+      replicationFactor: 2
+    enrichedTransactionEvents:
+      name: enriched-transaction-events
+      partitions: 10
+      replicationFactor: 2
     extra: []
 
 # ======================================================================

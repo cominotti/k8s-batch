@@ -1,0 +1,13 @@
+{
+  "type": "record",
+  "name": "TransactionEvent",
+  "namespace": "com.cominotti.k8sbatch.avro",
+  "doc": "Input event representing a financial transaction to be enriched.",
+  "fields": [
+    {"name": "transactionId", "type": "string", "doc": "UUID of the transaction"},
+    {"name": "accountId", "type": "string", "doc": "UUID of the account"},
+    {"name": "amount", "type": "double", "doc": "Transaction amount in original currency"},
+    {"name": "currency", "type": "string", "doc": "ISO 4217 currency code (e.g., EUR, GBP, USD)"},
+    {"name": "timestamp", "type": "long", "doc": "Event timestamp in milliseconds since epoch", "logicalType": "timestamp-millis"}
+  ]
+}

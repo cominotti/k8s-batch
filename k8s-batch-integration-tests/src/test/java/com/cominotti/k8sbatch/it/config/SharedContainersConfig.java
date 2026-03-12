@@ -2,6 +2,7 @@
 
 package com.cominotti.k8sbatch.it.config;
 
+import com.cominotti.k8sbatch.batch.transaction.TransactionTopicNames;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
@@ -43,11 +44,15 @@ public class SharedContainersConfig {
             // Topic names must match the production application config
             admin.createTopics(List.of(
                     new NewTopic("batch-partition-requests", 1, (short) 1),
-                    new NewTopic("batch-partition-replies", 1, (short) 1)
+                    new NewTopic("batch-partition-replies", 1, (short) 1),
+                    new NewTopic(TransactionTopicNames.TRANSACTION_EVENTS, 1, (short) 1),
+                    new NewTopic(TransactionTopicNames.ENRICHED_TRANSACTION_EVENTS, 1, (short) 1)
             )).all().get(30, TimeUnit.SECONDS);
 
             Set<String> topics = admin.listTopics().names().get(10, TimeUnit.SECONDS);
-            if (!topics.contains("batch-partition-requests") || !topics.contains("batch-partition-replies")) {
+            if (!topics.contains("batch-partition-requests") || !topics.contains("batch-partition-replies")
+                    || !topics.contains(TransactionTopicNames.TRANSACTION_EVENTS)
+                    || !topics.contains(TransactionTopicNames.ENRICHED_TRANSACTION_EVENTS)) {
                 throw new IllegalStateException(
                         "Kafka topics not created. Available: " + topics);
             }

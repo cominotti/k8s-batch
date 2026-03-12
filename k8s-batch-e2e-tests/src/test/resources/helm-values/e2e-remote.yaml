@@ -40,6 +40,9 @@ app:
   config:
     serverPort: 8080
     batchInitializeSchema: always
+    extra:
+      BATCH_TRANSACTION_CHUNK_SIZE: "10"
+      BATCH_TRANSACTION_KAFKA_TRANSACTIONS_ENABLED: "true"
   extraVolumeMounts:
     - name: test-data
       mountPath: /data/test
@@ -105,6 +108,14 @@ kafka:
     partitionReplies:
       name: batch-partition-replies
       partitions: 4
+      replicationFactor: 1
+    transactionEvents:
+      name: transaction-events
+      partitions: 1
+      replicationFactor: 1
+    enrichedTransactionEvents:
+      name: enriched-transaction-events
+      partitions: 1
       replicationFactor: 1
 
 schemaRegistry:

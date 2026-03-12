@@ -35,3 +35,10 @@ batch:
     input-file: ""
   multi-file:
     input-directory: ""
+  transaction:
+    chunk-size: 10
+    consumer-group: k8s-batch-transaction-processor-test
+    # Reduced from 5s to speed up tests — reader detects end-of-topic faster
+    poll-timeout-seconds: 1
+    # Enable Kafka transactions in integration tests to validate coordinated DB + Kafka writes
+    kafka-transactions-enabled: true

@@ -64,6 +64,13 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Application module (for generated Avro classes used in E2E verification) -->
+        <dependency>
+            <groupId>com.cominotti.k8sbatch</groupId>
+            <artifactId>k8s-batch-app</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <!-- Jackson for JSON parsing -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>

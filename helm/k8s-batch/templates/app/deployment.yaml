@@ -106,6 +106,12 @@ spec:
             - name: SPRING_KAFKA_PROPERTIES_SCHEMA_REGISTRY_URL
               value: {{ include "k8s-batch.schemaRegistry.url" . | quote }}
             {{- end }}
+            {{- if and .Values.kafka.enabled .Values.features.kafka }}
+            - name: BATCH_TRANSACTION_INPUT_TOPIC
+              value: {{ .Values.kafka.topics.transactionEvents.name | quote }}
+            - name: BATCH_TRANSACTION_OUTPUT_TOPIC
+              value: {{ .Values.kafka.topics.enrichedTransactionEvents.name | quote }}
+            {{- end }}
             - name: SERVER_PORT
               value: {{ .Values.app.config.serverPort | quote }}
             {{- with .Values.app.extraEnv }}

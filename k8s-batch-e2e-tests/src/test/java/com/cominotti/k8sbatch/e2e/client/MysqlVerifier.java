@@ -40,7 +40,7 @@ public final class MysqlVerifier {
      * Counts rows in target_records table.
      */
     public int countTargetRecords() throws SQLException {
-        return queryCount("SELECT COUNT(*) FROM target_records");
+        return countRows("target_records");
     }
 
     /**
@@ -107,10 +107,47 @@ public final class MysqlVerifier {
      * Deletes all data from target_records (for test isolation).
      */
     public void cleanTargetRecords() throws SQLException {
+        cleanTable("target_records");
+    }
+
+    /**
+     * Counts rows in enriched_transactions table.
+     */
+    public int countEnrichedTransactions() throws SQLException {
+        return countRows("enriched_transactions");
+    }
+
+    /**
+     * Deletes all data from enriched_transactions (for test isolation).
+     */
+    public void cleanEnrichedTransactions() throws SQLException {
+        cleanTable("enriched_transactions");
+    }
+
+    /**
+     * Checks if a table exists in the database schema.
+     */
+    public boolean tableExists(String tableName) throws SQLException {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?")) {
+            ps.setString(1, tableName);
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                return rs.getInt(1) == 1;
+            }
+        }
+    }
+
+    private int countRows(String tableName) throws SQLException {
+        return queryCount("SELECT COUNT(*) FROM " + tableName);
+    }
+
+    private void cleanTable(String tableName) throws SQLException {
         try (Connection conn = getConnection();
              var stmt = conn.createStatement()) {
-            int deleted = stmt.executeUpdate("DELETE FROM target_records");
-            log.debug("Cleaned target_records | deleted={}", deleted);
+            int deleted = stmt.executeUpdate("DELETE FROM " + tableName);
+            log.debug("Cleaned {} | deleted={}", tableName, deleted);
         }
     }
 
