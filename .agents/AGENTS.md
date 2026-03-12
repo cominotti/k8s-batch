@@ -13,6 +13,13 @@ Spring Boot 4.0.3 + Spring Batch 6.x reference project for horizontally-scalable
 - **Testcontainers 2.0.3** — integration tests
 - **Flyway** — database migrations
 
+## Prerequisites
+
+- **JDK 21** (e.g., Temurin)
+- **Docker** (not Podman — K3s E2E tests need privileged containers)
+- **Maven 3.9+**
+- **helm** CLI + `helm-unittest` plugin (`helm plugin install https://github.com/helm-unittest/helm-unittest`)
+
 ## Build & Test
 
 ```bash
@@ -244,6 +251,13 @@ scripts/license/
   check-spdx.sh       — validates SPDX headers on all Java/shell files
   apply-spdx.sh       — auto-applies missing SPDX headers
 ```
+
+## Claude Code Automations
+
+- **`/helm-validate`** — runs helm lint, unittest, and template render
+- **`/run-integration-tests`** — Docker prerequisite check + `mvn verify` for integration tests
+- **`helm-reviewer`** subagent — reviews Helm changes against project conventions (invoked automatically during PR reviews)
+- **`.mcp.json`** — shares context7 MCP server config with collaborators
 
 ## License
 
