@@ -6,6 +6,7 @@ import com.cominotti.k8sbatch.batch.common.adapters.observingexecution.logging.L
 import com.cominotti.k8sbatch.batch.common.adapters.observingexecution.logging.LoggingStepExecutionListener;
 import com.cominotti.k8sbatch.batch.common.adapters.persistingrecords.jdbc.CsvRecordWriter;
 import com.cominotti.k8sbatch.batch.common.adapters.readingcsv.file.CsvRecordReaderFactory;
+import com.cominotti.k8sbatch.batch.common.domain.BatchFileProperties;
 import com.cominotti.k8sbatch.batch.common.domain.BatchPartitionProperties;
 import com.cominotti.k8sbatch.batch.common.domain.BatchStepNames;
 import com.cominotti.k8sbatch.batch.common.domain.CsvRecord;
@@ -30,6 +31,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import javax.sql.DataSource;
+import java.nio.file.Path;
 
 /**
  * Defines the {@code fileRangeEtlJob} and its worker step for file-range partitioned CSV-to-DB ETL.
@@ -47,24 +49,29 @@ public class FileRangeJobConfig {
     private static final Logger log = LoggerFactory.getLogger(FileRangeJobConfig.class);
 
     private final BatchPartitionProperties partitionProperties;
+    private final BatchFileProperties fileProperties;
     private final LoggingJobExecutionListener jobExecutionListener;
     private final LoggingStepExecutionListener stepExecutionListener;
 
     /**
      * Injects shared batch infrastructure beans.
      *
-     * @param partitionProperties grid size and chunk size configuration
-     * @param jobExecutionListener logs job start/end events
+     * @param partitionProperties   grid size and chunk size configuration
+     * @param fileProperties        allowed base directory for input file validation
+     * @param jobExecutionListener  logs job start/end events
      * @param stepExecutionListener logs step start/end events
      */
     public FileRangeJobConfig(BatchPartitionProperties partitionProperties,
+                              BatchFileProperties fileProperties,
                               LoggingJobExecutionListener jobExecutionListener,
                               LoggingStepExecutionListener stepExecutionListener) {
         this.partitionProperties = partitionProperties;
+        this.fileProperties = fileProperties;
         this.jobExecutionListener = jobExecutionListener;
         this.stepExecutionListener = stepExecutionListener;
-        log.info("FileRangeJobConfig initialized | gridSize={} | chunkSize={}",
-                partitionProperties.gridSize(), partitionProperties.chunkSize());
+        log.info("FileRangeJobConfig initialized | gridSize={} | chunkSize={} | allowedBaseDir={}",
+                partitionProperties.gridSize(), partitionProperties.chunkSize(),
+                fileProperties.allowedBaseDir());
     }
 
     // @Qualifier is required because two Step beans exist (manager + worker) — Spring can't
@@ -85,7 +92,8 @@ public class FileRangeJobConfig {
     public FileRangePartitioner fileRangePartitioner(
             // Supplied by the REST API caller in the POST body
             @Value("#{jobParameters['batch.file-range.input-file']}") String inputFile) {
-        return new FileRangePartitioner(new FileSystemResource(inputFile));
+        String safePath = requireWithinAllowedBase(inputFile, fileProperties.allowedBaseDir());
+        return new FileRangePartitioner(new FileSystemResource(safePath));
     }
 
     // @StepScope: new reader per partition with its own line range from the ExecutionContext
@@ -119,11 +127,11 @@ public class FileRangeJobConfig {
     /**
      * Worker step: reads CSV lines, filters invalid records, and upserts to MySQL in chunks.
      *
-     * @param jobRepository        persists step metadata (read/write/filter counts, status)
-     * @param transactionManager   wraps each chunk in a database transaction
-     * @param fileRangeItemReader  {@code @StepScope} reader constrained to this partition's line range
+     * @param jobRepository          persists step metadata (read/write/filter counts, status)
+     * @param transactionManager     wraps each chunk in a database transaction
+     * @param fileRangeItemReader    {@code @StepScope} reader constrained to this partition's line range
      * @param fileRangeItemProcessor filters records with null or blank name (returns {@code null} to skip)
-     * @param fileRangeItemWriter  idempotent JDBC writer using {@code ON DUPLICATE KEY UPDATE}
+     * @param fileRangeItemWriter    idempotent JDBC writer using {@code ON DUPLICATE KEY UPDATE}
      * @return the configured worker {@link Step}
      */
     @Bean
@@ -141,5 +149,25 @@ public class FileRangeJobConfig {
                 .writer(fileRangeItemWriter)
                 .listener(stepExecutionListener)
                 .build();
+    }
+
+    /**
+     * Validates that {@code inputPath} resolves to a location within {@code allowedBaseDir},
+     * preventing path traversal attacks (CWE-22). Returns the normalised absolute path string.
+     *
+     * @param inputPath      user-supplied file path from job parameters
+     * @param allowedBaseDir configured base directory boundary (e.g. {@code /data})
+     * @return normalised absolute path, guaranteed to reside within {@code allowedBaseDir}
+     * @throws IllegalArgumentException if the resolved path escapes the allowed base
+     */
+    private static String requireWithinAllowedBase(String inputPath, String allowedBaseDir) {
+        Path base = Path.of(allowedBaseDir).toAbsolutePath().normalize();
+        Path resolved = base.resolve(inputPath).normalize().toAbsolutePath();
+        if (!resolved.startsWith(base)) {
+            throw new IllegalArgumentException(
+                    "Input path is not within the allowed base directory | path=" + inputPath
+                            + " | allowedBaseDir=" + allowedBaseDir);
+        }
+        return resolved.toString();
     }
 }

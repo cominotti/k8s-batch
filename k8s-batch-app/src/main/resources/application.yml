@@ -52,6 +52,11 @@ management:
       enabled: true
 
 batch:
+  file:
+    # Base directory that all job input file paths must reside in (path traversal guard).
+    # Override with the actual data volume mount path in production (e.g. BATCH_FILE_ALLOWED_BASE_DIR=/data).
+    # Defaults to / (system root), which allows any valid absolute path.
+    allowed-base-dir: ${BATCH_FILE_ALLOWED_BASE_DIR:/}
   partition:
     grid-size: ${BATCH_PARTITION_GRID_SIZE:4}
     chunk-size: ${BATCH_PARTITION_CHUNK_SIZE:100}
