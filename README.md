@@ -1,6 +1,6 @@
 # k8s-batch
 
-A reference project demonstrating **Spring Batch horizontal scaling on Kubernetes** using remote partitioning via Kafka.
+A reference project demonstrating **Spring Batch horizontal scaling on Kubernetes** using remote partitioning via Kafka, with Avro-based event streaming and optional Kafka transactions.
 
 ## Architecture
 
@@ -36,18 +36,20 @@ Every pod runs the same image and can act as both **manager** (partitions work) 
 | Spring Batch | 6.0.2 |
 | MySQL | 8.0 |
 | Kafka | Confluent Platform 7.9.0 (KRaft, no Zookeeper) |
+| Avro | 1.12 |
 | Schema Registry | Confluent 7.9.0 |
 | Helm | 3 |
 | Testcontainers | 2.0.3 |
 
 ## Sample Batch Jobs
 
-| Job | Partitioning Strategy |
-|-----|-----------------------|
-| `fileRangeEtlJob` | Splits a single CSV by line ranges across workers |
-| `multiFileEtlJob` | Assigns one CSV file per worker from a directory |
+| Job | Input | Output | Strategy |
+|-----|-------|--------|----------|
+| `fileRangeEtlJob` | Single CSV | MySQL `target_records` | Splits by line ranges across workers |
+| `multiFileEtlJob` | Directory of CSVs | MySQL `target_records` | One file per worker |
+| `transactionEnrichmentJob` | Kafka topic (Avro) | MySQL `enriched_transactions` + Kafka output topic | Single chunk step; parallelism via Kafka partition assignment |
 
-Both jobs: read CSV → process/validate → write to MySQL `target_records` table.
+The CSV jobs use Spring Batch remote partitioning (manager/worker via Kafka). The transaction enrichment job uses `KafkaItemReader` → `TransactionEnrichmentProcessor` (exchange rate + risk score) → `CompositeItemWriter` (DB upsert + Kafka). Optional Kafka transactions (`batch.transaction.kafka-transactions-enabled`) coordinate DB and Kafka writes via best-effort one-phase commit.
 
 ## Profiles
 
@@ -117,13 +119,14 @@ mvn -pl k8s-batch-integration-tests -am verify
 mvn -pl k8s-batch-integration-tests -am verify -Dit.test=FileRangePartitionStandaloneIT
 ```
 
-### Test Categories (42 tests)
+### Test Categories (47 tests)
 
 | Category | Tests | Description |
 |----------|-------|-------------|
 | REST Endpoints | 5 | Hello endpoint + Actuator health indicators |
-| Batch Standalone | 12 | Both jobs without Kafka, recovery, skip policies |
-| Batch Remote | 10 | Both jobs with real Kafka partitioning |
+| Batch Standalone | 12 | CSV jobs without Kafka, recovery, skip policies |
+| Batch Remote (CSV) | 10 | CSV jobs with real Kafka partitioning |
+| Batch Remote (Transaction) | 5 | Transaction enrichment job: end-to-end enrichment, exchange rate/risk score validation, upsert idempotency, Kafka transaction verification |
 | Database | 7 | Batch schema, Flyway migrations, constraints |
 | Infrastructure | 6 | MySQL/Kafka connectivity smoke tests |
 
@@ -156,14 +159,15 @@ mvn -pl k8s-batch-e2e-tests -am verify
 mvn verify -DskipE2E=true
 ```
 
-### E2E Test Suite (11 tests)
+### E2E Test Suite (13 tests)
 
 | Test Class | Tests | Description |
 |------------|-------|-------------|
 | `DeployHealthCheckE2E` | 3 | Pod readiness, actuator health, MySQL connectivity |
 | `FileRangeJobE2E` | 2 | File-range job execution + worker step validation |
 | `MultiFileJobE2E` | 2 | Multi-file job execution + one-worker-per-file validation |
-| `StandaloneProfileE2E` | 3 | Standalone profile (no Kafka pods), both jobs |
+| `TransactionEnrichmentJobE2E` | 2 | Avro event seeding via K8s Job, enrichment pipeline, MySQL verification |
+| `StandaloneProfileE2E` | 3 | Standalone profile (no Kafka pods), CSV jobs |
 | `PartitionDistributionE2E` | 1 | Verifies partitions distribute across workers |
 
 ### Cluster Lifecycle
@@ -173,7 +177,7 @@ The K3s cluster is started **once** and shared across all test classes — it is
 - **K3s container**: started on first access, reused for the entire test suite
 - **Docker images**: loaded into K3s once (`docker save` → `ctr images import`), tracked by a `loadedImages` set to avoid redundant loads
 - **Helm deployments**: reused when the values file matches. Tests sharing the same profile (e.g., `e2e-remote.yaml`) skip redeployment entirely. A profile change (e.g., remote → standalone) triggers a teardown + redeploy
-- **Test data isolation**: only application data is reset — `@BeforeEach cleanTestData()` deletes rows from `target_records` between test methods
+- **Test data isolation**: only application data is reset — `@BeforeEach cleanTestData()` deletes rows from `target_records` and `enriched_transactions` between test methods
 
 This means the ~9 minute E2E runtime is dominated by one-time setup (K3s boot, image loading, initial deployment) rather than per-test overhead.
 
@@ -256,6 +260,7 @@ Key `values.yaml` parameters:
 | `kafka.enabled` | `true` | Deploy Kafka |
 | `schemaRegistry.enabled` | `true` | Deploy Schema Registry |
 | `features.schemaRegistry` | `true` | Enable Schema Registry integration |
+| `app.config.extra` | `{}` | Extra env vars injected into app pods (e.g., `BATCH_TRANSACTION_KAFKA_TRANSACTIONS_ENABLED`) |
 | `ingress.enabled` | `false` | Expose via Ingress |
 
 ### Standalone Mode (no Kafka)
@@ -279,8 +284,10 @@ k8s-batch/
 ├── k8s-batch-app/                   # Main application
 │   ├── pom.xml
 │   └── src/main/
+│       ├── avro/                    # Avro schemas (TransactionEvent, EnrichedTransactionEvent)
 │       ├── java/.../k8sbatch/
 │       │   ├── batch/               # Batch jobs, partitioners, readers/writers
+│       │   │   └── transaction/     # Transaction enrichment job (Kafka→DB+Kafka)
 │       │   ├── config/              # Kafka integration, remote partitioning
 │       │   └── web/                 # REST controller
 │       └── resources/
@@ -289,13 +296,13 @@ k8s-batch/
 ├── k8s-batch-integration-tests/     # Integration tests (Redpanda + MySQL)
 │   ├── pom.xml
 │   └── src/test/
-│       ├── java/.../it/             # 13 test classes, 42 tests
+│       ├── java/.../it/             # 14 test classes, 47 tests
 │       │   └── config/              # ContainerHolder, SharedContainersConfig, etc.
 │       └── resources/test-data/     # CSV fixtures
 ├── k8s-batch-e2e-tests/             # E2E tests (K3s + Confluent Kafka)
 │   ├── pom.xml
 │   └── src/test/
-│       ├── java/.../e2e/            # 5 test classes, 11 tests
+│       ├── java/.../e2e/            # 6 test classes, 13 tests
 │       │   ├── cluster/             # K3sClusterManager, DeploymentWaiter, PodUtils
 │       │   ├── client/              # BatchAppClient (HTTP), MysqlVerifier (JDBC)
 │       │   └── diagnostics/         # PodDiagnostics (failure dump)
