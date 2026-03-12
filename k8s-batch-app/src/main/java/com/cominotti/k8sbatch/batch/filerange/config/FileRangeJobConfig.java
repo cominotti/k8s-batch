@@ -2,10 +2,10 @@
 
 package com.cominotti.k8sbatch.batch.filerange.config;
 
-import com.cominotti.k8sbatch.batch.common.adapters.CsvRecordReaderFactory;
-import com.cominotti.k8sbatch.batch.common.adapters.CsvRecordWriter;
-import com.cominotti.k8sbatch.batch.common.adapters.LoggingJobExecutionListener;
-import com.cominotti.k8sbatch.batch.common.adapters.LoggingStepExecutionListener;
+import com.cominotti.k8sbatch.batch.common.adapters.observingexecution.logging.LoggingJobExecutionListener;
+import com.cominotti.k8sbatch.batch.common.adapters.observingexecution.logging.LoggingStepExecutionListener;
+import com.cominotti.k8sbatch.batch.common.adapters.persistingrecords.jdbc.CsvRecordWriter;
+import com.cominotti.k8sbatch.batch.common.adapters.readingcsv.file.CsvRecordReaderFactory;
 import com.cominotti.k8sbatch.batch.common.domain.BatchPartitionProperties;
 import com.cominotti.k8sbatch.batch.common.domain.BatchStepNames;
 import com.cominotti.k8sbatch.batch.common.domain.CsvRecord;

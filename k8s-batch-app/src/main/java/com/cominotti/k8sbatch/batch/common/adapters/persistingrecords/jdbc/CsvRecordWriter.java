@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package com.cominotti.k8sbatch.batch.common.adapters;
+package com.cominotti.k8sbatch.batch.common.adapters.persistingrecords.jdbc;
 
 import com.cominotti.k8sbatch.batch.common.domain.CsvRecord;
 import org.slf4j.Logger;

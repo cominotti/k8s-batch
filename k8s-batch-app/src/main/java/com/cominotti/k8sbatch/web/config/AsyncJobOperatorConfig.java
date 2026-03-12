@@ -14,7 +14,7 @@ import org.springframework.core.task.SimpleAsyncTaskExecutor;
  * <p>The default auto-configured {@code JobOperator} is synchronous — {@code start()} blocks until
  * the job completes. This config creates a second operator backed by a
  * {@link SimpleAsyncTaskExecutor} so that
- * {@link com.cominotti.k8sbatch.web.controller.JobController}'s POST returns HTTP 202 immediately
+ * {@link com.cominotti.k8sbatch.web.adapters.launchingjobs.rest.JobController}'s POST returns HTTP 202 immediately
  * while the job runs in a background thread.
  */
 @Configuration(proxyBeanMethods = false)

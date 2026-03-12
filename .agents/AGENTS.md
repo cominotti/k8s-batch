@@ -235,16 +235,19 @@ log.info("Starting Redpanda container (redpanda:v25.1.9)...");
 ```
 k8s-batch-app/src/main/java/com/cominotti/k8sbatch/
   batch/common/domain/    — CsvRecord, CsvRecordProcessor, BatchStepNames, BatchPartitionProperties
-  batch/common/adapters/  — CsvRecordReaderFactory, CsvRecordWriter, logging listeners, BatchDurationUtils
+  batch/common/adapters/readingcsv/file/          — CsvRecordReaderFactory
+  batch/common/adapters/persistingrecords/jdbc/   — CsvRecordWriter
+  batch/common/adapters/observingexecution/logging/ — logging listeners, BatchDurationUtils
   batch/filerange/domain/ — FileRangePartitioner
   batch/filerange/config/ — FileRangeJobConfig
   batch/multifile/domain/ — MultiFilePartitioner
   batch/multifile/config/ — MultiFileJobConfig
   batch/transaction/domain/   — TransactionEnrichmentProcessor, TransactionJobProperties, TransactionTopicNames
-  batch/transaction/adapters/ — EnrichedTransactionWriter, TransactionKafkaConfig
+  batch/transaction/adapters/streamingevents/kafka/           — TransactionKafkaConfig
+  batch/transaction/adapters/persistingtransactions/jdbc/     — EnrichedTransactionWriter
   batch/transaction/config/   — TransactionEnrichmentJobConfig
   config/             — RemotePartitioningJobConfig, StandaloneJobConfig
-  web/controller/     — JobController, HelloController
+  web/adapters/launchingjobs/rest/ — JobController, HelloController
   web/config/         — AsyncJobOperatorConfig
   web/dto/            — JobExecutionResponse
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package com.cominotti.k8sbatch.web.controller;
+package com.cominotti.k8sbatch.web.adapters.launchingjobs.rest;
 
 import com.cominotti.k8sbatch.web.dto.JobExecutionResponse;
 import org.slf4j.Logger;
