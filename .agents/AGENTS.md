@@ -34,8 +34,11 @@ docker build -t k8s-batch:e2e .                # build Docker image for E2E test
 docker-compose up -d                           # local stack (app + MySQL + Kafka)
 helm lint helm/k8s-batch                       # validate Helm chart
 helm unittest helm/k8s-batch                   # run Helm unit tests (49 tests, ~60ms)
-mvn validate                                   # verify Apache-2.0 SPDX headers
+mvn validate                                   # verify Apache-2.0 SPDX headers + JavaDoc checks
 mvn -Plicense-fix validate                     # auto-apply missing SPDX headers
+mvn checkstyle:check                           # run JavaDoc checks only (standalone)
+mvn checkstyle:check -Dcheckstyle.failOnViolation=false  # JavaDoc checks, report-only
+mvn validate -Dskip.checkstyle=true            # skip JavaDoc checks entirely
 ```
 
 ## Module Structure
@@ -266,13 +269,17 @@ k8s-batch-e2e-tests/src/test/java/com/cominotti/k8sbatch/e2e/
 scripts/license/
   check-spdx.sh       — validates SPDX headers on all Java/shell files
   apply-spdx.sh       — auto-applies missing SPDX headers
+
+config/checkstyle/
+  javadoc-checks.xml   — Checkstyle rules for JavaDoc gap detection
+  suppressions.xml     — exclusions for generated code and test method-level
 ```
 
 ## Claude Code Automations
 
 - **`/helm-validate`** — runs helm lint, unittest, and template render
 - **`/run-integration-tests`** — Docker prerequisite check + `mvn verify` for integration tests
-- **`/doc-review`** — reviews documentation quality (JavaDoc, comments, README) for changed files after code changes
+- **`/doc-review`** — reviews documentation quality (JavaDoc, comments, README) for changed files after code changes. Uses Checkstyle XML report as deterministic baseline, then applies AI-driven semantic review
 - **`helm-reviewer`** subagent — reviews Helm changes against project conventions (invoked automatically during PR reviews)
 - **`.mcp.json`** — shares context7 MCP server config with collaborators
 
@@ -286,3 +293,17 @@ Apache-2.0. Every Java and shell source file must start with an SPDX header:
 **Enforcement**: `check-spdx.sh` runs automatically during Maven's `validate` phase via `exec-maven-plugin`. Any `mvn compile`, `mvn test`, or `mvn verify` will fail if headers are missing.
 
 **Auto-fix**: `mvn -Plicense-fix validate` or directly `./scripts/license/apply-spdx.sh`
+
+## Checkstyle JavaDoc Validation
+
+Deterministic JavaDoc gap detection via `maven-checkstyle-plugin` (Checkstyle 10.25.0). Runs in `validate` phase — no compilation needed.
+
+**What it checks**: missing JavaDoc on public types/methods, missing `@param`/`@return`/`@throws` tags, empty tag descriptions, malformed JavaDoc, trivial summary sentences.
+
+**What it skips**: Avro-generated classes (`generated-sources/`), method-level checks on test classes (only class-level JavaDoc required on tests).
+
+**Configuration**: `config/checkstyle/javadoc-checks.xml` (checks) + `config/checkstyle/suppressions.xml` (exclusions).
+
+**Build behavior**: Fails the build by default. Use `-Dcheckstyle.failOnViolation=false` for report-only mode, or `-Dskip.checkstyle=true` to skip entirely.
+
+**XML report**: `target/checkstyle-javadoc.xml` — consumed by the `/doc-review` skill as a deterministic baseline.

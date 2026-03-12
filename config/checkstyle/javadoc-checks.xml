@@ -1,0 +1,63 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+    "https://checkstyle.org/dtds/configuration_1_3.dtd">
+
+<!--
+  JavaDoc gap detection for the doc-review skill.
+
+  Checks structural completeness only — semantic quality (staleness, depth,
+  Spring Batch concept explanations) is handled by the AI-driven doc-review
+  skill in .agents/skills/doc-review/SKILL.md.
+
+  Run standalone:  mvn checkstyle:check
+  Report-only:     mvn checkstyle:check -Dcheckstyle.failOnViolation=false
+  Skip entirely:   mvn validate -Dskip.checkstyle=true
+-->
+<module name="Checker">
+    <property name="severity" value="warning"/>
+
+    <module name="TreeWalker">
+
+        <!-- 1. Missing JavaDoc on public types (classes, interfaces, enums, records) -->
+        <module name="MissingJavadocType">
+            <property name="scope" value="public"/>
+            <property name="skipAnnotations" value="Generated"/>
+            <property name="tokens" value="CLASS_DEF,INTERFACE_DEF,ENUM_DEF,ANNOTATION_DEF,RECORD_DEF"/>
+        </module>
+
+        <!-- 2. Missing JavaDoc on public methods -->
+        <module name="MissingJavadocMethod">
+            <property name="scope" value="public"/>
+            <property name="allowMissingPropertyJavadoc" value="true"/>
+            <property name="allowedAnnotations" value="Override,Bean,PostConstruct,PreDestroy"/>
+            <property name="minLineCount" value="-1"/>
+            <property name="tokens" value="METHOD_DEF,CTOR_DEF,ANNOTATION_FIELD_DEF"/>
+        </module>
+
+        <!-- 3. Incomplete JavaDoc — missing @param, @return, @throws tags -->
+        <module name="JavadocMethod">
+            <property name="accessModifiers" value="public"/>
+            <property name="allowMissingParamTags" value="false"/>
+            <property name="allowMissingReturnTag" value="false"/>
+            <property name="validateThrows" value="true"/>
+            <property name="allowedAnnotations" value="Override"/>
+        </module>
+
+        <!-- 4. Empty @param/@return/@throws descriptions -->
+        <module name="NonEmptyAtclauseDescription"/>
+
+        <!-- 5. JavaDoc style — first sentence required, no empty blocks -->
+        <module name="JavadocStyle">
+            <property name="scope" value="public"/>
+            <property name="checkFirstSentence" value="true"/>
+            <property name="checkEmptyJavadoc" value="true"/>
+        </module>
+
+        <!-- 6. Reject trivial summary sentences -->
+        <module name="SummaryJavadoc">
+            <property name="forbiddenSummaryFragments" value="^$|^This method|^This class"/>
+        </module>
+
+    </module>
+</module>

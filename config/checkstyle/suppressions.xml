@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<!DOCTYPE suppressions PUBLIC
+    "-//Checkstyle//DTD SuppressionFilter Configuration 1.2//EN"
+    "https://checkstyle.org/dtds/suppressions_1_2.dtd">
+
+<suppressions>
+    <!-- Skip all JavaDoc checks on Avro-generated classes -->
+    <suppress checks="MissingJavadoc.*|JavadocMethod|JavadocStyle|SummaryJavadoc|NonEmptyAtclauseDescription"
+              files="[\\/]generated-sources[\\/]"/>
+
+    <!-- Skip method-level checks on test classes (test method names are self-documenting) -->
+    <suppress checks="MissingJavadocMethod|JavadocMethod|NonEmptyAtclauseDescription"
+              files="[\\/]src[\\/]test[\\/]"/>
+</suppressions>
