@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package com.cominotti.k8sbatch.batch.transaction;
+package com.cominotti.k8sbatch.batch.transaction.adapters;
 
 import com.cominotti.k8sbatch.avro.EnrichedTransactionEvent;
 import com.cominotti.k8sbatch.avro.TransactionEvent;
+import com.cominotti.k8sbatch.batch.transaction.domain.TransactionJobProperties;
 import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig;
 import io.confluent.kafka.serializers.KafkaAvroDeserializer;
 import io.confluent.kafka.serializers.KafkaAvroDeserializerConfig;

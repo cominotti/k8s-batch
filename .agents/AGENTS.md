@@ -98,7 +98,7 @@ Use `JacksonJsonSerializer` / `JacksonJsonDeserializer` for Kafka partition requ
 - **MySQL**: `org.testcontainers.mysql.MySQLContainer` (not `org.testcontainers.containers.MySQLContainer`). **Non-generic** — no `<?>` wildcard.
 - **Redpanda** (replaces Confluent Kafka for integration tests): `org.testcontainers.redpanda.RedpandaContainer` — Kafka-compatible broker with built-in Schema Registry. Use `getBootstrapServers()` for Kafka API, `getSchemaRegistryAddress()` for Schema Registry URL. Much faster startup (~5-10s vs 30-60s for Confluent Kafka). E2E tests still use real Confluent Kafka via the Helm chart.
 - **`@ServiceConnection`** handles JDBC wiring automatically — never use `@DynamicPropertySource` for MySQL
-- **Kafka bootstrap servers** are set via `System.setProperty` in `ContainerHolder` (Kafka `@ServiceConnection` requires `spring-boot-kafka` which conflicts with manual `KafkaIntegrationConfig`)
+- **Kafka bootstrap servers** are set via `System.setProperty` in `ContainerHolder` (Kafka `@ServiceConnection` requires `spring-boot-kafka` which conflicts with manual `RemotePartitioningJobConfig`)
 - **Schema Registry URL** is set via `System.setProperty("spring.kafka.properties.schema.registry.url", REDPANDA.getSchemaRegistryAddress())` in `ContainerHolder.startAll()`
 - **Container lifecycle** is managed by `ContainerHolder` (not directly in config classes):
   - `ContainerHolder.startMysqlOnly()` — standalone tests, skips Redpanda entirely
@@ -154,7 +154,7 @@ Single chunk step (not partitioned) — reads Avro `TransactionEvent` from Kafka
 - **Parallelism**: comes from Kafka partition assignment across pod replicas, not Spring Batch partitioning
 - `@StepScope` is mandatory on reader/processor/writer/partitioner beans to enable partition-specific `ExecutionContext` and job parameter injection
 - **Remote partitioning manager** uses `JobRepository` polling (not reply channels) to detect worker completion — avoids `StepExecution` serialization issues through Kafka
-- **Worker-side processing**: `StepExecutionRequestHandler` + `BeanFactoryStepLocator` in `KafkaIntegrationConfig` handles incoming partition requests
+- **Worker-side processing**: `StepExecutionRequestHandler` + `BeanFactoryStepLocator` in `RemotePartitioningJobConfig` handles incoming partition requests
 - **`@Qualifier`** is required on `Step` bean parameters in job/manager configs to resolve ambiguity when multiple worker steps exist
 - **`BatchStepNames`** constants class — always use these constants for job/step names in builders and `@Qualifier` annotations (never raw strings)
 - **`BatchPartitionProperties`** includes `timeoutMs` — configurable via `batch.partition.timeout-ms` (default 60000, overridden to 15000 in integration-test profile)
@@ -211,7 +211,7 @@ log.info("Starting Redpanda container (redpanda:v25.1.9)...");
 - **Logger declaration**: plain SLF4J `private static final Logger log = LoggerFactory.getLogger(ClassName.class)` — no Lombok
 - **Log format**: `key=value | key=value` pipe-separated structured fields for machine parseability
 - **Configuration**: `logback-spring.xml` with `<springProfile>` blocks — do NOT use `logging.level` in application YAML files (avoids precedence confusion)
-- **Profile levels**: production=INFO, standalone=INFO (standalone subpackage DEBUG), integration-test=DEBUG
+- **Profile levels**: production=INFO, standalone=INFO (`StandaloneJobConfig` at DEBUG), integration-test=DEBUG
 - **Batch listeners**: `LoggingJobExecutionListener` and `LoggingStepExecutionListener` are `@Component` beans — register via `.listener()` on `JobBuilder` and `StepBuilder`/`RemotePartitioningManagerStepBuilder` respectively
 - **Duration utility**: `BatchDurationUtils.between(start, end)` for null-safe `Duration.between()` — shared by both listeners
 - **Log levels**: INFO for business events (job/step lifecycle, partition creation, config init), DEBUG for per-item details (filtered records, reader/writer creation), ERROR for failures, WARN for unexpected-but-non-fatal statuses
@@ -234,12 +234,16 @@ log.info("Starting Redpanda container (redpanda:v25.1.9)...");
 
 ```
 k8s-batch-app/src/main/java/com/cominotti/k8sbatch/
-  batch/common/       — shared data model, reader factory, writer, processor, batch listeners
-  batch/filerange/    — file-range partitioning job
-  batch/multifile/    — multi-file partitioning job
-  batch/transaction/  — transaction enrichment job (Kafka→DB+Kafka with Avro)
-  batch/standalone/   — standalone (no Kafka) manager step config
-  config/             — Kafka integration channels, remote partitioning config
+  batch/common/domain/    — CsvRecord, CsvRecordProcessor, BatchStepNames, BatchPartitionProperties
+  batch/common/adapters/  — CsvRecordReaderFactory, CsvRecordWriter, logging listeners, BatchDurationUtils
+  batch/filerange/domain/ — FileRangePartitioner
+  batch/filerange/config/ — FileRangeJobConfig
+  batch/multifile/domain/ — MultiFilePartitioner
+  batch/multifile/config/ — MultiFileJobConfig
+  batch/transaction/domain/   — TransactionEnrichmentProcessor, TransactionJobProperties, TransactionTopicNames
+  batch/transaction/adapters/ — EnrichedTransactionWriter, TransactionKafkaConfig
+  batch/transaction/config/   — TransactionEnrichmentJobConfig
+  config/             — RemotePartitioningJobConfig, StandaloneJobConfig
   web/                — REST controller
 
 k8s-batch-integration-tests/src/test/java/com/cominotti/k8sbatch/it/

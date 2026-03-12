@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package com.cominotti.k8sbatch.batch.common;
+package com.cominotti.k8sbatch.batch.common.domain;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

@@ -26,7 +26,7 @@
          thread diagnostics (partition execution, thread pool activity) -->
     <springProfile name="standalone">
         <logger name="com.cominotti.k8sbatch" level="INFO"/>
-        <logger name="com.cominotti.k8sbatch.batch.standalone" level="DEBUG"/>
+        <logger name="com.cominotti.k8sbatch.config.StandaloneJobConfig" level="DEBUG"/>
         <logger name="org.springframework.batch" level="WARN"/>
         <root level="INFO">
             <appender-ref ref="CONSOLE"/>

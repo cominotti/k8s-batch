@@ -2,7 +2,7 @@
 
 package com.cominotti.k8sbatch.it.config;
 
-import com.cominotti.k8sbatch.batch.transaction.TransactionTopicNames;
+import com.cominotti.k8sbatch.batch.transaction.domain.TransactionTopicNames;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;

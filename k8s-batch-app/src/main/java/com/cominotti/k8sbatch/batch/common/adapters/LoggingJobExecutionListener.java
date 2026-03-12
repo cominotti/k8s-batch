@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package com.cominotti.k8sbatch.batch.common;
+package com.cominotti.k8sbatch.batch.common.adapters;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

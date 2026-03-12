@@ -29,7 +29,7 @@ import java.util.Map;
  *
  * <p>{@code POST /api/jobs/{jobName}} launches a job in a background thread and returns HTTP 202
  * immediately. {@code GET /api/jobs/{jobName}/executions/{executionId}} polls execution status.
- * Job names must exactly match Spring bean names defined in {@link com.cominotti.k8sbatch.batch.common.BatchStepNames
+ * Job names must exactly match Spring bean names defined in {@link com.cominotti.k8sbatch.batch.common.domain.BatchStepNames
  * BatchStepNames}.
  */
 @RestController

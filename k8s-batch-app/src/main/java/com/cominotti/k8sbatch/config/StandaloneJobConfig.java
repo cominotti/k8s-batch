@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package com.cominotti.k8sbatch.batch.standalone;
+package com.cominotti.k8sbatch.config;
 
-import com.cominotti.k8sbatch.batch.common.BatchPartitionProperties;
-import com.cominotti.k8sbatch.batch.common.BatchStepNames;
-import com.cominotti.k8sbatch.batch.common.LoggingStepExecutionListener;
-import com.cominotti.k8sbatch.batch.filerange.FileRangePartitioner;
-import com.cominotti.k8sbatch.batch.multifile.MultiFilePartitioner;
+import com.cominotti.k8sbatch.batch.common.domain.BatchPartitionProperties;
+import com.cominotti.k8sbatch.batch.common.domain.BatchStepNames;
+import com.cominotti.k8sbatch.batch.common.adapters.LoggingStepExecutionListener;
+import com.cominotti.k8sbatch.batch.filerange.domain.FileRangePartitioner;
+import com.cominotti.k8sbatch.batch.multifile.domain.MultiFilePartitioner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.partition.support.TaskExecutorPartitionHandler;

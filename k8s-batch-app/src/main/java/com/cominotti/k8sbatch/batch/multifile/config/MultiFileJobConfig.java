@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package com.cominotti.k8sbatch.batch.multifile;
+package com.cominotti.k8sbatch.batch.multifile.config;
 
-import com.cominotti.k8sbatch.batch.common.BatchPartitionProperties;
-import com.cominotti.k8sbatch.batch.common.BatchStepNames;
-import com.cominotti.k8sbatch.batch.common.CsvRecord;
-import com.cominotti.k8sbatch.batch.common.CsvRecordProcessor;
-import com.cominotti.k8sbatch.batch.common.CsvRecordReaderFactory;
-import com.cominotti.k8sbatch.batch.common.CsvRecordWriter;
-import com.cominotti.k8sbatch.batch.common.LoggingJobExecutionListener;
-import com.cominotti.k8sbatch.batch.common.LoggingStepExecutionListener;
+import com.cominotti.k8sbatch.batch.common.adapters.CsvRecordReaderFactory;
+import com.cominotti.k8sbatch.batch.common.adapters.CsvRecordWriter;
+import com.cominotti.k8sbatch.batch.common.adapters.LoggingJobExecutionListener;
+import com.cominotti.k8sbatch.batch.common.adapters.LoggingStepExecutionListener;
+import com.cominotti.k8sbatch.batch.common.domain.BatchPartitionProperties;
+import com.cominotti.k8sbatch.batch.common.domain.BatchStepNames;
+import com.cominotti.k8sbatch.batch.common.domain.CsvRecord;
+import com.cominotti.k8sbatch.batch.common.domain.CsvRecordProcessor;
+import com.cominotti.k8sbatch.batch.multifile.domain.MultiFilePartitioner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.configuration.annotation.StepScope;
@@ -36,7 +37,7 @@ import java.nio.file.Path;
  * partition's worker step reads its entire file, filters invalid records, and upserts to MySQL.
  * The manager step is <strong>not</strong> defined here — it is contributed by either
  * {@link com.cominotti.k8sbatch.config.RemotePartitioningJobConfig RemotePartitioningJobConfig}
- * (Kafka) or {@link com.cominotti.k8sbatch.batch.standalone.StandaloneJobConfig StandaloneJobConfig}
+ * (Kafka) or {@link com.cominotti.k8sbatch.config.StandaloneJobConfig StandaloneJobConfig}
  * (local threads), depending on the active Spring profile.
  */
 @Configuration

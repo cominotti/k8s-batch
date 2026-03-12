@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package com.cominotti.k8sbatch.batch.multifile;
+package com.cominotti.k8sbatch.batch.multifile.domain;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,7 +18,7 @@ import java.util.Map;
  * Creates one partition per CSV file found in a directory for parallel processing.
  *
  * <p>Implements the Spring Batch {@link Partitioner} contract: {@link #partition(int)} returns a
- * map of {@link ExecutionContext} objects. Unlike {@link com.cominotti.k8sbatch.batch.filerange.FileRangePartitioner
+ * map of {@link ExecutionContext} objects. Unlike {@link com.cominotti.k8sbatch.batch.filerange.domain.FileRangePartitioner
  * FileRangePartitioner}, the {@code gridSize} parameter is deliberately ignored — the partition
  * count equals the number of {@code *.csv} files in the directory. Each context carries
  * {@code filePath} (full path) and {@code fileName} (name only), injected into worker beans via

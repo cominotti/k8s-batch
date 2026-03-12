@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package com.cominotti.k8sbatch.batch.transaction;
+package com.cominotti.k8sbatch.batch.transaction.domain;
 
 import com.cominotti.k8sbatch.avro.EnrichedTransactionEvent;
 import com.cominotti.k8sbatch.avro.TransactionEvent;

@@ -4,7 +4,7 @@ package com.cominotti.k8sbatch.it.batch.remote;
 
 import com.cominotti.k8sbatch.avro.EnrichedTransactionEvent;
 import com.cominotti.k8sbatch.avro.TransactionEvent;
-import com.cominotti.k8sbatch.batch.transaction.TransactionTopicNames;
+import com.cominotti.k8sbatch.batch.transaction.domain.TransactionTopicNames;
 import com.cominotti.k8sbatch.it.AbstractBatchIntegrationTest;
 import com.cominotti.k8sbatch.it.config.SharedContainersConfig;
 import com.cominotti.k8sbatch.it.config.TransactionTestConfig;

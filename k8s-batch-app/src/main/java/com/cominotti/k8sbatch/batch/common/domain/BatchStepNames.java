@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package com.cominotti.k8sbatch.batch.common;
+package com.cominotti.k8sbatch.batch.common.domain;
 
 /**
  * Single source of truth for all batch job and step name constants.

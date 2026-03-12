@@ -2,11 +2,11 @@
 
 package com.cominotti.k8sbatch.config;
 
-import com.cominotti.k8sbatch.batch.common.BatchPartitionProperties;
-import com.cominotti.k8sbatch.batch.common.BatchStepNames;
-import com.cominotti.k8sbatch.batch.common.LoggingStepExecutionListener;
-import com.cominotti.k8sbatch.batch.filerange.FileRangePartitioner;
-import com.cominotti.k8sbatch.batch.multifile.MultiFilePartitioner;
+import com.cominotti.k8sbatch.batch.common.domain.BatchPartitionProperties;
+import com.cominotti.k8sbatch.batch.common.domain.BatchStepNames;
+import com.cominotti.k8sbatch.batch.common.adapters.LoggingStepExecutionListener;
+import com.cominotti.k8sbatch.batch.filerange.domain.FileRangePartitioner;
+import com.cominotti.k8sbatch.batch.multifile.domain.MultiFilePartitioner;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
@@ -48,7 +48,7 @@ import java.util.Map;
  * fragile {@code StepExecution} serialization through Kafka.
  *
  * <p>Activated only under the {@code remote-partitioning} profile (the default). When the
- * {@code standalone} profile is active, {@link com.cominotti.k8sbatch.batch.standalone.StandaloneJobConfig
+ * {@code standalone} profile is active, {@link com.cominotti.k8sbatch.config.StandaloneJobConfig
  * StandaloneJobConfig} provides the manager steps instead — the two configs are mutually exclusive.
  */
 @Configuration

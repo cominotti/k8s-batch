@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package com.cominotti.k8sbatch.batch.transaction;
+package com.cominotti.k8sbatch.batch.transaction.config;
 
 import com.cominotti.k8sbatch.avro.EnrichedTransactionEvent;
 import com.cominotti.k8sbatch.avro.TransactionEvent;
-import com.cominotti.k8sbatch.batch.common.BatchStepNames;
-import com.cominotti.k8sbatch.batch.common.LoggingJobExecutionListener;
-import com.cominotti.k8sbatch.batch.common.LoggingStepExecutionListener;
+import com.cominotti.k8sbatch.batch.common.domain.BatchStepNames;
+import com.cominotti.k8sbatch.batch.common.adapters.LoggingJobExecutionListener;
+import com.cominotti.k8sbatch.batch.common.adapters.LoggingStepExecutionListener;
+import com.cominotti.k8sbatch.batch.transaction.adapters.EnrichedTransactionWriter;
+import com.cominotti.k8sbatch.batch.transaction.domain.TransactionEnrichmentProcessor;
+import com.cominotti.k8sbatch.batch.transaction.domain.TransactionJobProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.configuration.annotation.StepScope;

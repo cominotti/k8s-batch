@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package com.cominotti.k8sbatch.batch.transaction;
+package com.cominotti.k8sbatch.batch.transaction.domain;
 
 /**
  * Single source of truth for Kafka topic name constants used by the transaction enrichment job.
