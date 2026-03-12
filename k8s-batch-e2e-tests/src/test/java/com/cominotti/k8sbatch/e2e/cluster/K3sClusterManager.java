@@ -9,6 +9,7 @@ import io.fabric8.kubernetes.api.model.HasMetadata;
 import io.fabric8.kubernetes.client.Config;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientBuilder;
+import io.fabric8.kubernetes.client.dsl.NonDeletingOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.cominotti.k8sbatch.e2e.E2EContainerImages;
@@ -219,7 +220,7 @@ public final class K3sClusterManager {
                 .endMetadata()
                 .withData(singleData)
                 .build();
-        kubernetesClient.configMaps().inNamespace(NAMESPACE).resource(singleCm).createOrReplace();
+        kubernetesClient.configMaps().inNamespace(NAMESPACE).resource(singleCm).unlock().createOr(NonDeletingOperation::update);
         log.info("Created e2e-test-data ConfigMap | keys={}", singleData.keySet());
 
         // Multi-file test data (mounted at /data/test/multi/)
@@ -235,7 +236,7 @@ public final class K3sClusterManager {
                 .endMetadata()
                 .withData(multiData)
                 .build();
-        kubernetesClient.configMaps().inNamespace(NAMESPACE).resource(multiCm).createOrReplace();
+        kubernetesClient.configMaps().inNamespace(NAMESPACE).resource(multiCm).unlock().createOr(NonDeletingOperation::update);
         log.info("Created e2e-test-data-multi ConfigMap | keys={}", multiData.keySet());
     }
 
@@ -252,7 +253,7 @@ public final class K3sClusterManager {
         List<HasMetadata> resources = kubernetesClient.load(
                 new ByteArrayInputStream(manifests.getBytes(StandardCharsets.UTF_8))).items();
         for (HasMetadata resource : resources) {
-            kubernetesClient.resource(resource).inNamespace(NAMESPACE).createOrReplace();
+            kubernetesClient.resource(resource).inNamespace(NAMESPACE).unlock().createOr(NonDeletingOperation::update);
             log.debug("Applied | kind={} | name={}", resource.getKind(), resource.getMetadata().getName());
         }
         log.info("Applied {} K8s resources", resources.size());

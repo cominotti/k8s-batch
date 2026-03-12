@@ -12,6 +12,7 @@ import io.fabric8.kubernetes.api.model.DeletionPropagation;
 import io.fabric8.kubernetes.api.model.batch.v1.Job;
 import io.fabric8.kubernetes.api.model.batch.v1.JobBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
+import io.fabric8.kubernetes.client.dsl.NonDeletingOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,7 +64,7 @@ public final class KafkaEventSeeder {
                 .endMetadata()
                 .withData(Map.of("events.json", eventsData))
                 .build();
-        client.configMaps().inNamespace(namespace).resource(configMap).createOrReplace();
+        client.configMaps().inNamespace(namespace).resource(configMap).unlock().createOr(NonDeletingOperation::update);
         log.debug("Created seeder ConfigMap | events={}", eventsJson.size());
 
         // Derive schema from the generated Avro class to stay in sync with TransactionEvent.avsc
@@ -106,7 +107,7 @@ public final class KafkaEventSeeder {
                 .endSpec()
                 .build();
 
-        client.batch().v1().jobs().inNamespace(namespace).resource(seederJob).createOrReplace();
+        client.batch().v1().jobs().inNamespace(namespace).resource(seederJob).unlock().createOr(NonDeletingOperation::update);
         log.info("Created seeder Job | image={}", E2EContainerImages.SCHEMA_REGISTRY_IMAGE);
 
         // Wait for the job to complete

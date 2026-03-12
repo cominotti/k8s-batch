@@ -162,12 +162,12 @@ Single chunk step (not partitioned) — reads Avro `TransactionEvent` from Kafka
 
 ## Job REST API
 
-- **`JobController`** at `/api/jobs` — async job launch via `TaskExecutorJobLauncher`
+- **`JobController`** at `/api/jobs` — async job launch via `JobOperator` (backed by `JobOperatorFactoryBean`)
 - `POST /api/jobs/{jobName}` — accepts `Map<String, String>` parameters, returns `JobExecutionResponse` with HTTP 202
 - `GET /api/jobs/{jobName}/executions/{executionId}` — polls execution status
 - Unknown job names return HTTP 400 (not 500)
 - `Map<String, Job> jobRegistry` auto-wires all `Job` beans by Spring bean name
-- **`TaskExecutorJobLauncher`** with `SimpleAsyncTaskExecutor` ensures POST returns immediately; the job runs in a background thread
+- **`AsyncJobOperatorConfig`** defines a `@Bean("asyncJobOperator")` backed by `JobOperatorFactoryBean` with `SimpleAsyncTaskExecutor` — POST returns immediately while the job runs in a background thread. The auto-configured synchronous `JobOperator` coexists (used by tests via `JobOperatorTestUtils`)
 
 ## E2E Test Rules
 
@@ -285,6 +285,7 @@ config/checkstyle/
 - **`/run-integration-tests`** — Docker prerequisite check + `mvn verify` for integration tests
 - **`/doc-review`** — reviews documentation quality (JavaDoc, comments, README) for changed files after code changes. Uses Checkstyle XML report as deterministic baseline, then applies AI-driven semantic review
 - **`helm-reviewer`** subagent — reviews Helm changes against project conventions (invoked automatically during PR reviews)
+- **`/spring-migration`** — reviews Java code for deprecated Spring, Spring Batch, Spring Boot, and Fabric8 APIs; checks imports, method calls, and configuration against current non-deprecated alternatives
 - **`.mcp.json`** — shares context7 MCP server config with collaborators
 
 ## License

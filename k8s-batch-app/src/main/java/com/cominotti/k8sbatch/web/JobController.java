@@ -9,9 +9,9 @@ import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.JobExecution;
 import org.springframework.batch.core.job.parameters.JobParameters;
 import org.springframework.batch.core.job.parameters.JobParametersBuilder;
-import org.springframework.batch.core.launch.JobLauncher;
-import org.springframework.batch.core.launch.support.TaskExecutorJobLauncher;
+import org.springframework.batch.core.launch.JobOperator;
 import org.springframework.batch.core.repository.JobRepository;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,7 +20,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.core.task.SimpleAsyncTaskExecutor;
 
 import java.util.Map;
 
@@ -38,27 +37,24 @@ public class JobController {
 
     private static final Logger log = LoggerFactory.getLogger(JobController.class);
 
-    private final JobLauncher asyncJobLauncher;
+    private final JobOperator asyncJobOperator;
     private final JobRepository jobRepository;
     // Spring auto-wires all Job beans into a map keyed by bean name
     private final Map<String, Job> jobRegistry;
 
     /**
-     * Creates the controller with an internal async {@link TaskExecutorJobLauncher} so that
-     * {@code POST} returns immediately while the job runs in a background thread.
+     * Creates the controller with an async {@link JobOperator} so that {@code POST} returns
+     * immediately while the job runs in a background thread.
      *
-     * @param jobRepository repository used by the async launcher to persist job metadata
-     * @param jobRegistry   all {@link Job} beans, auto-wired by Spring as a map keyed by bean name
+     * @param asyncJobOperator async operator defined in {@link AsyncJobOperatorConfig}
+     * @param jobRepository    repository used to poll execution status
+     * @param jobRegistry      all {@link Job} beans, auto-wired by Spring as a map keyed by bean name
      */
-    public JobController(JobRepository jobRepository, Map<String, Job> jobRegistry) {
+    public JobController(@Qualifier("asyncJobOperator") JobOperator asyncJobOperator,
+                         JobRepository jobRepository, Map<String, Job> jobRegistry) {
+        this.asyncJobOperator = asyncJobOperator;
         this.jobRepository = jobRepository;
         this.jobRegistry = jobRegistry;
-
-        // Create an async launcher so POST returns immediately
-        TaskExecutorJobLauncher launcher = new TaskExecutorJobLauncher();
-        launcher.setJobRepository(jobRepository);
-        launcher.setTaskExecutor(new SimpleAsyncTaskExecutor("job-api-"));
-        this.asyncJobLauncher = launcher;
 
         log.info("JobController initialized | registeredJobs={}", jobRegistry.keySet());
     }
@@ -93,7 +89,7 @@ public class JobController {
             JobParameters jobParameters = builder.toJobParameters();
 
             // Async launch: creates the JobExecution, starts in background thread, returns immediately
-            JobExecution execution = asyncJobLauncher.run(job, jobParameters);
+            JobExecution execution = asyncJobOperator.start(job, jobParameters);
             long executionId = execution.getId();
 
             JobExecutionResponse response = toResponse(executionId, jobName, execution);
