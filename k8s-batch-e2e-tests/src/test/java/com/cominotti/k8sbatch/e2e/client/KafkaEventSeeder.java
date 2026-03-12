@@ -3,7 +3,6 @@
 package com.cominotti.k8sbatch.e2e.client;
 
 import com.cominotti.k8sbatch.avro.TransactionEvent;
-import com.cominotti.k8sbatch.batch.transaction.domain.TransactionTopicNames;
 import com.cominotti.k8sbatch.e2e.E2EContainerImages;
 import com.cominotti.k8sbatch.e2e.cluster.K3sClusterManager;
 import io.fabric8.kubernetes.api.model.ConfigMap;

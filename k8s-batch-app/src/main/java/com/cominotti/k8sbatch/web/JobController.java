@@ -4,7 +4,6 @@ package com.cominotti.k8sbatch.web;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.JobExecution;
 import org.springframework.batch.core.job.parameters.JobParameters;
@@ -122,10 +121,8 @@ public class JobController {
     }
 
     private static JobExecutionResponse toResponse(long executionId, String jobName, JobExecution execution) {
-        String exitCode = execution.getExitStatus() != null
-                ? execution.getExitStatus().getExitCode() : "";
-        String exitDescription = execution.getExitStatus() != null
-                ? execution.getExitStatus().getExitDescription() : "";
+        String exitCode = execution.getExitStatus().getExitCode();
+        String exitDescription = execution.getExitStatus().getExitDescription();
         return new JobExecutionResponse(executionId, jobName, execution.getStatus().name(),
                 exitCode, exitDescription);
     }
