@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Spring Boot 4.0.3 + Spring Batch 6.x reference project for horizontally-scalable batch processing on Kubernetes. Three batch jobs demonstrate different patterns: two CSV-to-DB ETL jobs use remote partitioning via Kafka (with standalone fallback), and a transaction enrichment job reads Avro events from Kafka, enriches them, and writes to both MySQL and a Kafka output topic.
+Spring Boot 4.0.3 + Spring Batch 6.x reference project for horizontally-scalable batch processing on Kubernetes. Four batch jobs demonstrate different patterns: two CSV-to-DB ETL jobs use remote partitioning via Kafka (with standalone fallback), a transaction enrichment job reads Avro events from Kafka, enriches them, and writes to both MySQL and a Kafka output topic, and a rules engine PoC job applies financial business rules using either Drools or EVRete (toggled via `batch.rules.engine` property).
 
 ## Tech Stack
 
@@ -13,6 +13,7 @@ Spring Boot 4.0.3 + Spring Batch 6.x reference project for horizontally-scalable
 - **Helm 3** — Kubernetes deployment
 - **Testcontainers 2.0.3** — integration tests
 - **Flyway** — database migrations
+- **Drools 10.x + EVRete** — rules engine PoC (toggled via `batch.rules.engine` property)
 
 ## Prerequisites
 
@@ -160,6 +161,18 @@ Single chunk step (not partitioned) — reads Avro `TransactionEvent` from Kafka
 - **`BatchPartitionProperties`** includes `timeoutMs` — configurable via `batch.partition.timeout-ms` (default 60000, overridden to 15000 in integration-test profile)
 - **`TaskExecutorPartitionHandler`** (standalone mode) has no timeout API — JUnit `@Timeout` is the only backstop
 
+### Rules Engine PoC Job (rulesEnginePocJob)
+
+Single non-partitioned chunk step — reads financial transactions from CSV, applies business rules via either Drools DRL or EVRete Java API, writes enriched results to MySQL. PoC for evaluating rules engine alternatives.
+
+- **Toggle**: `batch.rules.engine=drools` (default) or `batch.rules.engine=evrete` — selects the active `TransactionRulesEvaluator` implementation via `@ConditionalOnProperty`
+- **Config**: `RulesEnginePocJobConfig` + `RulesEngineProperties` (bound to `batch.rules.*`)
+- **Domain port**: `TransactionRulesEvaluator` interface — custom driven port with two adapter implementations
+- **Domain constants**: `EnrichmentRuleConstants` record — exchange rates, risk thresholds, compliance rules. Shared by both engines as single source of truth (Drools injects via `global`, EVRete via constructor)
+- **DRL**: `src/main/resources/rules/transaction-enrichment.drl` — 4 rules using `EnrichmentRuleConstants` global (not hardcoded constants)
+- **Adapter fact**: `TransactionFact` — mutable JavaBean for rules engine sessions (required by Drools DRL `then` blocks). Uses `RiskScore` enum (not String)
+- **Path validation**: `BatchFileProperties.requireWithinAllowedBase()` — shared CWE-22 path traversal prevention (used by all job configs)
+
 ## Job REST API
 
 - **`JobController`** at `/api/jobs` — async job launch via `JobOperator` (backed by `JobOperatorFactoryBean`)
@@ -246,6 +259,13 @@ k8s-batch-app/src/main/java/com/cominotti/k8sbatch/
   batch/transaction/adapters/streamingevents/kafka/           — TransactionKafkaConfig
   batch/transaction/adapters/persistingtransactions/jdbc/     — EnrichedTransactionWriter
   batch/transaction/config/   — TransactionEnrichmentJobConfig
+  batch/rulespoc/domain/      — FinancialTransaction, EnrichedFinancialTransaction, RiskScore, EnrichmentRuleConstants, TransactionRulesEvaluator
+  batch/rulespoc/adapters/evaluatingrules/         — TransactionFact (shared)
+  batch/rulespoc/adapters/evaluatingrules/drools/  — DroolsTransactionRulesEvaluator
+  batch/rulespoc/adapters/evaluatingrules/evrete/  — EvreteTransactionRulesEvaluator
+  batch/rulespoc/adapters/persistingresults/jdbc/  — EnrichedFinancialTransactionWriter
+  batch/rulespoc/adapters/readingcsv/file/         — FinancialTransactionReaderFactory
+  batch/rulespoc/config/      — RulesEnginePocJobConfig, RulesEngineProcessor, RulesEngineProperties
   config/             — RemotePartitioningJobConfig, StandaloneJobConfig
   web/adapters/launchingjobs/rest/ — JobController, HelloController
   web/config/         — AsyncJobOperatorConfig

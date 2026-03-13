@@ -4,6 +4,8 @@ package com.cominotti.k8sbatch.batch.common.domain;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.nio.file.Path;
+
 /**
  * File access configuration for batch jobs, bound to the {@code batch.file.*} properties.
  *
@@ -30,5 +32,24 @@ public record BatchFileProperties(String allowedBaseDir) {
         if (allowedBaseDir == null || allowedBaseDir.isBlank()) {
             allowedBaseDir = "/";
         }
+    }
+
+    /**
+     * Validates that {@code inputPath} resolves to a location within this record's
+     * {@code allowedBaseDir}, preventing path traversal attacks (CWE-22).
+     *
+     * @param inputPath user-supplied file or directory path from job parameters
+     * @return normalised absolute path, guaranteed to reside within {@code allowedBaseDir}
+     * @throws IllegalArgumentException if the resolved path escapes the allowed base
+     */
+    public String requireWithinAllowedBase(String inputPath) {
+        Path base = Path.of(allowedBaseDir).toAbsolutePath().normalize();
+        Path resolved = base.resolve(inputPath).normalize().toAbsolutePath();
+        if (!resolved.startsWith(base)) {
+            throw new IllegalArgumentException(
+                    "Input path is not within the allowed base directory | path=" + inputPath
+                            + " | allowedBaseDir=" + allowedBaseDir);
+        }
+        return resolved.toString();
     }
 }

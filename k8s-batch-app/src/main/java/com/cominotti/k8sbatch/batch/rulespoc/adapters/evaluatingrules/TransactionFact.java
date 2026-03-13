@@ -2,7 +2,12 @@
 
 package com.cominotti.k8sbatch.batch.rulespoc.adapters.evaluatingrules;
 
+import com.cominotti.k8sbatch.batch.rulespoc.domain.EnrichedFinancialTransaction;
+import com.cominotti.k8sbatch.batch.rulespoc.domain.FinancialTransaction;
+import com.cominotti.k8sbatch.batch.rulespoc.domain.RiskScore;
+
 import java.math.BigDecimal;
+import java.time.Instant;
 
 /**
  * Mutable fact object inserted into rules engine sessions for in-place enrichment.
@@ -24,7 +29,7 @@ public class TransactionFact {
     // Enrichment fields — set by rules
     private BigDecimal exchangeRate;
     private BigDecimal amountUsd;
-    private String riskScore;
+    private RiskScore riskScore;
     private boolean complianceFlag;
 
     /**
@@ -43,6 +48,37 @@ public class TransactionFact {
         this.amount = amount;
         this.currency = currency;
         this.timestamp = timestamp;
+    }
+
+    /**
+     * Creates a fact from a domain {@link FinancialTransaction} with enrichment fields unset.
+     *
+     * @param transaction the source domain record
+     * @return mutable fact ready for rules engine insertion
+     */
+    public static TransactionFact from(FinancialTransaction transaction) {
+        return new TransactionFact(
+                transaction.transactionId(),
+                transaction.accountId(),
+                transaction.amount(),
+                transaction.currency(),
+                transaction.timestamp());
+    }
+
+    /**
+     * Converts this enriched fact into an immutable {@link EnrichedFinancialTransaction} domain
+     * record. Call after rules have fired and all enrichment fields are populated.
+     *
+     * @param engineName  identifier of the rules engine that produced this enrichment
+     * @param processedAt instant when enrichment was performed
+     * @return immutable domain record with original and enriched fields
+     */
+    public EnrichedFinancialTransaction toEnrichedTransaction(String engineName,
+                                                               Instant processedAt) {
+        return new EnrichedFinancialTransaction(
+                transactionId, accountId, amount, currency,
+                exchangeRate, amountUsd, riskScore, complianceFlag,
+                engineName, timestamp, processedAt);
     }
 
     /**
@@ -127,11 +163,11 @@ public class TransactionFact {
     }
 
     /**
-     * Returns the risk score tier.
+     * Returns the risk score tier, or {@code null} if not yet evaluated.
      *
-     * @return risk score: LOW, MEDIUM, or HIGH
+     * @return risk score enum value
      */
-    public String getRiskScore() {
+    public RiskScore getRiskScore() {
         return riskScore;
     }
 
@@ -140,7 +176,7 @@ public class TransactionFact {
      *
      * @param riskScore the computed risk tier
      */
-    public void setRiskScore(String riskScore) {
+    public void setRiskScore(RiskScore riskScore) {
         this.riskScore = riskScore;
     }
 

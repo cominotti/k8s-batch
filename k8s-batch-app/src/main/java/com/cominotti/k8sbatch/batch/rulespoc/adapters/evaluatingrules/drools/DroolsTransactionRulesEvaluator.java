@@ -4,8 +4,8 @@ package com.cominotti.k8sbatch.batch.rulespoc.adapters.evaluatingrules.drools;
 
 import com.cominotti.k8sbatch.batch.rulespoc.adapters.evaluatingrules.TransactionFact;
 import com.cominotti.k8sbatch.batch.rulespoc.domain.EnrichedFinancialTransaction;
+import com.cominotti.k8sbatch.batch.rulespoc.domain.EnrichmentRuleConstants;
 import com.cominotti.k8sbatch.batch.rulespoc.domain.FinancialTransaction;
-import com.cominotti.k8sbatch.batch.rulespoc.domain.RiskScore;
 import com.cominotti.k8sbatch.batch.rulespoc.domain.TransactionRulesEvaluator;
 import org.drools.model.codegen.ExecutableModelProject;
 import org.kie.api.KieServices;
@@ -41,14 +41,29 @@ public class DroolsTransactionRulesEvaluator implements TransactionRulesEvaluato
     private static final String DRL_PATH = "rules/transaction-enrichment.drl";
 
     private final KieContainer kieContainer;
+    private final EnrichmentRuleConstants ruleConstants;
 
     /**
-     * Builds the Drools {@link KieContainer} from the DRL file on the classpath.
+     * Builds the Drools {@link KieContainer} from the DRL file on the classpath, using
+     * {@link EnrichmentRuleConstants#DEFAULTS default} business rule constants.
      *
      * @throws IllegalStateException if the DRL file contains compilation errors
      */
     public DroolsTransactionRulesEvaluator() {
+        this(EnrichmentRuleConstants.DEFAULTS);
+    }
+
+    /**
+     * Builds the Drools {@link KieContainer} with explicit rule constants (used for testing
+     * with custom thresholds).
+     *
+     * @param ruleConstants shared business rule constants injected as a DRL global
+     * @throws IllegalStateException if the DRL file contains compilation errors
+     */
+    DroolsTransactionRulesEvaluator(EnrichmentRuleConstants ruleConstants) {
         log.info("Initializing Drools rules evaluator | drl={}", DRL_PATH);
+
+        this.ruleConstants = ruleConstants;
 
         KieServices kieServices = KieServices.Factory.get();
         KieFileSystem kieFileSystem = kieServices.newKieFileSystem();
@@ -71,33 +86,18 @@ public class DroolsTransactionRulesEvaluator implements TransactionRulesEvaluato
 
     @Override
     public EnrichedFinancialTransaction evaluate(FinancialTransaction transaction) {
-        TransactionFact fact = new TransactionFact(
-                transaction.transactionId(),
-                transaction.accountId(),
-                transaction.amount(),
-                transaction.currency(),
-                transaction.timestamp());
+        TransactionFact fact = TransactionFact.from(transaction);
 
         KieSession session = kieContainer.newKieSession();
         try {
+            session.setGlobal("ruleConstants", ruleConstants);
             session.insert(fact);
             session.fireAllRules();
         } finally {
             session.dispose();
         }
 
-        return new EnrichedFinancialTransaction(
-                fact.getTransactionId(),
-                fact.getAccountId(),
-                fact.getAmount(),
-                fact.getCurrency(),
-                fact.getExchangeRate(),
-                fact.getAmountUsd(),
-                RiskScore.valueOf(fact.getRiskScore()),
-                fact.isComplianceFlag(),
-                engineName(),
-                fact.getTimestamp(),
-                Instant.now());
+        return fact.toEnrichedTransaction(engineName(), Instant.now());
     }
 
     @Override

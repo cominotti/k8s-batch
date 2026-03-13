@@ -6,7 +6,6 @@ import com.cominotti.k8sbatch.batch.rulespoc.adapters.evaluatingrules.Transactio
 import com.cominotti.k8sbatch.batch.rulespoc.domain.EnrichedFinancialTransaction;
 import com.cominotti.k8sbatch.batch.rulespoc.domain.EnrichmentRuleConstants;
 import com.cominotti.k8sbatch.batch.rulespoc.domain.FinancialTransaction;
-import com.cominotti.k8sbatch.batch.rulespoc.domain.RiskScore;
 import com.cominotti.k8sbatch.batch.rulespoc.domain.TransactionRulesEvaluator;
 import org.evrete.KnowledgeService;
 import org.evrete.api.Knowledge;
@@ -83,7 +82,7 @@ public class EvreteTransactionRulesEvaluator implements TransactionRulesEvaluato
                 .where("$tx.amountUsd != null && $tx.riskScore == null")
                 .execute(ctx -> {
                     TransactionFact tx = ctx.get("$tx");
-                    tx.setRiskScore(ruleConstants.riskScoreFor(tx.getAmountUsd()).name());
+                    tx.setRiskScore(ruleConstants.riskScoreFor(tx.getAmountUsd()));
                     ctx.update(tx);
                 })
                 .newRule("Compliance Flag")
@@ -91,8 +90,7 @@ public class EvreteTransactionRulesEvaluator implements TransactionRulesEvaluato
                 .where("$tx.riskScore != null && !$tx.complianceFlag")
                 .execute(ctx -> {
                     TransactionFact tx = ctx.get("$tx");
-                    RiskScore score = RiskScore.valueOf(tx.getRiskScore());
-                    if (ruleConstants.requiresComplianceReview(score, tx.getAmountUsd())) {
+                    if (ruleConstants.requiresComplianceReview(tx.getRiskScore(), tx.getAmountUsd())) {
                         tx.setComplianceFlag(true);
                         ctx.update(tx);
                     }
@@ -104,30 +102,14 @@ public class EvreteTransactionRulesEvaluator implements TransactionRulesEvaluato
 
     @Override
     public EnrichedFinancialTransaction evaluate(FinancialTransaction transaction) {
-        TransactionFact fact = new TransactionFact(
-                transaction.transactionId(),
-                transaction.accountId(),
-                transaction.amount(),
-                transaction.currency(),
-                transaction.timestamp());
+        TransactionFact fact = TransactionFact.from(transaction);
 
         try (StatefulSession session = knowledge.newStatefulSession()) {
             session.insert(fact);
             session.fire();
         }
 
-        return new EnrichedFinancialTransaction(
-                fact.getTransactionId(),
-                fact.getAccountId(),
-                fact.getAmount(),
-                fact.getCurrency(),
-                fact.getExchangeRate(),
-                fact.getAmountUsd(),
-                RiskScore.valueOf(fact.getRiskScore()),
-                fact.isComplianceFlag(),
-                engineName(),
-                fact.getTimestamp(),
-                Instant.now());
+        return fact.toEnrichedTransaction(engineName(), Instant.now());
     }
 
     @Override

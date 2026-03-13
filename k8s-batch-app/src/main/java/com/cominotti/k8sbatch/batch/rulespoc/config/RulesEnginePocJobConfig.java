@@ -29,7 +29,6 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import javax.sql.DataSource;
-import java.nio.file.Path;
 
 /**
  * Defines the {@code rulesEnginePocJob} — a non-partitioned CSV-to-DB batch job that applies
@@ -97,7 +96,7 @@ public class RulesEnginePocJobConfig {
     @StepScope
     public FlatFileItemReader<FinancialTransaction> rulesEnginePocReader(
             @Value("#{jobParameters['batch.rules.input-file']}") String inputFile) {
-        String safePath = requireWithinAllowedBase(inputFile, fileProperties.allowedBaseDir());
+        String safePath = fileProperties.requireWithinAllowedBase(inputFile);
         return FinancialTransactionReaderFactory.create(new FileSystemResource(safePath));
     }
 
@@ -151,16 +150,5 @@ public class RulesEnginePocJobConfig {
                 .writer(rulesEnginePocWriter)
                 .listener(stepExecutionListener)
                 .build();
-    }
-
-    private static String requireWithinAllowedBase(String inputPath, String allowedBaseDir) {
-        Path base = Path.of(allowedBaseDir).toAbsolutePath().normalize();
-        Path resolved = base.resolve(inputPath).normalize().toAbsolutePath();
-        if (!resolved.startsWith(base)) {
-            throw new IllegalArgumentException(
-                    "Input path is not within the allowed base directory | path=" + inputPath
-                            + " | allowedBaseDir=" + allowedBaseDir);
-        }
-        return resolved.toString();
     }
 }

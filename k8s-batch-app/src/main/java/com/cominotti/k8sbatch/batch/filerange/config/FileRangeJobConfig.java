@@ -31,7 +31,6 @@ import org.springframework.core.io.Resource;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import javax.sql.DataSource;
-import java.nio.file.Path;
 
 /**
  * Defines the {@code fileRangeEtlJob} and its worker step for file-range partitioned CSV-to-DB ETL.
@@ -103,7 +102,7 @@ public class FileRangeJobConfig {
     public FileRangePartitioner fileRangePartitioner(
             // Supplied by the REST API caller in the POST body
             @Value("#{jobParameters['batch.file-range.input-file']}") String inputFile) {
-        String safePath = requireWithinAllowedBase(inputFile, fileProperties.allowedBaseDir());
+        String safePath = fileProperties.requireWithinAllowedBase(inputFile);
         return new FileRangePartitioner(new FileSystemResource(safePath));
     }
 
@@ -182,25 +181,5 @@ public class FileRangeJobConfig {
                 .writer(fileRangeItemWriter)
                 .listener(stepExecutionListener)
                 .build();
-    }
-
-    /**
-     * Validates that {@code inputPath} resolves to a location within {@code allowedBaseDir},
-     * preventing path traversal attacks (CWE-22). Returns the normalised absolute path string.
-     *
-     * @param inputPath      user-supplied file path from job parameters
-     * @param allowedBaseDir configured base directory boundary (e.g. {@code /data})
-     * @return normalised absolute path, guaranteed to reside within {@code allowedBaseDir}
-     * @throws IllegalArgumentException if the resolved path escapes the allowed base
-     */
-    private static String requireWithinAllowedBase(String inputPath, String allowedBaseDir) {
-        Path base = Path.of(allowedBaseDir).toAbsolutePath().normalize();
-        Path resolved = base.resolve(inputPath).normalize().toAbsolutePath();
-        if (!resolved.startsWith(base)) {
-            throw new IllegalArgumentException(
-                    "Input path is not within the allowed base directory | path=" + inputPath
-                            + " | allowedBaseDir=" + allowedBaseDir);
-        }
-        return resolved.toString();
     }
 }
