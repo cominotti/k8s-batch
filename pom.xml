@@ -87,6 +87,12 @@
                 <artifactId>drools-xml-support</artifactId>
                 <version>${drools.version}</version>
             </dependency>
+            <!-- KIE DMN Runtime (decision table evaluation for Kogito adapter) -->
+            <dependency>
+                <groupId>org.kie</groupId>
+                <artifactId>kie-dmn-core</artifactId>
+                <version>${drools.version}</version>
+            </dependency>
             <!-- EVRete rules engine (zero-dependency RETE implementation) -->
             <dependency>
                 <groupId>org.evrete</groupId>

@@ -63,7 +63,7 @@
             <artifactId>kafka-avro-serializer</artifactId>
         </dependency>
 
-        <!-- Rules Engines (PoC: Drools vs EVRete) -->
+        <!-- Rules Engines (PoC: Drools vs EVRete vs Kogito) -->
         <dependency>
             <groupId>org.drools</groupId>
             <artifactId>drools-engine</artifactId>
@@ -71,6 +71,10 @@
         <dependency>
             <groupId>org.drools</groupId>
             <artifactId>drools-xml-support</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.kie</groupId>
+            <artifactId>kie-dmn-core</artifactId>
         </dependency>
         <dependency>
             <groupId>org.evrete</groupId>

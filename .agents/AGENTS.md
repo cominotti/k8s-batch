@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Spring Boot 4.0.3 + Spring Batch 6.x reference project for horizontally-scalable batch processing on Kubernetes. Four batch jobs demonstrate different patterns: two CSV-to-DB ETL jobs use remote partitioning via Kafka (with standalone fallback), a transaction enrichment job reads Avro events from Kafka, enriches them, and writes to both MySQL and a Kafka output topic, and a rules engine PoC job applies financial business rules using either Drools or EVRete (toggled via `batch.rules.engine` property).
+Spring Boot 4.0.3 + Spring Batch 6.x reference project for horizontally-scalable batch processing on Kubernetes. Four batch jobs demonstrate different patterns: two CSV-to-DB ETL jobs use remote partitioning via Kafka (with standalone fallback), a transaction enrichment job reads Avro events from Kafka, enriches them, and writes to both MySQL and a Kafka output topic, and a rules engine PoC job applies financial business rules using Drools, EVRete, or a Kogito hybrid (Java + DMN decision tables), toggled via `batch.rules.engine` property.
 
 ## Tech Stack
 
@@ -13,7 +13,7 @@ Spring Boot 4.0.3 + Spring Batch 6.x reference project for horizontally-scalable
 - **Helm 3** — Kubernetes deployment
 - **Testcontainers 2.0.3** — integration tests
 - **Flyway** — database migrations
-- **Drools 10.x + EVRete** — rules engine PoC (toggled via `batch.rules.engine` property)
+- **Drools 10.x + EVRete + KIE DMN** — rules engine PoC (toggled via `batch.rules.engine` property)
 
 ## Prerequisites
 
@@ -163,14 +163,16 @@ Single chunk step (not partitioned) — reads Avro `TransactionEvent` from Kafka
 
 ### Rules Engine PoC Job (rulesEnginePocJob)
 
-Single non-partitioned chunk step — reads financial transactions from CSV, applies business rules via either Drools DRL or EVRete Java API, writes enriched results to MySQL. PoC for evaluating rules engine alternatives.
+Single non-partitioned chunk step — reads financial transactions from CSV, applies business rules via Drools DRL, EVRete Java API, or Kogito hybrid (Java + DMN), writes enriched results to MySQL. PoC for evaluating rules engine alternatives.
 
-- **Toggle**: `batch.rules.engine=drools` (default) or `batch.rules.engine=evrete` — selects the active `TransactionRulesEvaluator` implementation via `@ConditionalOnProperty`
+- **Toggle**: `batch.rules.engine=drools` (default), `evrete`, or `kogito` — selects the active `TransactionRulesEvaluator` implementation via `@ConditionalOnProperty`
 - **Config**: `RulesEnginePocJobConfig` + `RulesEngineProperties` (bound to `batch.rules.*`)
-- **Domain port**: `TransactionRulesEvaluator` interface — custom driven port with two adapter implementations
-- **Domain constants**: `EnrichmentRuleConstants` record — exchange rates, risk thresholds, compliance rules. Shared by both engines as single source of truth (Drools injects via `global`, EVRete via constructor)
+- **Domain port**: `TransactionRulesEvaluator` interface — custom driven port with three adapter implementations
+- **Domain constants**: `EnrichmentRuleConstants` record — exchange rates, risk thresholds, compliance rules. Shared by Drools (DRL `global`) and EVRete (constructor injection). Kogito adapter uses it for exchange rates; risk/compliance thresholds are in the DMN model.
 - **DRL**: `src/main/resources/rules/transaction-enrichment.drl` — 4 rules using `EnrichmentRuleConstants` global (not hardcoded constants)
-- **Adapter fact**: `TransactionFact` — mutable JavaBean for rules engine sessions (required by Drools DRL `then` blocks). Uses `RiskScore` enum (not String)
+- **DMN**: `src/main/resources/dmn/risk-assessment.dmn` — two decision tables (Risk Score, Compliance Review) with dependency graph. Used by Kogito adapter via `DMNRuntime` API loaded through `KieFileSystem`.
+- **Adapter fact**: `TransactionFact` — mutable JavaBean for rules engine sessions (required by Drools DRL `then` blocks). Uses `RiskScore` enum (not String). Factory methods: `from(FinancialTransaction)` and `toEnrichedTransaction(engineName, processedAt)`
+- **Kogito adapter note**: Rule units (`RuleUnitData` + `DataStore`) require `kie-maven-plugin` for build-time code generation, but the plugin's embedded ECJ compiler doesn't support Java 21 records/text blocks (Drools 10.1.0 limitation). The Kogito adapter uses Java for the sequential part (exchange rate + conversion) and DMN for the tabular part instead.
 - **Path validation**: `BatchFileProperties.requireWithinAllowedBase()` — shared CWE-22 path traversal prevention (used by all job configs)
 
 ## Job REST API
@@ -263,6 +265,7 @@ k8s-batch-app/src/main/java/com/cominotti/k8sbatch/
   batch/rulespoc/adapters/evaluatingrules/         — TransactionFact (shared)
   batch/rulespoc/adapters/evaluatingrules/drools/  — DroolsTransactionRulesEvaluator
   batch/rulespoc/adapters/evaluatingrules/evrete/  — EvreteTransactionRulesEvaluator
+  batch/rulespoc/adapters/evaluatingrules/kogito/  — KogitoTransactionRulesEvaluator (Java + DMN hybrid)
   batch/rulespoc/adapters/persistingresults/jdbc/  — EnrichedFinancialTransactionWriter
   batch/rulespoc/adapters/readingcsv/file/         — FinancialTransactionReaderFactory
   batch/rulespoc/config/      — RulesEnginePocJobConfig, RulesEngineProcessor, RulesEngineProperties
