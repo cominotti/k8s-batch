@@ -38,6 +38,8 @@
         <maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
         <avro.version>1.12.0</avro.version>
         <confluent.version>7.9.0</confluent.version>
+        <drools.version>10.1.0</drools.version>
+        <evrete.version>4.0.3</evrete.version>
     </properties>
 
     <repositories>
@@ -73,6 +75,23 @@
                 <groupId>io.confluent</groupId>
                 <artifactId>kafka-avro-serializer</artifactId>
                 <version>${confluent.version}</version>
+            </dependency>
+            <!-- Drools rules engine (aggregator for traditional DRL + executable model) -->
+            <dependency>
+                <groupId>org.drools</groupId>
+                <artifactId>drools-engine</artifactId>
+                <version>${drools.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.drools</groupId>
+                <artifactId>drools-xml-support</artifactId>
+                <version>${drools.version}</version>
+            </dependency>
+            <!-- EVRete rules engine (zero-dependency RETE implementation) -->
+            <dependency>
+                <groupId>org.evrete</groupId>
+                <artifactId>evrete-core</artifactId>
+                <version>${evrete.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

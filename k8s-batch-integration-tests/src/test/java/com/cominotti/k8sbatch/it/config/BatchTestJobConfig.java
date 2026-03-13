@@ -66,6 +66,17 @@ public class BatchTestJobConfig {
     }
 
     @Bean
+    public JobOperatorTestUtils rulesEngineJobOperatorTestUtils(
+            JobOperator jobOperator,
+            JobRepository jobRepository,
+            @Qualifier(BatchStepNames.RULES_ENGINE_POC_JOB) Job rulesEnginePocJob) {
+        log.debug("Creating JobOperatorTestUtils for rulesEnginePocJob");
+        JobOperatorTestUtils utils = new JobOperatorTestUtils(jobOperator, jobRepository);
+        utils.setJob(rulesEnginePocJob);
+        return utils;
+    }
+
+    @Bean
     public JobRepositoryTestUtils jobRepositoryTestUtils(JobRepository jobRepository) {
         log.debug("Creating JobRepositoryTestUtils");
         return new JobRepositoryTestUtils(jobRepository);

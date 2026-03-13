@@ -1,0 +1,134 @@
+// SPDX-License-Identifier: Apache-2.0
+
+package com.cominotti.k8sbatch.batch.rulespoc.rules;
+
+import com.cominotti.k8sbatch.batch.rulespoc.adapters.evaluatingrules.TransactionFact;
+import java.math.BigDecimal;
+
+// ── Exchange Rate Rules ─────────────────────────────────────────────────────
+// Each rule matches a specific currency and sets the exchange rate.
+// The "no-loop" attribute prevents infinite re-evaluation after modification.
+
+rule "Exchange Rate USD"
+    no-loop
+    salience 100
+    when
+        $tx : TransactionFact( currency == "USD", exchangeRate == null )
+    then
+        $tx.setExchangeRate(new BigDecimal("1.0"));
+        update($tx);
+end
+
+rule "Exchange Rate EUR"
+    no-loop
+    salience 100
+    when
+        $tx : TransactionFact( currency == "EUR", exchangeRate == null )
+    then
+        $tx.setExchangeRate(new BigDecimal("1.08"));
+        update($tx);
+end
+
+rule "Exchange Rate GBP"
+    no-loop
+    salience 100
+    when
+        $tx : TransactionFact( currency == "GBP", exchangeRate == null )
+    then
+        $tx.setExchangeRate(new BigDecimal("1.27"));
+        update($tx);
+end
+
+rule "Exchange Rate JPY"
+    no-loop
+    salience 100
+    when
+        $tx : TransactionFact( currency == "JPY", exchangeRate == null )
+    then
+        $tx.setExchangeRate(new BigDecimal("0.0067"));
+        update($tx);
+end
+
+rule "Exchange Rate BRL"
+    no-loop
+    salience 100
+    when
+        $tx : TransactionFact( currency == "BRL", exchangeRate == null )
+    then
+        $tx.setExchangeRate(new BigDecimal("0.18"));
+        update($tx);
+end
+
+rule "Exchange Rate Default"
+    no-loop
+    salience 90
+    when
+        $tx : TransactionFact( exchangeRate == null )
+    then
+        $tx.setExchangeRate(new BigDecimal("1.0"));
+        update($tx);
+end
+
+// ── USD Conversion Rule ─────────────────────────────────────────────────────
+// Computes amountUsd once the exchange rate is set.
+
+rule "Convert to USD"
+    no-loop
+    salience 80
+    when
+        $tx : TransactionFact( exchangeRate != null, amountUsd == null )
+    then
+        $tx.setAmountUsd($tx.getAmount().multiply($tx.getExchangeRate()));
+        update($tx);
+end
+
+// ── Risk Score Rules ────────────────────────────────────────────────────────
+// Threshold-based risk tiers on the USD amount.
+
+rule "Risk Score LOW"
+    no-loop
+    salience 70
+    when
+        $tx : TransactionFact( amountUsd != null, riskScore == null,
+                               amountUsd.doubleValue() < 1000 )
+    then
+        $tx.setRiskScore("LOW");
+        update($tx);
+end
+
+rule "Risk Score MEDIUM"
+    no-loop
+    salience 70
+    when
+        $tx : TransactionFact( amountUsd != null, riskScore == null,
+                               amountUsd.doubleValue() >= 1000,
+                               amountUsd.doubleValue() < 10000 )
+    then
+        $tx.setRiskScore("MEDIUM");
+        update($tx);
+end
+
+rule "Risk Score HIGH"
+    no-loop
+    salience 70
+    when
+        $tx : TransactionFact( amountUsd != null, riskScore == null,
+                               amountUsd.doubleValue() >= 10000 )
+    then
+        $tx.setRiskScore("HIGH");
+        update($tx);
+end
+
+// ── Compliance Flag Rule ────────────────────────────────────────────────────
+// Flags transactions with HIGH risk or amountUsd >= 50000 for compliance review.
+
+rule "Compliance Flag Required"
+    no-loop
+    salience 60
+    when
+        $tx : TransactionFact( riskScore != null, complianceFlag == false,
+                               ( riskScore == "HIGH" || amountUsd.doubleValue() >= 50000 ) )
+    then
+        $tx.setComplianceFlag(true);
+        update($tx);
+end

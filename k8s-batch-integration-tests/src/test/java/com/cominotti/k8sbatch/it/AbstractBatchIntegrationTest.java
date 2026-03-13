@@ -71,6 +71,8 @@ public abstract class AbstractBatchIntegrationTest {
     void cleanupAppData() {
         log.debug("Cleaning up target_records table");
         jdbcTemplate.execute("DELETE FROM target_records");
+        log.debug("Cleaning up rules_poc_enriched_transactions table");
+        jdbcTemplate.execute("DELETE FROM rules_poc_enriched_transactions");
     }
 
     protected String testResourcePath(String relativePath) {
@@ -88,6 +90,13 @@ public abstract class AbstractBatchIntegrationTest {
     protected static JobParameters multiFileJobParams(String inputDirectory) {
         return new JobParametersBuilder()
                 .addString("batch.multi-file.input-directory", inputDirectory)
+                .addLong("timestamp", System.currentTimeMillis())
+                .toJobParameters();
+    }
+
+    protected static JobParameters rulesEngineJobParams(String inputFile) {
+        return new JobParametersBuilder()
+                .addString("batch.rules.input-file", inputFile)
                 .addLong("timestamp", System.currentTimeMillis())
                 .toJobParameters();
     }

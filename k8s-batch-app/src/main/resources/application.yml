@@ -85,3 +85,9 @@ batch:
     # When true, the producer uses idempotent delivery and transactional commits synchronized
     # with the Spring DataSourceTransactionManager. Disabled by default (~30% slower throughput).
     kafka-transactions-enabled: ${BATCH_TRANSACTION_KAFKA_TRANSACTIONS_ENABLED:false}
+  # ── Rules Engine PoC ───────────────────────────────────────────────────
+  # CSV-to-DB enrichment job using Drools or EVRete (toggle via engine property).
+  # Existing jobs are not modified — this is a standalone PoC for rules engine evaluation.
+  rules:
+    engine: ${BATCH_RULES_ENGINE:drools}
+    chunk-size: ${BATCH_RULES_CHUNK_SIZE:100}

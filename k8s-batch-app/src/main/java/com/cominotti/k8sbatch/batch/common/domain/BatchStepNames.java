@@ -28,6 +28,10 @@ public final class BatchStepNames {
     public static final String TRANSACTION_ENRICHMENT_JOB = "transactionEnrichmentJob";
     public static final String TRANSACTION_ENRICHMENT_STEP = "transactionEnrichmentStep";
 
+    // Rules engine PoC job — CSV-to-DB with Drools/EVRete toggle, no partitioning
+    public static final String RULES_ENGINE_POC_JOB = "rulesEnginePocJob";
+    public static final String RULES_ENGINE_POC_STEP = "rulesEnginePocStep";
+
     private BatchStepNames() {
     }
 }
