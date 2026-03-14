@@ -41,6 +41,9 @@
         <confluent.version>7.9.0</confluent.version>
         <drools.version>10.1.0</drools.version>
         <evrete.version>4.0.3</evrete.version>
+        <!-- Test output verbosity: override with -Dtest.log.level=DEBUG -DredirectTestOutputToFile=false -->
+        <test.log.level>WARN</test.log.level>
+        <redirectTestOutputToFile>true</redirectTestOutputToFile>
     </properties>
 
     <repositories>

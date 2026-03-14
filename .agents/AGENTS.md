@@ -27,9 +27,10 @@ Spring Boot 4.0.3 + Spring Batch 6.x reference project for horizontally-scalable
 ```bash
 mvn clean compile                              # compile all modules
 mvn test-compile                               # compile including test sources
-mvn -pl k8s-batch-integration-tests -am verify  # run integration tests (requires Docker)
-mvn -pl k8s-batch-e2e-tests -am verify          # run E2E tests (requires Docker + helm CLI)
+mvn -pl k8s-batch-integration-tests -am verify  # run integration tests (quiet: output in target/failsafe-reports/)
+mvn -pl k8s-batch-e2e-tests -am verify          # run E2E tests (quiet: output in target/failsafe-reports/)
 mvn verify -DskipE2E=true                      # run integration tests, skip E2E
+mvn -pl k8s-batch-integration-tests -am verify -Dtest.log.level=DEBUG -DredirectTestOutputToFile=false  # verbose: full output on console
 mvn package -DskipTests                        # build JAR without tests
 docker build -t k8s-batch:e2e .                # build Docker image for E2E tests
 docker-compose up -d                           # local stack (app + MySQL + Kafka)
@@ -131,7 +132,7 @@ Use `JacksonJsonSerializer` / `JacksonJsonDeserializer` for Kafka partition requ
 |---------|-----------|----------------|-------------|
 | `remote-partitioning` | Default | Yes | Remote partitioning via Kafka |
 | `standalone` | `--spring.profiles.active=standalone` | No | In-process `TaskExecutorPartitionHandler` |
-| `integration-test` | Test classes only | Depends on test | Test-specific config (schema auto-create, debug logging) |
+| `integration-test` | Test classes only | Depends on test | Test-specific config (schema auto-create, WARN logging by default — override with `-Dtest.log.level=DEBUG`) |
 
 ## Batch Job Design
 
@@ -229,7 +230,7 @@ log.info("Starting Redpanda container (redpanda:v25.1.9)...");
 - **Logger declaration**: plain SLF4J `private static final Logger log = LoggerFactory.getLogger(ClassName.class)` — no Lombok
 - **Log format**: `key=value | key=value` pipe-separated structured fields for machine parseability
 - **Configuration**: `logback-spring.xml` with `<springProfile>` blocks — do NOT use `logging.level` in application YAML files (avoids precedence confusion)
-- **Profile levels**: production=INFO, standalone=INFO (`StandaloneJobConfig` at DEBUG), integration-test=DEBUG
+- **Profile levels**: production=INFO, standalone=INFO (`StandaloneJobConfig` at DEBUG), integration-test=WARN (override with `-Dtest.log.level=DEBUG`)
 - **Batch listeners**: `LoggingJobExecutionListener` and `LoggingStepExecutionListener` are `@Component` beans — register via `.listener()` on `JobBuilder` and `StepBuilder`/`RemotePartitioningManagerStepBuilder` respectively
 - **Duration utility**: `BatchDurationUtils.between(start, end)` for null-safe `Duration.between()` — shared by both listeners
 - **Log levels**: INFO for business events (job/step lifecycle, partition creation, config init), DEBUG for per-item details (filtered records, reader/writer creation), ERROR for failures, WARN for unexpected-but-non-fatal statuses

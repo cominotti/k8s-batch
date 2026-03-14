@@ -126,6 +126,11 @@
                     <failIfNoTests>true</failIfNoTests>
                     <!-- 5-minute safety net for stuck Testcontainer processes -->
                     <forkedProcessTimeoutInSeconds>300</forkedProcessTimeoutInSeconds>
+                    <!-- Test output goes to target/failsafe-reports/*.txt (override: -DredirectTestOutputToFile=false) -->
+                    <redirectTestOutputToFile>${redirectTestOutputToFile}</redirectTestOutputToFile>
+                    <systemPropertyVariables>
+                        <test.log.level>${test.log.level}</test.log.level>
+                    </systemPropertyVariables>
                 </configuration>
             </plugin>
             <!-- Skip spring-boot repackage for test-only module -->
