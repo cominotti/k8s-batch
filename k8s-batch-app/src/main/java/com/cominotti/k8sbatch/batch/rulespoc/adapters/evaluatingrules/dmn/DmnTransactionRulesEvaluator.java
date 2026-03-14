@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package com.cominotti.k8sbatch.batch.rulespoc.adapters.evaluatingrules.kogito;
+package com.cominotti.k8sbatch.batch.rulespoc.adapters.evaluatingrules.dmn;
 
 import com.cominotti.k8sbatch.batch.rulespoc.adapters.evaluatingrules.TransactionFact;
 import com.cominotti.k8sbatch.batch.rulespoc.domain.EnrichedFinancialTransaction;
@@ -27,8 +27,8 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 
 /**
- * Hybrid Java + DMN implementation of {@link TransactionRulesEvaluator} demonstrating how to
- * combine programmatic enrichment with DMN decision tables.
+ * Hybrid Java + DMN implementation of {@link TransactionRulesEvaluator} that combines
+ * programmatic enrichment with DMN decision tables via the KIE DMN runtime.
  *
  * <p>The enrichment flow is split across two phases:
  * <ol>
@@ -42,18 +42,16 @@ import java.time.Instant;
  *
  * <p>This demonstrates the architectural principle: use DMN for tabular business decisions that
  * benefit from visual editability and standardized notation, and Java/domain methods for
- * straightforward computations. In a production system with more complex sequential rules,
- * the Java phase could be replaced by a Drools rule unit (requires {@code kie-maven-plugin}
- * for build-time code generation, which needs a Java source level compatible ECJ version).
+ * straightforward computations.
  *
  * <p>This adapter coexists with the classic Drools and EVRete adapters, selected via
- * {@code batch.rules.engine=kogito}.
+ * {@code batch.rules.engine=dmn}.
  */
 @Component
-@ConditionalOnProperty(name = "batch.rules.engine", havingValue = "kogito")
-public class KogitoTransactionRulesEvaluator implements TransactionRulesEvaluator {
+@ConditionalOnProperty(name = "batch.rules.engine", havingValue = "dmn")
+public class DmnTransactionRulesEvaluator implements TransactionRulesEvaluator {
 
-    private static final Logger log = LoggerFactory.getLogger(KogitoTransactionRulesEvaluator.class);
+    private static final Logger log = LoggerFactory.getLogger(DmnTransactionRulesEvaluator.class);
     private static final String DMN_PATH = "dmn/risk-assessment.dmn";
     private static final String DMN_NAMESPACE = "https://cominotti.com/k8s-batch/rules-poc/risk-assessment";
     private static final String DMN_MODEL_NAME = "Risk Assessment";
@@ -68,7 +66,7 @@ public class KogitoTransactionRulesEvaluator implements TransactionRulesEvaluato
      *
      * @throws IllegalStateException if the DMN model contains compilation errors
      */
-    public KogitoTransactionRulesEvaluator() {
+    public DmnTransactionRulesEvaluator() {
         this(EnrichmentRuleConstants.DEFAULTS);
     }
 
@@ -79,8 +77,8 @@ public class KogitoTransactionRulesEvaluator implements TransactionRulesEvaluato
      * @param ruleConstants shared business rule constants for exchange rate lookup
      * @throws IllegalStateException if the DMN model contains compilation errors
      */
-    KogitoTransactionRulesEvaluator(EnrichmentRuleConstants ruleConstants) {
-        log.info("Initializing Kogito rules evaluator | dmn={}", DMN_PATH);
+    DmnTransactionRulesEvaluator(EnrichmentRuleConstants ruleConstants) {
+        log.info("Initializing DMN rules evaluator | dmn={}", DMN_PATH);
 
         this.ruleConstants = ruleConstants;
 
@@ -108,7 +106,7 @@ public class KogitoTransactionRulesEvaluator implements TransactionRulesEvaluato
                     + " | name=" + DMN_MODEL_NAME);
         }
 
-        log.info("Kogito rules evaluator initialized | dmnModel={} | dmnNamespace={}",
+        log.info("DMN rules evaluator initialized | dmnModel={} | dmnNamespace={}",
                 riskAssessmentModel.getName(), riskAssessmentModel.getNamespace());
     }
 
@@ -141,6 +139,6 @@ public class KogitoTransactionRulesEvaluator implements TransactionRulesEvaluato
 
     @Override
     public String engineName() {
-        return "kogito";
+        return "dmn";
     }
 }

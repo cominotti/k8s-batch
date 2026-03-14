@@ -10,7 +10,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * <p>Lives in the config zone because it uses Spring Boot's {@code @ConfigurationProperties}
  * annotation, keeping the domain package free of framework dependencies.
  *
- * @param engine    rules engine to use: {@code "drools"} or {@code "evrete"}
+ * @param engine    rules engine to use: {@code "drools"}, {@code "evrete"}, {@code "dmn"},
+ *                  or {@code "drools-ruleunit"}
  * @param chunkSize items per transaction in the chunk-oriented step (default: 100)
  */
 @ConfigurationProperties(prefix = "batch.rules")

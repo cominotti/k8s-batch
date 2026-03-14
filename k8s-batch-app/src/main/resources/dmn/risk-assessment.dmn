@@ -3,13 +3,13 @@
   SPDX-License-Identifier: Apache-2.0
 
   DMN decision model for risk scoring and compliance flagging.
-  Evaluated after the Kogito adapter computes exchange rate and USD conversion in Java.
+  Evaluated after the DMN adapter computes exchange rate and USD conversion in Java.
 
   Thresholds match EnrichmentRuleConstants.DEFAULTS:
     - MEDIUM risk >= 1000 USD, HIGH risk >= 10000 USD
     - Compliance review required for HIGH risk OR amountUsd >= 50000
 
-  Input: amountUsd (number) — computed by KogitoTransactionRulesEvaluator
+  Input: amountUsd (number) — computed by DmnTransactionRulesEvaluator
   Outputs: Risk Score (string: LOW/MEDIUM/HIGH), Compliance Review (boolean)
 -->
 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/"
@@ -41,16 +41,28 @@
             </input>
             <output id="dt_riskScore_output" typeRef="string"/>
             <rule id="dt_riskScore_rule1">
-                <inputEntry id="dt_riskScore_ie1"><text>&lt; 1000</text></inputEntry>
-                <outputEntry id="dt_riskScore_oe1"><text>"LOW"</text></outputEntry>
+                <inputEntry id="dt_riskScore_ie1">
+                    <text>&lt; 1000</text>
+                </inputEntry>
+                <outputEntry id="dt_riskScore_oe1">
+                    <text>"LOW"</text>
+                </outputEntry>
             </rule>
             <rule id="dt_riskScore_rule2">
-                <inputEntry id="dt_riskScore_ie2"><text>[1000..10000)</text></inputEntry>
-                <outputEntry id="dt_riskScore_oe2"><text>"MEDIUM"</text></outputEntry>
+                <inputEntry id="dt_riskScore_ie2">
+                    <text>[1000..10000)</text>
+                </inputEntry>
+                <outputEntry id="dt_riskScore_oe2">
+                    <text>"MEDIUM"</text>
+                </outputEntry>
             </rule>
             <rule id="dt_riskScore_rule3">
-                <inputEntry id="dt_riskScore_ie3"><text>&gt;= 10000</text></inputEntry>
-                <outputEntry id="dt_riskScore_oe3"><text>"HIGH"</text></outputEntry>
+                <inputEntry id="dt_riskScore_ie3">
+                    <text>&gt;= 10000</text>
+                </inputEntry>
+                <outputEntry id="dt_riskScore_oe3">
+                    <text>"HIGH"</text>
+                </outputEntry>
             </rule>
         </decisionTable>
     </decision>
@@ -77,19 +89,37 @@
             </input>
             <output id="dt_compliance_output" typeRef="boolean"/>
             <rule id="dt_compliance_rule1">
-                <inputEntry id="dt_compliance_ie1"><text>"HIGH"</text></inputEntry>
-                <inputEntry id="dt_compliance_ie2"><text>-</text></inputEntry>
-                <outputEntry id="dt_compliance_oe1"><text>true</text></outputEntry>
+                <inputEntry id="dt_compliance_ie1">
+                    <text>"HIGH"</text>
+                </inputEntry>
+                <inputEntry id="dt_compliance_ie2">
+                    <text>-</text>
+                </inputEntry>
+                <outputEntry id="dt_compliance_oe1">
+                    <text>true</text>
+                </outputEntry>
             </rule>
             <rule id="dt_compliance_rule2">
-                <inputEntry id="dt_compliance_ie3"><text>-</text></inputEntry>
-                <inputEntry id="dt_compliance_ie4"><text>&gt;= 50000</text></inputEntry>
-                <outputEntry id="dt_compliance_oe2"><text>true</text></outputEntry>
+                <inputEntry id="dt_compliance_ie3">
+                    <text>-</text>
+                </inputEntry>
+                <inputEntry id="dt_compliance_ie4">
+                    <text>&gt;= 50000</text>
+                </inputEntry>
+                <outputEntry id="dt_compliance_oe2">
+                    <text>true</text>
+                </outputEntry>
             </rule>
             <rule id="dt_compliance_rule3">
-                <inputEntry id="dt_compliance_ie5"><text>-</text></inputEntry>
-                <inputEntry id="dt_compliance_ie6"><text>-</text></inputEntry>
-                <outputEntry id="dt_compliance_oe3"><text>false</text></outputEntry>
+                <inputEntry id="dt_compliance_ie5">
+                    <text>-</text>
+                </inputEntry>
+                <inputEntry id="dt_compliance_ie6">
+                    <text>-</text>
+                </inputEntry>
+                <outputEntry id="dt_compliance_oe3">
+                    <text>false</text>
+                </outputEntry>
             </rule>
         </decisionTable>
     </decision>

@@ -7,7 +7,7 @@ package com.cominotti.k8sbatch.batch.rulespoc.domain;
  *
  * <p>Implementations apply exchange rate conversion, risk scoring, and compliance flagging to a
  * raw {@link FinancialTransaction}, producing an {@link EnrichedFinancialTransaction}. The active
- * implementation is selected by the {@code batch.rules.engine} property (Drools or EVRete).
+ * implementation is selected by the {@code batch.rules.engine} property.
  */
 public interface TransactionRulesEvaluator {
 

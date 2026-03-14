@@ -16,7 +16,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Shared test logic for all rules engine PoC adapters (Drools, EVRete, Kogito).
+ * Shared test logic for all rules engine PoC adapters (Drools, EVRete, DMN).
  *
  * <p>Subclasses activate a specific engine via {@code @TestPropertySource} and override
  * {@link #expectedEngineName()} to verify the {@code rules_engine} column. All business
@@ -31,7 +31,7 @@ abstract class AbstractRulesEngineIT extends AbstractStandaloneBatchTest {
 
     /**
      * Returns the expected value of the {@code rules_engine} column (e.g. "drools", "evrete",
-     * "kogito").
+     * "dmn").
      *
      * @return engine name matching the adapter's {@code engineName()} return value
      */

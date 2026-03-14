@@ -32,7 +32,7 @@ import javax.sql.DataSource;
 
 /**
  * Defines the {@code rulesEnginePocJob} — a non-partitioned CSV-to-DB batch job that applies
- * financial business rules using either Drools or EVRete, controlled by the
+ * financial business rules using the active rules engine adapter, controlled by the
  * {@code batch.rules.engine} property.
  *
  * <p>The job reads financial transactions from a CSV file, delegates enrichment to the active
@@ -103,7 +103,7 @@ public class RulesEnginePocJobConfig {
     /**
      * Creates a {@code @StepScope} processor that delegates to the active rules evaluator.
      *
-     * @param rulesEvaluator the active {@link TransactionRulesEvaluator} (Drools or EVRete)
+     * @param rulesEvaluator the active {@link TransactionRulesEvaluator} implementation
      * @return processor wrapping the rules evaluator
      */
     @Bean

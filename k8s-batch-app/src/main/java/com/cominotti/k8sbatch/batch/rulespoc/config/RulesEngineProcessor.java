@@ -13,7 +13,7 @@ import org.springframework.batch.infrastructure.item.ItemProcessor;
  * Spring Batch processor that delegates financial transaction enrichment to the active
  * {@link TransactionRulesEvaluator} implementation.
  *
- * <p>This processor is engine-agnostic — the concrete rules engine (Drools or EVRete) is injected
+ * <p>This processor is engine-agnostic — the concrete rules engine implementation is injected
  * via Spring's {@code @ConditionalOnProperty} mechanism based on the {@code batch.rules.engine}
  * property. It lives in the config zone (not domain) because it implements the Spring Batch
  * {@link ItemProcessor} framework interface.

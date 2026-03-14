@@ -87,7 +87,13 @@
                 <artifactId>drools-xml-support</artifactId>
                 <version>${drools.version}</version>
             </dependency>
-            <!-- KIE DMN Runtime (decision table evaluation for Kogito adapter) -->
+            <!-- Drools Rule Units (typed data scoping for rule-unit adapter) -->
+            <dependency>
+                <groupId>org.drools</groupId>
+                <artifactId>drools-ruleunits-engine</artifactId>
+                <version>${drools.version}</version>
+            </dependency>
+            <!-- KIE DMN Runtime (decision table evaluation for DMN adapter) -->
             <dependency>
                 <groupId>org.kie</groupId>
                 <artifactId>kie-dmn-core</artifactId>
