@@ -13,6 +13,8 @@ spring:
   main:
     # Explicit false prevents lazy init from masking missing beans in tests
     lazy-initialization: false
+    # Suppress banner — it writes to System.out before logback filtering is active
+    banner-mode: off
 
 management:
   endpoint:

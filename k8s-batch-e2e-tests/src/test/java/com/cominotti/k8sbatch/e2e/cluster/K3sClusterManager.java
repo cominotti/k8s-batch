@@ -142,11 +142,20 @@ public final class K3sClusterManager {
         try {
             ProcessBuilder pb = new ProcessBuilder(
                     "docker", "save", "--platform", "linux/amd64", "-o", tempTar.toString(), imageName);
-            pb.inheritIO();
+            // Merge stderr into stdout to avoid cross-stream pipe buffer deadlock
+            // (same pattern as HelmRenderer.executeHelm)
+            pb.redirectErrorStream(true);
             Process process = pb.start();
+            byte[] output = process.getInputStream().readAllBytes();
             int exitCode = process.waitFor();
             if (exitCode != 0) {
+                String stderr = new String(output, StandardCharsets.UTF_8).strip();
+                log.error("docker save failed | image={} | output={}", imageName, stderr);
                 throw new RuntimeException("Failed to save Docker image: " + imageName);
+            }
+            if (output.length > 0) {
+                log.debug("docker save output | image={} | output={}",
+                        imageName, new String(output, StandardCharsets.UTF_8).strip());
             }
 
             // Copy tar into K3s container and import

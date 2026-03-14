@@ -8,9 +8,9 @@ import java.util.Map;
 /**
  * Shared business rule constants for financial transaction enrichment.
  *
- * <p>Both rules engine adapters (Drools and EVRete) consume these constants to ensure consistent
- * rule evaluation. Exchange rates are static for deterministic test predictability — in production,
- * this would be replaced with an external FX rate service.
+ * <p>All rules engine adapters consume these constants to ensure consistent rule evaluation.
+ * Exchange rates are static for deterministic test predictability — in production, this would
+ * be replaced with an external FX rate service.
  *
  * @param exchangeRates       currency code → USD conversion rate (e.g. EUR=1.08, GBP=1.27)
  * @param defaultExchangeRate fallback rate for unknown currencies

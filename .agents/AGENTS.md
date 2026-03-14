@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Spring Boot 4.0.3 + Spring Batch 6.x reference project for horizontally-scalable batch processing on Kubernetes. Four batch jobs demonstrate different patterns: two CSV-to-DB ETL jobs use remote partitioning via Kafka (with standalone fallback), a transaction enrichment job reads Avro events from Kafka, enriches them, and writes to both MySQL and a Kafka output topic, and a rules engine PoC job applies financial business rules using Drools, EVRete, or a Kogito hybrid (Java + DMN decision tables), toggled via `batch.rules.engine` property.
+Spring Boot 4.0.3 + Spring Batch 6.x reference project for horizontally-scalable batch processing on Kubernetes. Four batch jobs demonstrate different patterns: two CSV-to-DB ETL jobs use remote partitioning via Kafka (with standalone fallback), a transaction enrichment job reads Avro events from Kafka, enriches them, and writes to both MySQL and a Kafka output topic, and a rules engine PoC job applies financial business rules using Drools, EVRete, KIE DMN decision tables, or Drools rule units, toggled via `batch.rules.engine` property.
 
 ## Tech Stack
 
@@ -13,7 +13,7 @@ Spring Boot 4.0.3 + Spring Batch 6.x reference project for horizontally-scalable
 - **Helm 3** — Kubernetes deployment
 - **Testcontainers 2.0.3** — integration tests
 - **Flyway** — database migrations
-- **Drools 10.x + EVRete + KIE DMN** — rules engine PoC (toggled via `batch.rules.engine` property)
+- **Drools 10.x (classic + rule units) + EVRete + KIE DMN** — rules engine PoC (toggled via `batch.rules.engine` property)
 
 ## Prerequisites
 
@@ -27,9 +27,10 @@ Spring Boot 4.0.3 + Spring Batch 6.x reference project for horizontally-scalable
 ```bash
 mvn clean compile                              # compile all modules
 mvn test-compile                               # compile including test sources
-mvn -pl k8s-batch-integration-tests -am verify  # run integration tests (requires Docker)
-mvn -pl k8s-batch-e2e-tests -am verify          # run E2E tests (requires Docker + helm CLI)
+mvn -pl k8s-batch-integration-tests -am verify  # run integration tests (quiet: output in target/failsafe-reports/)
+mvn -pl k8s-batch-e2e-tests -am verify          # run E2E tests (quiet: output in target/failsafe-reports/)
 mvn verify -DskipE2E=true                      # run integration tests, skip E2E
+mvn -pl k8s-batch-integration-tests -am verify -Dtest.log.level=DEBUG -DredirectTestOutputToFile=false  # verbose: full output on console
 mvn package -DskipTests                        # build JAR without tests
 docker build -t k8s-batch:e2e .                # build Docker image for E2E tests
 docker-compose up -d                           # local stack (app + MySQL + Kafka)
@@ -46,7 +47,8 @@ mvn validate -Dskip.checkstyle=true            # skip JavaDoc checks entirely
 
 | Module | Purpose |
 |--------|---------|
-| `k8s-batch-app` | Main Spring Boot application (REST, batch jobs, config) |
+| `k8s-batch-rules-kie` | KIE-based rules engine adapters (DMN + Drools Rule Units) and rules PoC domain types |
+| `k8s-batch-app` | Main Spring Boot application (REST, batch jobs, config). Depends on `k8s-batch-rules-kie` |
 | `k8s-batch-integration-tests` | Testcontainers integration tests (separate to keep test infra out of production artifact) |
 | `k8s-batch-e2e-tests` | E2E tests using Testcontainers K3s — deploys Helm chart into real K8s cluster |
 
@@ -130,7 +132,7 @@ Use `JacksonJsonSerializer` / `JacksonJsonDeserializer` for Kafka partition requ
 |---------|-----------|----------------|-------------|
 | `remote-partitioning` | Default | Yes | Remote partitioning via Kafka |
 | `standalone` | `--spring.profiles.active=standalone` | No | In-process `TaskExecutorPartitionHandler` |
-| `integration-test` | Test classes only | Depends on test | Test-specific config (schema auto-create, debug logging) |
+| `integration-test` | Test classes only | Depends on test | Test-specific config (schema auto-create, WARN logging by default — override with `-Dtest.log.level=DEBUG`) |
 
 ## Batch Job Design
 
@@ -163,16 +165,18 @@ Single chunk step (not partitioned) — reads Avro `TransactionEvent` from Kafka
 
 ### Rules Engine PoC Job (rulesEnginePocJob)
 
-Single non-partitioned chunk step — reads financial transactions from CSV, applies business rules via Drools DRL, EVRete Java API, or Kogito hybrid (Java + DMN), writes enriched results to MySQL. PoC for evaluating rules engine alternatives.
+Single non-partitioned chunk step — reads financial transactions from CSV, applies business rules via Drools DRL, EVRete Java API, KIE DMN decision tables, or Drools rule units, writes enriched results to MySQL. PoC for evaluating rules engine alternatives.
 
-- **Toggle**: `batch.rules.engine=drools` (default), `evrete`, or `kogito` — selects the active `TransactionRulesEvaluator` implementation via `@ConditionalOnProperty`
-- **Config**: `RulesEnginePocJobConfig` + `RulesEngineProperties` (bound to `batch.rules.*`)
-- **Domain port**: `TransactionRulesEvaluator` interface — custom driven port with three adapter implementations
-- **Domain constants**: `EnrichmentRuleConstants` record — exchange rates, risk thresholds, compliance rules. Shared by Drools (DRL `global`) and EVRete (constructor injection). Kogito adapter uses it for exchange rates; risk/compliance thresholds are in the DMN model.
-- **DRL**: `src/main/resources/rules/transaction-enrichment.drl` — 4 rules using `EnrichmentRuleConstants` global (not hardcoded constants)
-- **DMN**: `src/main/resources/dmn/risk-assessment.dmn` — two decision tables (Risk Score, Compliance Review) with dependency graph. Used by Kogito adapter via `DMNRuntime` API loaded through `KieFileSystem`.
-- **Adapter fact**: `TransactionFact` — mutable JavaBean for rules engine sessions (required by Drools DRL `then` blocks). Uses `RiskScore` enum (not String). Factory methods: `from(FinancialTransaction)` and `toEnrichedTransaction(engineName, processedAt)`
-- **Kogito adapter note**: Rule units (`RuleUnitData` + `DataStore`) require `kie-maven-plugin` for build-time code generation, but the plugin's embedded ECJ compiler doesn't support Java 21 records/text blocks (Drools 10.1.0 limitation). The Kogito adapter uses Java for the sequential part (exchange rate + conversion) and DMN for the tabular part instead.
+- **Module split**: Domain types (port, value objects, shared fact) and KIE-based adapters (DMN, Drools Rule Units) live in `k8s-batch-rules-kie`. Classic Drools DRL and EVRete adapters stay in `k8s-batch-app`. Dependency direction: `k8s-batch-app` → `k8s-batch-rules-kie` (one-directional). Same Java packages are preserved — Spring Boot auto-scans `@Component` beans across both modules.
+- **Toggle**: `batch.rules.engine=drools` (default), `evrete`, `dmn`, or `drools-ruleunit` — selects the active `TransactionRulesEvaluator` implementation via `@ConditionalOnProperty`
+- **Config**: `RulesEnginePocJobConfig` + `RulesEngineProperties` (bound to `batch.rules.*`) — stay in `k8s-batch-app`
+- **Domain port**: `TransactionRulesEvaluator` interface — custom driven port with four adapter implementations (in `k8s-batch-rules-kie`)
+- **Domain constants**: `EnrichmentRuleConstants` record — exchange rates, risk thresholds, compliance rules (in `k8s-batch-rules-kie`). Shared by Drools (DRL `global`), EVRete (constructor injection), and Drools rule units (plain field on `TransactionEnrichmentUnit`). DMN adapter uses it for exchange rates; risk/compliance thresholds are in the DMN model.
+- **DRL**: `k8s-batch-app/src/main/resources/rules/transaction-enrichment.drl` — 4 rules using `EnrichmentRuleConstants` global (not hardcoded constants). Imports resolve from `k8s-batch-rules-kie` at DRL compile time.
+- **DMN**: `k8s-batch-rules-kie/src/main/resources/dmn/risk-assessment.dmn` — two decision tables (Risk Score, Compliance Review) with dependency graph. Used by DMN adapter via `DMNRuntime` API loaded through `KieFileSystem`.
+- **Adapter fact**: `TransactionFact` — mutable JavaBean in `k8s-batch-rules-kie` for rules engine sessions (required by Drools DRL `then` blocks). Uses `RiskScore` enum (not String). Factory methods: `from(FinancialTransaction)` and `toEnrichedTransaction(engineName, processedAt)`
+- **Rule-unit adapter**: `DroolsRuleUnitTransactionRulesEvaluator` in `k8s-batch-rules-kie` uses `RuleUnitProvider` API with `TransactionEnrichmentUnit` (`RuleUnitData` + `DataStore`). FX/USD conversion in Java, risk scoring + compliance in DRL with OOPath syntax. No `kie-maven-plugin` needed — DRL is discovered at runtime. Designed for future decomposition into multiple units as the rule set grows.
+- **Rule-unit DRL**: co-located with the unit class package at `k8s-batch-rules-kie/src/main/resources/com/cominotti/.../droolsruleunit/transaction-enrichment-unit.drl` — 2 rules (risk scoring, compliance) using OOPath and unit-scoped field access instead of globals. Must be on the classpath matching the unit's Java package for `RuleUnitProvider` auto-discovery.
 - **Path validation**: `BatchFileProperties.requireWithinAllowedBase()` — shared CWE-22 path traversal prevention (used by all job configs)
 
 ## Job REST API
@@ -226,10 +230,35 @@ log.info("Starting Redpanda container (redpanda:v25.1.9)...");
 - **Logger declaration**: plain SLF4J `private static final Logger log = LoggerFactory.getLogger(ClassName.class)` — no Lombok
 - **Log format**: `key=value | key=value` pipe-separated structured fields for machine parseability
 - **Configuration**: `logback-spring.xml` with `<springProfile>` blocks — do NOT use `logging.level` in application YAML files (avoids precedence confusion)
-- **Profile levels**: production=INFO, standalone=INFO (`StandaloneJobConfig` at DEBUG), integration-test=DEBUG
+- **Profile levels**: production=INFO, standalone=INFO (`StandaloneJobConfig` at DEBUG), integration-test=WARN (override with `-Dtest.log.level=DEBUG`)
 - **Batch listeners**: `LoggingJobExecutionListener` and `LoggingStepExecutionListener` are `@Component` beans — register via `.listener()` on `JobBuilder` and `StepBuilder`/`RemotePartitioningManagerStepBuilder` respectively
 - **Duration utility**: `BatchDurationUtils.between(start, end)` for null-safe `Duration.between()` — shared by both listeners
 - **Log levels**: INFO for business events (job/step lifecycle, partition creation, config init), DEBUG for per-item details (filtered records, reader/writer creation), ERROR for failures, WARN for unexpected-but-non-fatal statuses
+
+## AutoCloseable / Resource Management
+
+**Always use try-with-resources** for objects that implement `AutoCloseable` or `Closeable`. Never use manual `try-finally` with `.close()` or `.dispose()`.
+
+```java
+// CORRECT
+try (KieSession session = kieContainer.newKieSession()) {
+    session.insert(fact);
+    session.fireAllRules();
+}
+
+// WRONG — manual try-finally
+KieSession session = kieContainer.newKieSession();
+try {
+    session.insert(fact);
+    session.fireAllRules();
+} finally {
+    session.dispose();
+}
+```
+
+**Scope**: sessions (KieSession, StatefulSession, RuleUnitInstance), streams, connections, prepared statements, readers/writers — any short-lived resource acquired and released within a method.
+
+**Exception**: long-lived resources managed by Spring's bean lifecycle (e.g., `KnowledgeService` cleaned up via `@PreDestroy`) do not use try-with-resources.
 
 ## Helm Chart Conventions
 
@@ -248,6 +277,12 @@ log.info("Starting Redpanda container (redpanda:v25.1.9)...");
 ## Key Directories
 
 ```
+k8s-batch-rules-kie/src/main/java/com/cominotti/k8sbatch/
+  batch/rulespoc/domain/      — TransactionRulesEvaluator port, FinancialTransaction, EnrichedFinancialTransaction, RiskScore, EnrichmentRuleConstants
+  batch/rulespoc/adapters/evaluatingrules/         — TransactionFact (shared mutable fact)
+  batch/rulespoc/adapters/evaluatingrules/dmn/     — DmnTransactionRulesEvaluator (Java + DMN hybrid)
+  batch/rulespoc/adapters/evaluatingrules/droolsruleunit/ — DroolsRuleUnitTransactionRulesEvaluator, TransactionEnrichmentUnit
+
 k8s-batch-app/src/main/java/com/cominotti/k8sbatch/
   batch/common/domain/    — CsvRecord, CsvRecordProcessor, BatchStepNames, BatchPartitionProperties
   batch/common/adapters/readingcsv/file/          — CsvRecordReaderFactory
@@ -261,11 +296,8 @@ k8s-batch-app/src/main/java/com/cominotti/k8sbatch/
   batch/transaction/adapters/streamingevents/kafka/           — TransactionKafkaConfig
   batch/transaction/adapters/persistingtransactions/jdbc/     — EnrichedTransactionWriter
   batch/transaction/config/   — TransactionEnrichmentJobConfig
-  batch/rulespoc/domain/      — FinancialTransaction, EnrichedFinancialTransaction, RiskScore, EnrichmentRuleConstants, TransactionRulesEvaluator
-  batch/rulespoc/adapters/evaluatingrules/         — TransactionFact (shared)
   batch/rulespoc/adapters/evaluatingrules/drools/  — DroolsTransactionRulesEvaluator
   batch/rulespoc/adapters/evaluatingrules/evrete/  — EvreteTransactionRulesEvaluator
-  batch/rulespoc/adapters/evaluatingrules/kogito/  — KogitoTransactionRulesEvaluator (Java + DMN hybrid)
   batch/rulespoc/adapters/persistingresults/jdbc/  — EnrichedFinancialTransactionWriter
   batch/rulespoc/adapters/readingcsv/file/         — FinancialTransactionReaderFactory
   batch/rulespoc/config/      — RulesEnginePocJobConfig, RulesEngineProcessor, RulesEngineProperties

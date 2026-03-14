@@ -7,6 +7,7 @@ WORKDIR /app
 
 # Copy dependency descriptors first for Docker layer caching
 COPY pom.xml .
+COPY k8s-batch-rules-kie/pom.xml k8s-batch-rules-kie/
 COPY k8s-batch-app/pom.xml k8s-batch-app/
 COPY k8s-batch-integration-tests/pom.xml k8s-batch-integration-tests/
 COPY k8s-batch-e2e-tests/pom.xml k8s-batch-e2e-tests/
@@ -14,6 +15,7 @@ RUN mvn dependency:go-offline -B -pl k8s-batch-app -am
 
 # Copy license scripts (needed for Maven validate phase) and source
 COPY scripts/license scripts/license
+COPY k8s-batch-rules-kie/src k8s-batch-rules-kie/src
 COPY k8s-batch-app/src k8s-batch-app/src
 RUN mvn package -DskipTests -B -pl k8s-batch-app -am && \
     # Spring Boot layertools: splits JAR into layers ordered by change frequency for Docker cache optimization

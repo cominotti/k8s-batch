@@ -88,13 +88,10 @@ public class DroolsTransactionRulesEvaluator implements TransactionRulesEvaluato
     public EnrichedFinancialTransaction evaluate(FinancialTransaction transaction) {
         TransactionFact fact = TransactionFact.from(transaction);
 
-        KieSession session = kieContainer.newKieSession();
-        try {
+        try (KieSession session = kieContainer.newKieSession()) {
             session.setGlobal("ruleConstants", ruleConstants);
             session.insert(fact);
             session.fireAllRules();
-        } finally {
-            session.dispose();
         }
 
         return fact.toEnrichedTransaction(engineName(), Instant.now());

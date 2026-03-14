@@ -128,6 +128,11 @@
                     <!-- 10 minutes: K3s cluster startup + Helm install + image loading takes much longer than IT -->
                     <forkedProcessTimeoutInSeconds>600</forkedProcessTimeoutInSeconds>
                     <skipTests>${skipE2E}</skipTests>
+                    <!-- Test output goes to target/failsafe-reports/*.txt (override: -DredirectTestOutputToFile=false) -->
+                    <redirectTestOutputToFile>${redirectTestOutputToFile}</redirectTestOutputToFile>
+                    <systemPropertyVariables>
+                        <test.log.level>${test.log.level}</test.log.level>
+                    </systemPropertyVariables>
                 </configuration>
             </plugin>
             <!-- No spring-boot repackage for test-only module -->

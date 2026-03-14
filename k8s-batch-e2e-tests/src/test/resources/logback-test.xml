@@ -1,15 +1,18 @@
 <configuration>
+    <!-- test.log.level: configurable threshold (default WARN, override -Dtest.log.level=DEBUG) -->
+    <variable name="TEST_LOG_LEVEL" value="${test.log.level:-WARN}"/>
+
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
 
-    <logger name="com.cominotti.k8sbatch.e2e" level="DEBUG"/>
-    <logger name="io.fabric8.kubernetes" level="WARN"/>
-    <logger name="org.testcontainers" level="INFO"/>
+    <logger name="com.cominotti.k8sbatch.e2e" level="${TEST_LOG_LEVEL}"/>
+    <logger name="io.fabric8.kubernetes" level="${TEST_LOG_LEVEL}"/>
+    <logger name="org.testcontainers" level="${TEST_LOG_LEVEL}"/>
 
-    <root level="INFO">
+    <root level="${TEST_LOG_LEVEL}">
         <appender-ref ref="CONSOLE"/>
     </root>
 </configuration>

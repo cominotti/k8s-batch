@@ -20,6 +20,7 @@
     <description>Spring Boot + Spring Batch reference project for Kubernetes horizontal scaling</description>
 
     <modules>
+        <module>k8s-batch-rules-kie</module>
         <module>k8s-batch-app</module>
         <module>k8s-batch-integration-tests</module>
         <module>k8s-batch-e2e-tests</module>
@@ -40,6 +41,9 @@
         <confluent.version>7.9.0</confluent.version>
         <drools.version>10.1.0</drools.version>
         <evrete.version>4.0.3</evrete.version>
+        <!-- Test output verbosity: override with -Dtest.log.level=DEBUG -DredirectTestOutputToFile=false -->
+        <test.log.level>WARN</test.log.level>
+        <redirectTestOutputToFile>true</redirectTestOutputToFile>
     </properties>
 
     <repositories>
@@ -54,6 +58,11 @@
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>com.cominotti.k8sbatch</groupId>
+                <artifactId>k8s-batch-rules-kie</artifactId>
+                <version>${project.version}</version>
+            </dependency>
             <dependency>
                 <groupId>com.cominotti.k8sbatch</groupId>
                 <artifactId>k8s-batch-app</artifactId>
@@ -87,7 +96,13 @@
                 <artifactId>drools-xml-support</artifactId>
                 <version>${drools.version}</version>
             </dependency>
-            <!-- KIE DMN Runtime (decision table evaluation for Kogito adapter) -->
+            <!-- Drools Rule Units (typed data scoping for rule-unit adapter) -->
+            <dependency>
+                <groupId>org.drools</groupId>
+                <artifactId>drools-ruleunits-engine</artifactId>
+                <version>${drools.version}</version>
+            </dependency>
+            <!-- KIE DMN Runtime (decision table evaluation for DMN adapter) -->
             <dependency>
                 <groupId>org.kie</groupId>
                 <artifactId>kie-dmn-core</artifactId>

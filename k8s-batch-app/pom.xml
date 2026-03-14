@@ -63,7 +63,13 @@
             <artifactId>kafka-avro-serializer</artifactId>
         </dependency>
 
-        <!-- Rules Engines (PoC: Drools vs EVRete vs Kogito) -->
+        <!-- Rules PoC: KIE adapters (DMN + Drools Rule Units) and shared domain types -->
+        <dependency>
+            <groupId>com.cominotti.k8sbatch</groupId>
+            <artifactId>k8s-batch-rules-kie</artifactId>
+        </dependency>
+
+        <!-- Rules PoC: Classic Drools DRL adapter (stays in this module) -->
         <dependency>
             <groupId>org.drools</groupId>
             <artifactId>drools-engine</artifactId>
@@ -72,10 +78,8 @@
             <groupId>org.drools</groupId>
             <artifactId>drools-xml-support</artifactId>
         </dependency>
-        <dependency>
-            <groupId>org.kie</groupId>
-            <artifactId>kie-dmn-core</artifactId>
-        </dependency>
+
+        <!-- Rules PoC: EVRete adapter (stays in this module) -->
         <dependency>
             <groupId>org.evrete</groupId>
             <artifactId>evrete-core</artifactId>
