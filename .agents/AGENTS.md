@@ -234,6 +234,31 @@ log.info("Starting Redpanda container (redpanda:v25.1.9)...");
 - **Duration utility**: `BatchDurationUtils.between(start, end)` for null-safe `Duration.between()` — shared by both listeners
 - **Log levels**: INFO for business events (job/step lifecycle, partition creation, config init), DEBUG for per-item details (filtered records, reader/writer creation), ERROR for failures, WARN for unexpected-but-non-fatal statuses
 
+## AutoCloseable / Resource Management
+
+**Always use try-with-resources** for objects that implement `AutoCloseable` or `Closeable`. Never use manual `try-finally` with `.close()` or `.dispose()`.
+
+```java
+// CORRECT
+try (KieSession session = kieContainer.newKieSession()) {
+    session.insert(fact);
+    session.fireAllRules();
+}
+
+// WRONG — manual try-finally
+KieSession session = kieContainer.newKieSession();
+try {
+    session.insert(fact);
+    session.fireAllRules();
+} finally {
+    session.dispose();
+}
+```
+
+**Scope**: sessions (KieSession, StatefulSession, RuleUnitInstance), streams, connections, prepared statements, readers/writers — any short-lived resource acquired and released within a method.
+
+**Exception**: long-lived resources managed by Spring's bean lifecycle (e.g., `KnowledgeService` cleaned up via `@PreDestroy`) do not use try-with-resources.
+
 ## Helm Chart Conventions
 
 - Schema initialization: MySQL `docker-entrypoint-initdb.d` ConfigMap, not `initialize-schema: always`
