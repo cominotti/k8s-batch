@@ -44,6 +44,21 @@
             <groupId>org.drools</groupId>
             <artifactId>drools-xml-support</artifactId>
         </dependency>
+
+        <!-- Test: JUnit 5 + AssertJ + SLF4J/Logback backend for evaluator constructor logging -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Test: dynamic class generation for Drools Rule Unit DRL compilation at runtime -->
+        <dependency>
+            <groupId>org.drools</groupId>
+            <artifactId>drools-wiring-dynamic</artifactId>
+            <version>${drools.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
