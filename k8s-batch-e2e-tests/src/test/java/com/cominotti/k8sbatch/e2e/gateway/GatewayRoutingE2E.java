@@ -37,11 +37,6 @@ class GatewayRoutingE2E extends AbstractE2ETest {
         return true;
     }
 
-    @Override
-    protected boolean requiresGateway() {
-        return true;
-    }
-
     @Test
     @Order(1)
     void gatewayPodShouldBeReady() {

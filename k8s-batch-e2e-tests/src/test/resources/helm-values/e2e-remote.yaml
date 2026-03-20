@@ -133,6 +133,11 @@ schemaRegistry:
       cpu: 500m
       memory: 512Mi
 
+# Gateway proxies requests to the backend app via Spring Cloud Gateway routes.
+# pullPolicy: Never because the image is built locally and loaded into K3s via
+# docker save + ctr images import (no registry involved in E2E tests).
+# runAsNonRoot: false + runAsUser: 0 because K3s local-path provisioner creates
+# volumes owned by root — non-root containers can't write to /tmp.
 gateway:
   enabled: true
   replicaCount: 1
@@ -156,6 +161,9 @@ gateway:
     limits:
       cpu: "1"
       memory: 512Mi
+  # Higher thresholds and longer delays than production defaults because K3s
+  # single-node performance is slower — the gateway init container waits for
+  # the app pod to be ready, which adds to overall startup time.
   livenessProbe:
     httpGet:
       path: /actuator/health/liveness
@@ -173,6 +181,7 @@ gateway:
     failureThreshold: 10
     timeoutSeconds: 5
 
+# HPA disabled in E2E — single replica is sufficient and avoids resource contention in K3s
 gatewayHpa:
   enabled: false
 

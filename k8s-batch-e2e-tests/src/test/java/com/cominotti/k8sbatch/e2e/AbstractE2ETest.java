@@ -46,8 +46,13 @@ public abstract class AbstractE2ETest {
         return false;
     }
 
+    /**
+     * Whether to load the gateway Docker image into K3s. Defaults to {@link #requiresKafka()}
+     * because the gateway is always co-deployed in the remote profile ({@code e2e-remote.yaml}).
+     * Standalone tests skip both Kafka and gateway.
+     */
     protected boolean requiresGateway() {
-        return false;
+        return requiresKafka();
     }
 
     @BeforeAll

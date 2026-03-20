@@ -6,6 +6,7 @@ import com.cominotti.k8sbatch.e2e.diagnostics.PodDiagnostics;
 import io.fabric8.kubernetes.api.model.ConfigMap;
 import io.fabric8.kubernetes.api.model.ConfigMapBuilder;
 import io.fabric8.kubernetes.api.model.HasMetadata;
+import io.fabric8.kubernetes.api.model.batch.v1.Job;
 import io.fabric8.kubernetes.client.Config;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientBuilder;
@@ -262,7 +263,18 @@ public final class K3sClusterManager {
         List<HasMetadata> resources = kubernetesClient.load(
                 new ByteArrayInputStream(manifests.getBytes(StandardCharsets.UTF_8))).items();
         for (HasMetadata resource : resources) {
-            kubernetesClient.resource(resource).inNamespace(NAMESPACE).unlock().createOr(NonDeletingOperation::update);
+            if (resource instanceof Job) {
+                // Jobs are immutable after creation (spec.selector, spec.template) —
+                // delete before re-creating. Mirrors helm.sh/hook-delete-policy: before-hook-creation.
+                try {
+                    kubernetesClient.resource(resource).inNamespace(NAMESPACE).delete();
+                } catch (Exception e) {
+                    log.debug("Job not found for pre-delete | name={}", resource.getMetadata().getName());
+                }
+                kubernetesClient.resource(resource).inNamespace(NAMESPACE).create();
+            } else {
+                kubernetesClient.resource(resource).inNamespace(NAMESPACE).unlock().createOr(NonDeletingOperation::update);
+            }
             log.debug("Applied | kind={} | name={}", resource.getKind(), resource.getMetadata().getName());
         }
         log.info("Applied {} K8s resources", resources.size());

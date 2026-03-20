@@ -5,7 +5,9 @@ FROM maven:3.9-eclipse-temurin-21 AS build
 
 WORKDIR /app
 
-# Copy dependency descriptors first for Docker layer caching
+# Copy dependency descriptors first for Docker layer caching.
+# All sibling module POMs must be present even though only k8s-batch-jobs is built —
+# Maven resolves the full reactor from the parent POM and fails if any <module> is missing.
 COPY pom.xml .
 COPY k8s-batch-rules-kie/pom.xml k8s-batch-rules-kie/
 COPY k8s-batch-jobs/pom.xml k8s-batch-jobs/
@@ -19,6 +21,8 @@ RUN mvn dependency:go-offline -B -pl k8s-batch-jobs -am
 COPY scripts/license scripts/license
 COPY k8s-batch-rules-kie/src k8s-batch-rules-kie/src
 COPY k8s-batch-jobs/src k8s-batch-jobs/src
+# skip.checkstyle: config/checkstyle/suppressions.xml is not in the Docker context —
+# checkstyle is a CI/dev validation tool, not needed for producing the runtime JAR
 RUN mvn package -DskipTests -Dskip.checkstyle=true -B -pl k8s-batch-jobs -am && \
     # Spring Boot layertools: splits JAR into layers ordered by change frequency for Docker cache optimization
     java -Djarmode=tools -jar k8s-batch-jobs/target/*-exec.jar extract --layers --launcher --destination extracted

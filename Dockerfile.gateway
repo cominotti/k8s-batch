@@ -8,7 +8,8 @@ WORKDIR /app
 # Copy dependency descriptors first for Docker layer caching
 COPY pom.xml .
 COPY k8s-batch-api-gateway/pom.xml k8s-batch-api-gateway/
-# Sibling modules referenced by parent POM (Maven needs them to resolve the reactor)
+# All sibling module POMs must be present even though only k8s-batch-api-gateway is built —
+# Maven resolves the full reactor from the parent POM and fails if any <module> is missing.
 COPY k8s-batch-rules-kie/pom.xml k8s-batch-rules-kie/
 COPY k8s-batch-jobs/pom.xml k8s-batch-jobs/
 COPY k8s-batch-integration-tests/pom.xml k8s-batch-integration-tests/
@@ -19,6 +20,8 @@ RUN mvn dependency:go-offline -B -pl k8s-batch-api-gateway -am
 # Copy license scripts (needed for Maven validate phase) and source
 COPY scripts/license scripts/license
 COPY k8s-batch-api-gateway/src k8s-batch-api-gateway/src
+# skip.checkstyle: config/checkstyle/suppressions.xml is not in the Docker context —
+# checkstyle is a CI/dev validation tool, not needed for producing the runtime JAR
 RUN mvn package -DskipTests -Dskip.checkstyle=true -B -pl k8s-batch-api-gateway -am && \
     # Spring Boot layertools: splits JAR into layers ordered by change frequency for Docker cache optimization
     java -Djarmode=tools -jar k8s-batch-api-gateway/target/*-exec.jar extract --layers --launcher --destination extracted

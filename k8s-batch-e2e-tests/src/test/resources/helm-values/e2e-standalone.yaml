@@ -86,6 +86,9 @@ kafka:
 schemaRegistry:
   enabled: false
 
+# Gateway disabled in standalone profile — standalone tests validate batch jobs
+# running in-process without Kafka, and the gateway requires the backend app
+# to be reachable which is already covered by direct appClient access.
 gateway:
   enabled: false
 
