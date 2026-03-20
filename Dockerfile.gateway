@@ -19,7 +19,7 @@ RUN mvn dependency:go-offline -B -pl k8s-batch-api-gateway -am
 # Copy license scripts (needed for Maven validate phase) and source
 COPY scripts/license scripts/license
 COPY k8s-batch-api-gateway/src k8s-batch-api-gateway/src
-RUN mvn package -DskipTests -B -pl k8s-batch-api-gateway -am && \
+RUN mvn package -DskipTests -Dskip.checkstyle=true -B -pl k8s-batch-api-gateway -am && \
     # Spring Boot layertools: splits JAR into layers ordered by change frequency for Docker cache optimization
     java -Djarmode=tools -jar k8s-batch-api-gateway/target/*-exec.jar extract --layers --launcher --destination extracted
 

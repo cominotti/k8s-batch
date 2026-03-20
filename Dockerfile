@@ -11,13 +11,15 @@ COPY k8s-batch-rules-kie/pom.xml k8s-batch-rules-kie/
 COPY k8s-batch-jobs/pom.xml k8s-batch-jobs/
 COPY k8s-batch-integration-tests/pom.xml k8s-batch-integration-tests/
 COPY k8s-batch-e2e-tests/pom.xml k8s-batch-e2e-tests/
+COPY k8s-batch-api-gateway/pom.xml k8s-batch-api-gateway/
+COPY k8s-batch-api-gateway-tests/pom.xml k8s-batch-api-gateway-tests/
 RUN mvn dependency:go-offline -B -pl k8s-batch-jobs -am
 
 # Copy license scripts (needed for Maven validate phase) and source
 COPY scripts/license scripts/license
 COPY k8s-batch-rules-kie/src k8s-batch-rules-kie/src
 COPY k8s-batch-jobs/src k8s-batch-jobs/src
-RUN mvn package -DskipTests -B -pl k8s-batch-jobs -am && \
+RUN mvn package -DskipTests -Dskip.checkstyle=true -B -pl k8s-batch-jobs -am && \
     # Spring Boot layertools: splits JAR into layers ordered by change frequency for Docker cache optimization
     java -Djarmode=tools -jar k8s-batch-jobs/target/*-exec.jar extract --layers --launcher --destination extracted
 
