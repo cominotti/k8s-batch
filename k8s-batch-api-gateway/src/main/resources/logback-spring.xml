@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <property name="LOG_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{40} - %msg%n"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- test.log.level: configurable threshold for gateway tests (default WARN, override -Dtest.log.level=DEBUG) -->
+    <variable name="TEST_LOG_LEVEL" value="${test.log.level:-WARN}"/>
+
+    <!-- Default: gateway and route logging at INFO, framework noise at WARN -->
+    <springProfile name="default">
+        <logger name="com.cominotti.k8sbatch.gateway" level="INFO"/>
+        <logger name="org.springframework.cloud.gateway" level="WARN"/>
+        <logger name="io.github.resilience4j" level="WARN"/>
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <!-- Gateway test: all loggers gated by TEST_LOG_LEVEL (default WARN, override -Dtest.log.level=DEBUG) -->
+    <springProfile name="gateway-test">
+        <logger name="com.cominotti.k8sbatch.gateway" level="${TEST_LOG_LEVEL}"/>
+        <logger name="org.springframework.cloud.gateway" level="${TEST_LOG_LEVEL}"/>
+        <logger name="io.github.resilience4j" level="${TEST_LOG_LEVEL}"/>
+        <root level="${TEST_LOG_LEVEL}">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+</configuration>

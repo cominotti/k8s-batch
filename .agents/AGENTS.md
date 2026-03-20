@@ -48,7 +48,7 @@ mvn validate -Dskip.checkstyle=true            # skip JavaDoc checks entirely
 | Module | Purpose |
 |--------|---------|
 | `k8s-batch-rules-kie` | KIE-based rules engine adapters (DMN + Drools Rule Units) and rules PoC domain types |
-| `k8s-batch-app` | Main Spring Boot application (REST, batch jobs, config). Depends on `k8s-batch-rules-kie` |
+| `k8s-batch-jobs` | Main Spring Boot application (REST, batch jobs, config). Depends on `k8s-batch-rules-kie` |
 | `k8s-batch-integration-tests` | Testcontainers integration tests (separate to keep test infra out of production artifact) |
 | `k8s-batch-e2e-tests` | E2E tests using Testcontainers K3s — deploys Helm chart into real K8s cluster |
 
@@ -151,7 +151,7 @@ Single chunk step (not partitioned) — reads Avro `TransactionEvent` from Kafka
 
 - **Config**: `TransactionEnrichmentJobConfig` + `TransactionKafkaConfig` (both `@Profile("remote-partitioning")`)
 - **Properties**: `TransactionJobProperties` bound to `batch.transaction.*`
-- **Avro schemas**: `k8s-batch-app/src/main/avro/` (generates Java classes via `avro-maven-plugin`)
+- **Avro schemas**: `k8s-batch-jobs/src/main/avro/` (generates Java classes via `avro-maven-plugin`)
 - **DB writer**: `EnrichedTransactionWriter` — upsert via `ON DUPLICATE KEY UPDATE` for idempotency
 - **Kafka transactions**: `batch.transaction.kafka-transactions-enabled` (default: `false`). When `true`, `ProducerFactory` gets a `transactionIdPrefix`, enabling best-effort 1PC coordination with `DataSourceTransactionManager` via Spring's `TransactionSynchronizationManager`. Consumer uses `read_committed` isolation.
 - **Parallelism**: comes from Kafka partition assignment across pod replicas, not Spring Batch partitioning
@@ -167,12 +167,12 @@ Single chunk step (not partitioned) — reads Avro `TransactionEvent` from Kafka
 
 Single non-partitioned chunk step — reads financial transactions from CSV, applies business rules via Drools DRL, EVRete Java API, KIE DMN decision tables, or Drools rule units, writes enriched results to MySQL. PoC for evaluating rules engine alternatives.
 
-- **Module split**: Domain types (port, value objects, shared fact) and KIE-based adapters (DMN, Drools Rule Units) live in `k8s-batch-rules-kie`. Classic Drools DRL and EVRete adapters stay in `k8s-batch-app`. Dependency direction: `k8s-batch-app` → `k8s-batch-rules-kie` (one-directional). Same Java packages are preserved — Spring Boot auto-scans `@Component` beans across both modules.
+- **Module split**: Domain types (port, value objects, shared fact) and KIE-based adapters (DMN, Drools Rule Units) live in `k8s-batch-rules-kie`. Classic Drools DRL and EVRete adapters stay in `k8s-batch-jobs`. Dependency direction: `k8s-batch-jobs` → `k8s-batch-rules-kie` (one-directional). Same Java packages are preserved — Spring Boot auto-scans `@Component` beans across both modules.
 - **Toggle**: `batch.rules.engine=drools` (default), `evrete`, `dmn`, or `drools-ruleunit` — selects the active `TransactionRulesEvaluator` implementation via `@ConditionalOnProperty`
-- **Config**: `RulesEnginePocJobConfig` + `RulesEngineProperties` (bound to `batch.rules.*`) — stay in `k8s-batch-app`
+- **Config**: `RulesEnginePocJobConfig` + `RulesEngineProperties` (bound to `batch.rules.*`) — stay in `k8s-batch-jobs`
 - **Domain port**: `TransactionRulesEvaluator` interface — custom driven port with four adapter implementations (in `k8s-batch-rules-kie`)
 - **Domain constants**: `EnrichmentRuleConstants` record — exchange rates, risk thresholds, compliance rules (in `k8s-batch-rules-kie`). Shared by Drools (DRL `global`), EVRete (constructor injection), and Drools rule units (plain field on `TransactionEnrichmentUnit`). DMN adapter uses it for exchange rates; risk/compliance thresholds are in the DMN model.
-- **DRL**: `k8s-batch-app/src/main/resources/rules/transaction-enrichment.drl` — 4 rules using `EnrichmentRuleConstants` global (not hardcoded constants). Imports resolve from `k8s-batch-rules-kie` at DRL compile time.
+- **DRL**: `k8s-batch-jobs/src/main/resources/rules/transaction-enrichment.drl` — 4 rules using `EnrichmentRuleConstants` global (not hardcoded constants). Imports resolve from `k8s-batch-rules-kie` at DRL compile time.
 - **DMN**: `k8s-batch-rules-kie/src/main/resources/dmn/risk-assessment.dmn` — two decision tables (Risk Score, Compliance Review) with dependency graph. Used by DMN adapter via `DMNRuntime` API loaded through `KieFileSystem`.
 - **Adapter fact**: `TransactionFact` — mutable JavaBean in `k8s-batch-rules-kie` for rules engine sessions (required by Drools DRL `then` blocks). Uses `RiskScore` enum (not String). Factory methods: `from(FinancialTransaction)` and `toEnrichedTransaction(engineName, processedAt)`
 - **Rule-unit adapter**: `DroolsRuleUnitTransactionRulesEvaluator` in `k8s-batch-rules-kie` uses `RuleUnitProvider` API with `TransactionEnrichmentUnit` (`RuleUnitData` + `DataStore`). FX/USD conversion in Java, risk scoring + compliance in DRL with OOPath syntax. No `kie-maven-plugin` needed — DRL is discovered at runtime. Designed for future decomposition into multiple units as the rule set grows.
@@ -283,7 +283,7 @@ k8s-batch-rules-kie/src/main/java/com/cominotti/k8sbatch/
   batch/rulespoc/adapters/evaluatingrules/dmn/     — DmnTransactionRulesEvaluator (Java + DMN hybrid)
   batch/rulespoc/adapters/evaluatingrules/droolsruleunit/ — DroolsRuleUnitTransactionRulesEvaluator, TransactionEnrichmentUnit
 
-k8s-batch-app/src/main/java/com/cominotti/k8sbatch/
+k8s-batch-jobs/src/main/java/com/cominotti/k8sbatch/
   batch/common/domain/    — CsvRecord, CsvRecordProcessor, BatchStepNames, BatchPartitionProperties
   batch/common/adapters/readingcsv/file/          — CsvRecordReaderFactory
   batch/common/adapters/persistingrecords/jdbc/   — CsvRecordWriter

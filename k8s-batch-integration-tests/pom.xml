@@ -18,7 +18,7 @@
         <!-- Application under test -->
         <dependency>
             <groupId>com.cominotti.k8sbatch</groupId>
-            <artifactId>k8s-batch-app</artifactId>
+            <artifactId>k8s-batch-jobs</artifactId>
             <scope>test</scope>
         </dependency>
 

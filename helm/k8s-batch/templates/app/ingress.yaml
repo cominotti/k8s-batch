@@ -25,9 +25,15 @@ spec:
             pathType: {{ .pathType }}
             backend:
               service:
+                {{- if $.Values.gateway.enabled }}
+                name: {{ include "k8s-batch.fullname" $ }}-gateway
+                port:
+                  number: {{ $.Values.gateway.service.port }}
+                {{- else }}
                 name: {{ include "k8s-batch.fullname" $ }}
                 port:
                   number: {{ $.Values.app.service.port }}
+                {{- end }}
           {{- end }}
     {{- end }}
 {{- end }}

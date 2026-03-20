@@ -21,9 +21,11 @@
 
     <modules>
         <module>k8s-batch-rules-kie</module>
-        <module>k8s-batch-app</module>
+        <module>k8s-batch-jobs</module>
         <module>k8s-batch-integration-tests</module>
         <module>k8s-batch-e2e-tests</module>
+        <module>k8s-batch-api-gateway</module>
+        <module>k8s-batch-api-gateway-tests</module>
     </modules>
 
     <properties>
@@ -41,6 +43,8 @@
         <confluent.version>7.9.0</confluent.version>
         <drools.version>10.1.0</drools.version>
         <evrete.version>4.0.3</evrete.version>
+        <spring-cloud.version>2025.1.1</spring-cloud.version>
+        <bucket4j.version>8.15.0</bucket4j.version>
         <!-- Test output verbosity: override with -Dtest.log.level=DEBUG -DredirectTestOutputToFile=false -->
         <test.log.level>WARN</test.log.level>
         <redirectTestOutputToFile>true</redirectTestOutputToFile>
@@ -65,8 +69,20 @@
             </dependency>
             <dependency>
                 <groupId>com.cominotti.k8sbatch</groupId>
-                <artifactId>k8s-batch-app</artifactId>
+                <artifactId>k8s-batch-jobs</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.cominotti.k8sbatch</groupId>
+                <artifactId>k8s-batch-api-gateway</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
             <dependency>
                 <groupId>org.testcontainers</groupId>
@@ -113,6 +129,12 @@
                 <groupId>org.evrete</groupId>
                 <artifactId>evrete-core</artifactId>
                 <version>${evrete.version}</version>
+            </dependency>
+            <!-- Bucket4j in-memory rate limiting for API gateway -->
+            <dependency>
+                <groupId>com.bucket4j</groupId>
+                <artifactId>bucket4j_jdk17-core</artifactId>
+                <version>${bucket4j.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

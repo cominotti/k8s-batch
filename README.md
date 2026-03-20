@@ -281,7 +281,7 @@ k8s-batch/
 ├── pom.xml                          # Parent POM
 ├── Dockerfile                       # Multi-stage build
 ├── docker-compose.yml               # Local dev stack
-├── k8s-batch-app/                   # Main application
+├── k8s-batch-jobs/                   # Main application
 │   ├── pom.xml
 │   └── src/main/
 │       ├── avro/                    # Avro schemas (TransactionEvent, EnrichedTransactionEvent)

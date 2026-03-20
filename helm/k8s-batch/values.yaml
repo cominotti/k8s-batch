@@ -79,6 +79,100 @@ app:
     extra: {}
 
 # ======================================================================
+# API Gateway
+# ======================================================================
+gateway:
+  enabled: true
+
+  image:
+    repository: ghcr.io/cominotti/k8s-batch-api-gateway
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 2
+
+  podAnnotations: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    fsGroup: 1000
+
+  securityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+
+  livenessProbe:
+    httpGet:
+      path: /actuator/health/liveness
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 15
+    failureThreshold: 5
+    timeoutSeconds: 5
+
+  readinessProbe:
+    httpGet:
+      path: /actuator/health/readiness
+      port: http
+    initialDelaySeconds: 15
+    periodSeconds: 10
+    failureThreshold: 3
+    timeoutSeconds: 5
+
+  service:
+    type: ClusterIP
+    port: 9090
+
+  config:
+    serverPort: 9090
+    extra: {}
+
+# ======================================================================
+# Gateway HPA
+# ======================================================================
+gatewayHpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 120
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Pods
+          value: 3
+          periodSeconds: 60
+
+# ======================================================================
 # Ingress
 # ======================================================================
 ingress:
@@ -251,4 +345,5 @@ features:
   kafka: true
   schemaRegistry: true
   hpa: true
+  gateway: true
   ingress: false

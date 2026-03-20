@@ -67,7 +67,7 @@
         <!-- Application module (for generated Avro classes used in E2E verification) -->
         <dependency>
             <groupId>com.cominotti.k8sbatch</groupId>
-            <artifactId>k8s-batch-app</artifactId>
+            <artifactId>k8s-batch-jobs</artifactId>
             <scope>test</scope>
         </dependency>
 

@@ -1,0 +1,53 @@
+server:
+  port: ${SERVER_PORT:9090}
+
+spring:
+  application:
+    name: k8s-batch-api-gateway
+  threads:
+    virtual:
+      enabled: true
+
+# ── Gateway Configuration ─────────────────────────────────────────────────
+# Routes all traffic to the k8s-batch-jobs backend. In Kubernetes, the backend URL
+# is set to the app's ClusterIP Service DNS name via GATEWAY_BACKEND_URL env var.
+gateway:
+  backend-url: ${GATEWAY_BACKEND_URL:http://localhost:8080}
+  rate-limit:
+    capacity: ${GATEWAY_RATE_LIMIT_CAPACITY:100}
+    period-seconds: ${GATEWAY_RATE_LIMIT_PERIOD_SECONDS:60}
+  circuit-breaker-name: batchBackend
+
+# ── Resilience4j ────────────────────────────────────────────────────────
+# Circuit breaker thresholds for the batchBackend instance referenced by
+# BatchAppRouteConfig. These are read by Resilience4j auto-configuration,
+# not by GatewayProperties (which only carries the circuit breaker name).
+resilience4j:
+  circuitbreaker:
+    instances:
+      batchBackend:
+        failure-rate-threshold: ${GATEWAY_CB_FAILURE_RATE_THRESHOLD:50}
+        minimum-number-of-calls: ${GATEWAY_CB_MIN_CALLS:5}
+        wait-duration-in-open-state: ${GATEWAY_CB_WAIT_DURATION_SECONDS:30}s
+        sliding-window-size: 10
+        permitted-number-of-calls-in-half-open-state: 3
+
+# ── Actuator ────────────────────────────────────────────────────────────
+# Gateway exposes its own health endpoints for K8s liveness/readiness probes.
+# Backend actuator is not routed — accessed directly by K8s.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+      probes:
+        enabled: true
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true

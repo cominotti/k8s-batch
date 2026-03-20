@@ -1,0 +1,21 @@
+{{- if .Values.gateway.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "k8s-batch.fullname" . }}-gateway-config
+  labels:
+    {{- include "k8s-batch.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+data:
+  SERVER_PORT: {{ .Values.gateway.config.serverPort | quote }}
+  # UseContainerSupport reads cgroup memory limits; MaxRAMPercentage caps heap at 75% of container limit
+  JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+  GATEWAY_BACKEND_URL: "http://{{ include "k8s-batch.fullname" . }}:{{ .Values.app.service.port }}"
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,prometheus,metrics"
+  MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
+  MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED: "true"
+  MANAGEMENT_HEALTH_READINESSSTATE_ENABLED: "true"
+  {{- range $key, $value := .Values.gateway.config.extra }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+{{- end }}
