@@ -86,8 +86,15 @@ kafka:
 schemaRegistry:
   enabled: false
 
+gateway:
+  enabled: false
+
+gatewayHpa:
+  enabled: false
+
 features:
   kafka: false
   schemaRegistry: false
+  gateway: false
   hpa: false
   ingress: false

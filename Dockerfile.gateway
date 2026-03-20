@@ -1,0 +1,51 @@
+# ============================================================
+# Stage 1: Build
+# ============================================================
+FROM maven:3.9-eclipse-temurin-21 AS build
+
+WORKDIR /app
+
+# Copy dependency descriptors first for Docker layer caching
+COPY pom.xml .
+COPY k8s-batch-api-gateway/pom.xml k8s-batch-api-gateway/
+# Sibling modules referenced by parent POM (Maven needs them to resolve the reactor)
+COPY k8s-batch-rules-kie/pom.xml k8s-batch-rules-kie/
+COPY k8s-batch-jobs/pom.xml k8s-batch-jobs/
+COPY k8s-batch-integration-tests/pom.xml k8s-batch-integration-tests/
+COPY k8s-batch-e2e-tests/pom.xml k8s-batch-e2e-tests/
+COPY k8s-batch-api-gateway-tests/pom.xml k8s-batch-api-gateway-tests/
+RUN mvn dependency:go-offline -B -pl k8s-batch-api-gateway -am
+
+# Copy license scripts (needed for Maven validate phase) and source
+COPY scripts/license scripts/license
+COPY k8s-batch-api-gateway/src k8s-batch-api-gateway/src
+RUN mvn package -DskipTests -B -pl k8s-batch-api-gateway -am && \
+    # Spring Boot layertools: splits JAR into layers ordered by change frequency for Docker cache optimization
+    java -Djarmode=tools -jar k8s-batch-api-gateway/target/*-exec.jar extract --layers --launcher --destination extracted
+
+# ============================================================
+# Stage 2: Runtime
+# ============================================================
+FROM eclipse-temurin:21-jre-alpine AS runtime
+
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+WORKDIR /app
+
+# Copy layers in order of change frequency (least to most)
+COPY --from=build /app/extracted/dependencies/ ./
+COPY --from=build /app/extracted/spring-boot-loader/ ./
+COPY --from=build /app/extracted/snapshot-dependencies/ ./
+COPY --from=build /app/extracted/application/ ./
+
+RUN chown -R appuser:appgroup /app
+USER appuser
+
+EXPOSE 9090
+
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=60s \
+  CMD ["wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/actuator/health"]
+
+# JarLauncher is required when the JAR is extracted into layers (a regular java -jar uses the embedded launcher)
+ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", \
+            "org.springframework.boot.loader.launch.JarLauncher"]

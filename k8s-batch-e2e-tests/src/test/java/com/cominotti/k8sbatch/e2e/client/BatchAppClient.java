@@ -107,6 +107,20 @@ public final class BatchAppClient {
     }
 
     /**
+     * Calls GET /hello.
+     */
+    public String getHello() throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + "/hello"))
+                .GET()
+                .timeout(Duration.ofSeconds(10))
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        return response.body();
+    }
+
+    /**
      * Checks /actuator/health.
      */
     public String getHealth() throws Exception {

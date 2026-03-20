@@ -17,6 +17,8 @@ public final class E2EContainerImages {
     public static final String BUSYBOX_IMAGE = "busybox:1.36";
     public static final String KAFKA_IMAGE = "confluentinc/cp-kafka:7.9.0";
     public static final String SCHEMA_REGISTRY_IMAGE = "confluentinc/cp-schema-registry:7.9.0";
+    /** Locally-built gateway image — run {@code docker build -f Dockerfile.gateway -t k8s-batch-api-gateway:e2e .} before E2E tests. */
+    public static final String GATEWAY_IMAGE = "k8s-batch-api-gateway:e2e";
     /** Requires Docker (not Podman rootless) — K3s needs privileged containers. */
     public static final String K3S_IMAGE = "rancher/k3s:v1.31.4-k3s1";
 

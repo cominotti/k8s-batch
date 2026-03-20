@@ -37,11 +37,16 @@ public abstract class AbstractE2ETest {
 
     protected PortForwardManager portForwardManager;
     protected BatchAppClient appClient;
+    protected BatchAppClient gatewayClient;
     protected MysqlVerifier mysqlVerifier;
 
     protected abstract String valuesFile();
 
     protected boolean requiresKafka() {
+        return false;
+    }
+
+    protected boolean requiresGateway() {
         return false;
     }
 
@@ -62,6 +67,12 @@ public abstract class AbstractE2ETest {
         appClient = new BatchAppClient(appPort);
         // Credentials must match the Helm values file (mysql.auth.database/username/password)
         mysqlVerifier = new MysqlVerifier(mysqlPort, "k8sbatch", "k8sbatch", "e2e_pass");
+
+        if (requiresGateway()) {
+            int gatewayPort = portForwardManager.forwardToGateway(9090);
+            gatewayClient = new BatchAppClient(gatewayPort);
+            log.info("Gateway port-forward established | gatewayPort={}", gatewayPort);
+        }
 
         log.info("E2E test setup complete | appPort={} | mysqlPort={}", appPort, mysqlPort);
     }
@@ -89,6 +100,10 @@ public abstract class AbstractE2ETest {
         if (requiresKafka()) {
             K3sClusterManager.loadImage(E2EContainerImages.KAFKA_IMAGE);
             K3sClusterManager.loadImage(E2EContainerImages.SCHEMA_REGISTRY_IMAGE);
+        }
+
+        if (requiresGateway()) {
+            K3sClusterManager.loadImage(E2EContainerImages.GATEWAY_IMAGE);
         }
     }
 }
