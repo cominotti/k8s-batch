@@ -125,8 +125,9 @@
                     <forkCount>1</forkCount>
                     <reuseForks>true</reuseForks>
                     <failIfNoTests>true</failIfNoTests>
-                    <!-- 10 minutes: K3s cluster startup + Helm install + image loading takes much longer than IT -->
-                    <forkedProcessTimeoutInSeconds>600</forkedProcessTimeoutInSeconds>
+                    <!-- 15 minutes: K3s startup + image loading (app, gateway, kafka, mysql, schema-registry,
+                         busybox) + sequential pod readiness chain (mysql → kafka → SR → app → gateway) -->
+                    <forkedProcessTimeoutInSeconds>900</forkedProcessTimeoutInSeconds>
                     <skipTests>${skipE2E}</skipTests>
                     <!-- Test output goes to target/failsafe-reports/*.txt (override: -DredirectTestOutputToFile=false) -->
                     <redirectTestOutputToFile>${redirectTestOutputToFile}</redirectTestOutputToFile>

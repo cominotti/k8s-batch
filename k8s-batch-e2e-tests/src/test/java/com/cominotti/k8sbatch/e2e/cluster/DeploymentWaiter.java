@@ -210,10 +210,22 @@ final class DeploymentWaiter {
         throw new RuntimeException(message);
     }
 
+    /**
+     * Lists release pods, excluding completed Job pods.
+     * <p>
+     * Kubernetes sets {@code pod.status.phase = "Succeeded"} for Job pods that exit
+     * normally (e.g., the Kafka topic-creation Job). These pods carry the same
+     * {@code app.kubernetes.io/instance} label as long-running pods, so they appear
+     * in the pod list. However, a Succeeded pod never has a {@code Ready=True} condition,
+     * which makes the {@code readyCount == pods.size()} termination check impossible
+     * to satisfy — causing a false stall timeout after 120s.
+     */
     private List<Pod> listReleasePods() {
         return client.pods().inNamespace(namespace)
                 .withLabel("app.kubernetes.io/instance", releaseLabel)
-                .list().getItems();
+                .list().getItems().stream()
+                .filter(pod -> !"Succeeded".equals(pod.getStatus().getPhase()))
+                .toList();
     }
 
     private static int countCompletedInitContainers(List<Pod> pods) {

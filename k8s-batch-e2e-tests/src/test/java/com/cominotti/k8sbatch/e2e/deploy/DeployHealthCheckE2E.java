@@ -37,10 +37,15 @@ class DeployHealthCheckE2E extends AbstractE2ETest {
     @Test
     @Order(1)
     void allPodsShouldBeReady() {
+        // Filter out Succeeded pods (e.g., completed Kafka topic-creation Job) —
+        // they carry the same release label but are not long-running services.
+        // A Succeeded pod never has Ready=True, so including it would always fail.
         List<Pod> pods = K3sClusterManager.client().pods()
                 .inNamespace(K3sClusterManager.namespace())
                 .withLabel("app.kubernetes.io/instance", K3sClusterManager.releaseName())
-                .list().getItems();
+                .list().getItems().stream()
+                .filter(pod -> !"Succeeded".equals(pod.getStatus().getPhase()))
+                .toList();
 
         assertThat(pods).isNotEmpty();
         for (Pod pod : pods) {
