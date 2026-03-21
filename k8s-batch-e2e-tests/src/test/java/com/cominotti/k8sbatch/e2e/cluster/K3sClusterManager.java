@@ -24,15 +24,18 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
  * Manages a shared K3s cluster for E2E tests.
  * Follows the ContainerHolder singleton pattern from integration tests.
+ *
+ * <p>Image loading is delegated to {@link K3sImageLoader}, which supports parallel
+ * and batch loading. The K3s container has a {@value #K3S_MEMORY_LIMIT_MB}MB memory
+ * ceiling to prevent host-level OOM — resource exhaustion surfaces as pod-level
+ * OOMKilled (detected by {@link DeploymentWaiter}) instead of Docker daemon kills.
  */
 public final class K3sClusterManager {
 
@@ -42,6 +45,10 @@ public final class K3sClusterManager {
     private static final String RELEASE_NAME = "e2e";
     private static final Duration POD_READY_TIMEOUT = Duration.ofMinutes(5);
 
+    /** Memory ceiling for the K3s container. Prevents host-level OOM. */
+    private static final long K3S_MEMORY_LIMIT_MB = 6 * 1024;
+    private static final long K3S_MEMORY_LIMIT_BYTES = K3S_MEMORY_LIMIT_MB * 1024 * 1024;
+
     private static volatile K3sContainer k3sContainer;
     private static volatile KubernetesClient kubernetesClient;
     private static volatile boolean clusterReady = false;
@@ -49,8 +56,6 @@ public final class K3sClusterManager {
     // Manifests are cached so teardownDeployment() can delete the same resources it created
     // (we use raw kubectl-equivalent apply, not helm install, so there's no helm release to uninstall)
     private static volatile String cachedManifests;
-    // Deduplication set: loading the same image twice wastes minutes of tar-file copy
-    private static final Set<String> loadedImages = new HashSet<>();
 
     private K3sClusterManager() {
     }
@@ -128,42 +133,25 @@ public final class K3sClusterManager {
     }
 
     /**
-     * Loads a Docker image into K3s via ctr images import.
+     * Loads a single Docker image into K3s.
+     * Delegates to {@link K3sImageLoader#loadImage(K3sContainer, String)}.
+     *
+     * @param imageName the Docker image name (e.g., {@code "mysql:8.0"})
+     * @throws Exception if saving, copying, or importing the image fails
      */
-    public static synchronized void loadImage(String imageName) throws Exception {
-        if (loadedImages.contains(imageName)) {
-            log.debug("Image already loaded | image={}", imageName);
-            return;
-        }
-        log.info("Loading image into K3s | image={}", imageName);
+    public static void loadImage(String imageName) throws Exception {
+        K3sImageLoader.loadImage(container(), imageName);
+    }
 
-        // Save the image to a tar file on the host
-        Path tempTar = Files.createTempFile("k3s-image-", ".tar");
-        try {
-            ProcessBuilder pb = new ProcessBuilder(
-                    "docker", "save", "--platform", "linux/amd64", "-o", tempTar.toString(), imageName);
-            pb.inheritIO();
-            Process process = pb.start();
-            int exitCode = process.waitFor();
-            if (exitCode != 0) {
-                throw new RuntimeException("Failed to save Docker image: " + imageName);
-            }
-
-            // Copy tar into K3s container and import
-            k3sContainer.copyFileToContainer(
-                    org.testcontainers.utility.MountableFile.forHostPath(tempTar),
-                    "/tmp/image.tar");
-            var result = k3sContainer.execInContainer(
-                    "ctr", "--namespace", "k8s.io", "images", "import", "/tmp/image.tar");
-            if (result.getExitCode() != 0) {
-                log.warn("ctr images import stderr: {}", result.getStderr());
-                throw new RuntimeException("Failed to import image into K3s: " + result.getStderr());
-            }
-            loadedImages.add(imageName);
-            log.info("Image loaded into K3s | image={}", imageName);
-        } finally {
-            Files.deleteIfExists(tempTar);
-        }
+    /**
+     * Loads multiple Docker images into K3s in parallel with batch optimization.
+     * Delegates to {@link K3sImageLoader#loadImages(K3sContainer, List)}.
+     *
+     * @param imageNames the Docker image names to load
+     * @throws Exception if any image fails to load
+     */
+    public static void loadImages(List<String> imageNames) throws Exception {
+        K3sImageLoader.loadImages(container(), imageNames);
     }
 
     public static synchronized void teardownDeployment() {
@@ -194,12 +182,17 @@ public final class K3sClusterManager {
     }
 
     private static void startK3s() {
-        log.info("Starting K3s container...");
+        log.info("Starting K3s container | memoryLimit={}MB", K3S_MEMORY_LIMIT_MB);
         k3sContainer = new K3sContainer(DockerImageName.parse(E2EContainerImages.K3S_IMAGE))
                 // Traefik disabled — the Helm chart uses NodePort/ClusterIP, not Ingress
-                .withCommand("server", "--disable=traefik");
+                .withCommand("server", "--disable=traefik")
+                // Memory ceiling: OOM surfaces as pod OOMKilled (detected by DeploymentWaiter)
+                // instead of an opaque Docker daemon kill at the host level
+                .withCreateContainerCmdModifier(cmd ->
+                        cmd.getHostConfig().withMemory(K3S_MEMORY_LIMIT_BYTES));
         k3sContainer.start();
-        log.info("K3s container started");
+        K3sImageLoader.resetLoadedImages();
+        log.info("K3s container started | memoryLimit={}MB", K3S_MEMORY_LIMIT_MB);
 
         String kubeconfig = k3sContainer.getKubeConfigYaml();
         Config config = Config.fromKubeconfig(kubeconfig);

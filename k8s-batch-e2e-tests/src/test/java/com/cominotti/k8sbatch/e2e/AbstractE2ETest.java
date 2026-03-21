@@ -15,6 +15,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -81,14 +83,26 @@ public abstract class AbstractE2ETest {
         }
     }
 
-    private void loadRequiredImages() throws Exception {
-        K3sClusterManager.loadImage(E2EContainerImages.APP_IMAGE);
-        K3sClusterManager.loadImage(E2EContainerImages.MYSQL_IMAGE);
-        K3sClusterManager.loadImage(E2EContainerImages.BUSYBOX_IMAGE);
+    /**
+     * Returns the list of Docker images required by this test class.
+     * Override to customize for tests that need fewer (or additional) images.
+     *
+     * @return list of image names from {@link E2EContainerImages}
+     */
+    protected List<String> requiredImages() {
+        List<String> images = new ArrayList<>();
+        images.add(E2EContainerImages.APP_IMAGE);
+        images.add(E2EContainerImages.MYSQL_IMAGE);
+        images.add(E2EContainerImages.BUSYBOX_IMAGE);
 
         if (requiresKafka()) {
-            K3sClusterManager.loadImage(E2EContainerImages.KAFKA_IMAGE);
-            K3sClusterManager.loadImage(E2EContainerImages.SCHEMA_REGISTRY_IMAGE);
+            images.add(E2EContainerImages.KAFKA_IMAGE);
+            images.add(E2EContainerImages.SCHEMA_REGISTRY_IMAGE);
         }
+        return images;
+    }
+
+    private void loadRequiredImages() throws Exception {
+        K3sClusterManager.loadImages(requiredImages());
     }
 }
