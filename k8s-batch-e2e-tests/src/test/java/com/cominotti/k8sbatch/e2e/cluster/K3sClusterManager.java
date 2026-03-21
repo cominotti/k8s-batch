@@ -60,6 +60,14 @@ public final class K3sClusterManager {
     private K3sClusterManager() {
     }
 
+    /**
+     * Ensures the K3s cluster is running, starting it if necessary.
+     *
+     * <p>Thread-safe and idempotent: the first call starts the cluster and sets the
+     * {@code clusterReady} volatile flag. Subsequent calls return immediately without
+     * acquiring the lock (volatile read fast-path), while concurrent first calls are
+     * serialized by the {@code synchronized} block.
+     */
     public static synchronized void ensureClusterRunning() {
         if (clusterReady) {
             return;
@@ -68,6 +76,13 @@ public final class K3sClusterManager {
         clusterReady = true;
     }
 
+    /**
+     * Returns the Fabric8 {@link KubernetesClient} connected to the K3s cluster.
+     *
+     * @return the Kubernetes client for the running K3s cluster
+     * @throws IllegalStateException if the cluster has not been started via
+     *     {@link #ensureClusterRunning()}
+     */
     public static KubernetesClient client() {
         if (kubernetesClient == null) {
             throw new IllegalStateException("K3s cluster not started. Call ensureClusterRunning() first.");
@@ -75,6 +90,13 @@ public final class K3sClusterManager {
         return kubernetesClient;
     }
 
+    /**
+     * Returns the underlying Testcontainers {@link K3sContainer}.
+     *
+     * @return the running K3s container
+     * @throws IllegalStateException if the cluster has not been started via
+     *     {@link #ensureClusterRunning()}
+     */
     public static K3sContainer container() {
         if (k3sContainer == null) {
             throw new IllegalStateException("K3s cluster not started. Call ensureClusterRunning() first.");
@@ -82,10 +104,21 @@ public final class K3sClusterManager {
         return k3sContainer;
     }
 
+    /**
+     * Returns the Kubernetes namespace used for all E2E resources.
+     *
+     * @return always {@code "default"}
+     */
     public static String namespace() {
         return NAMESPACE;
     }
 
+    /**
+     * Returns the Helm release name used in all E2E deployments.
+     * Used as the label value for {@code app.kubernetes.io/instance}.
+     *
+     * @return always {@code "e2e"}
+     */
     public static String releaseName() {
         return RELEASE_NAME;
     }
@@ -119,7 +152,10 @@ public final class K3sClusterManager {
         cachedManifests = HelmRenderer.render(RELEASE_NAME, chartPath, valuesPath);
         applyManifests(cachedManifests);
 
-        // Render and apply Helm hooks (topic creation job)
+        // Render and apply Helm hooks (topic creation job).
+        // Hooks (e.g., pre-install Jobs like Kafka topic creation) are rendered separately
+        // because we bypass Helm's hook lifecycle — we apply raw manifests via Fabric8, so
+        // hooks must be applied explicitly after the main resources.
         String hooks = HelmRenderer.renderHooks(RELEASE_NAME, chartPath, valuesPath);
         if (hooks != null && !hooks.isBlank()) {
             applyManifests(hooks);
@@ -154,6 +190,15 @@ public final class K3sClusterManager {
         K3sImageLoader.loadImages(container(), imageNames);
     }
 
+    /**
+     * Tears down the current Helm deployment.
+     *
+     * <p>Deletes cached Kubernetes manifests and test-data ConfigMaps, then waits up to
+     * 2 minutes for all release-labeled pods to terminate. Resets {@code currentProfile}
+     * so a subsequent {@link #deploy(String)} call triggers a fresh deployment.
+     *
+     * <p>No-op if no deployment is currently active.
+     */
     public static synchronized void teardownDeployment() {
         if (currentProfile == null) {
             return;
@@ -181,6 +226,16 @@ public final class K3sClusterManager {
         cachedManifests = null;
     }
 
+    /**
+     * Creates and starts the K3s container.
+     *
+     * <p>Configures the container with Traefik disabled (the Helm chart uses NodePort/ClusterIP,
+     * not Ingress) and a {@value #K3S_MEMORY_LIMIT_MB}MB memory ceiling to prevent host-level
+     * OOM. Builds a Fabric8 {@link KubernetesClient} from the container's generated kubeconfig.
+     *
+     * <p>Resets the image loader's dedup set via {@link K3sImageLoader#resetLoadedImages()}
+     * since the new containerd instance has no pre-loaded images.
+     */
     private static void startK3s() {
         log.info("Starting K3s container | memoryLimit={}MB", K3S_MEMORY_LIMIT_MB);
         k3sContainer = new K3sContainer(DockerImageName.parse(E2EContainerImages.K3S_IMAGE))
@@ -191,6 +246,7 @@ public final class K3sClusterManager {
                 .withCreateContainerCmdModifier(cmd ->
                         cmd.getHostConfig().withMemory(K3S_MEMORY_LIMIT_BYTES));
         k3sContainer.start();
+        // New K3s containerd instance has no images — clear the dedup set from any previous cluster
         K3sImageLoader.resetLoadedImages();
         log.info("K3s container started | memoryLimit={}MB", K3S_MEMORY_LIMIT_MB);
 
@@ -200,6 +256,17 @@ public final class K3sClusterManager {
         log.info("Kubernetes client connected to K3s cluster");
     }
 
+    /**
+     * Creates two ConfigMaps from classpath CSV resources for E2E test data.
+     *
+     * <p>{@code e2e-test-data} contains single-file CSVs (10-row and 100-row samples
+     * mounted at {@code /data/test/}) and {@code e2e-test-data-multi} contains multi-file
+     * CSVs ({@code file-a/b/c.csv} mounted at {@code /data/test/multi/}).
+     *
+     * <p>Uses {@code createOrUpdate} to be idempotent across profile switches.
+     *
+     * @throws IOException if any CSV resource is not found on the classpath
+     */
     private static void createTestDataConfigMaps() throws IOException {
         // Single-file test data (mounted at /data/test/)
         Map<String, String> singleData = new HashMap<>();
@@ -233,6 +300,14 @@ public final class K3sClusterManager {
         log.info("Created e2e-test-data-multi ConfigMap | keys={}", multiData.keySet());
     }
 
+    /**
+     * Reads a classpath resource and adds it as a String entry in the ConfigMap data map.
+     *
+     * @param data         the mutable data map to add the entry to
+     * @param key          the ConfigMap data key (e.g., {@code "sample-10rows.csv"})
+     * @param resourcePath the classpath resource path to read
+     * @throws IOException if the resource is not found on the classpath
+     */
     private static void addResourceToConfigMap(Map<String, String> data, String key, String resourcePath) throws IOException {
         try (InputStream is = K3sClusterManager.class.getClassLoader().getResourceAsStream(resourcePath)) {
             if (is == null) {
@@ -242,6 +317,14 @@ public final class K3sClusterManager {
         }
     }
 
+    /**
+     * Parses a multi-document YAML string into Kubernetes resources and applies each one
+     * via Fabric8's {@code createOrUpdate}.
+     *
+     * <p>Used for both main chart manifests and hook manifests.
+     *
+     * @param manifests the multi-document YAML string rendered by {@link HelmRenderer}
+     */
     private static void applyManifests(String manifests) {
         List<HasMetadata> resources = kubernetesClient.load(
                 new ByteArrayInputStream(manifests.getBytes(StandardCharsets.UTF_8))).items();
@@ -252,6 +335,14 @@ public final class K3sClusterManager {
         log.info("Applied {} K8s resources", resources.size());
     }
 
+    /**
+     * Parses the multi-document YAML string and deletes each resource.
+     *
+     * <p>Ignores individual delete errors since a resource may already be gone during
+     * teardown (e.g., cascade-deleted by an owner reference).
+     *
+     * @param manifests the multi-document YAML string to parse and delete
+     */
     private static void deleteManifests(String manifests) {
         List<HasMetadata> resources = kubernetesClient.load(
                 new ByteArrayInputStream(manifests.getBytes(StandardCharsets.UTF_8))).items();
@@ -265,6 +356,10 @@ public final class K3sClusterManager {
         }
     }
 
+    /**
+     * Creates a {@link DeploymentWaiter} with {@link PodDiagnostics} and waits up to
+     * {@link #POD_READY_TIMEOUT} (5 minutes) for all release-labeled pods to become ready.
+     */
     private static void waitForPodsReady() {
         PodDiagnostics diagnostics = new PodDiagnostics(kubernetesClient, NAMESPACE);
         DeploymentWaiter waiter = new DeploymentWaiter(
@@ -272,6 +367,15 @@ public final class K3sClusterManager {
         waiter.waitForPodsReady(POD_READY_TIMEOUT);
     }
 
+    /**
+     * Locates the Helm chart directory.
+     *
+     * <p>Tries {@code ../helm/k8s-batch} first (when CWD is the e2e submodule directory),
+     * then {@code ./helm/k8s-batch} (when CWD is the project root).
+     *
+     * @return the absolute path to the Helm chart directory
+     * @throws IllegalStateException if the chart is not found at either location
+     */
     static String resolveChartPath() {
         // First path: running from the e2e-tests submodule directory (parent = project root)
         Path projectRoot = Path.of(System.getProperty("user.dir")).getParent();
@@ -286,6 +390,13 @@ public final class K3sClusterManager {
         return chartPath.toString();
     }
 
+    /**
+     * Resolves a Helm values file from the classpath {@code helm-values/} directory.
+     *
+     * @param valuesFile the values file name (e.g., {@code "values-remote.yaml"})
+     * @return the absolute filesystem path to the resolved values file
+     * @throws IllegalStateException if the file is not found on the classpath
+     */
     static String resolveValuesPath(String valuesFile) {
         var url = K3sClusterManager.class.getClassLoader().getResource("helm-values/" + valuesFile);
         if (url == null) {

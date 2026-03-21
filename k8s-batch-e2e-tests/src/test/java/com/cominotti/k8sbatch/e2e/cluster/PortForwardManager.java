@@ -32,7 +32,9 @@ public final class PortForwardManager implements Closeable {
     /**
      * Port-forwards to a pod matching the given labels.
      *
-     * @return the local port
+     * @param labels        Kubernetes labels used to select the target pod
+     * @param containerPort the port on the container to forward to
+     * @return the locally-allocated port number for the forwarded connection
      */
     public int forwardToService(Map<String, String> labels, int containerPort) {
         List<Pod> pods = client.pods().inNamespace(namespace)
@@ -75,6 +77,11 @@ public final class PortForwardManager implements Closeable {
                 "app.kubernetes.io/component", "mysql"), containerPort);
     }
 
+    /**
+     * Closes all active Fabric8 {@link LocalPortForward} instances. Called by
+     * {@code AbstractE2ETest.tearDown()} after all test methods in a class complete. The K3s
+     * cluster and deployment remain alive for reuse by the next test class.
+     */
     @Override
     public void close() {
         for (LocalPortForward forward : forwards) {

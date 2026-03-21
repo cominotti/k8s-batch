@@ -67,6 +67,26 @@ final class DeploymentWaiter {
         this.diagnostics = diagnostics;
     }
 
+    /**
+     * Main polling loop that waits for all Helm release pods to become ready.
+     *
+     * <p>Runs five detection features on each poll cycle:
+     * <ol>
+     *   <li>Terminal waiting errors (ImagePullBackOff, CrashLoopBackOff, OOMKilled)</li>
+     *   <li>Unschedulable pods (insufficient CPU/memory on the K3s node)</li>
+     *   <li>Init container progress logging (deduplicated)</li>
+     *   <li>Progress stall detection (no new ready pods or init completions within
+     *       {@link #STALL_TIMEOUT})</li>
+     *   <li>Log streaming for pods stuck beyond {@link #LOG_STREAM_THRESHOLD}</li>
+     * </ol>
+     *
+     * <p>Fails fast on terminal errors and stalls rather than waiting for the full timeout.
+     * On timeout, dumps diagnostics via {@link PodDiagnostics} before throwing.
+     *
+     * @param timeout maximum time to wait for all pods to become ready
+     * @throws RuntimeException if pods do not become ready within the timeout, or if a
+     *     terminal error or stall is detected
+     */
     void waitForPodsReady(Duration timeout) {
         log.info("Waiting for pods to become ready | timeout={}", timeout);
         long deadline = System.currentTimeMillis() + timeout.toMillis();
@@ -76,6 +96,7 @@ final class DeploymentWaiter {
             List<Pod> pods = listReleasePods();
 
             if (pods.isEmpty()) {
+                // Give pods time to appear in the API — K3s may still be processing the applied manifests
                 sleep(INITIAL_WAIT);
                 continue;
             }
@@ -112,6 +133,18 @@ final class DeploymentWaiter {
         failWithDiagnostics("Pods did not become ready within " + timeout, pods);
     }
 
+    /**
+     * Checks a single pod for non-recoverable container states via
+     * {@link PodUtils#findTerminalError(Pod)}.
+     *
+     * <p>If a terminal error is found, dumps diagnostics for all pods and throws
+     * immediately — there is no point waiting for a pod stuck in ImagePullBackOff
+     * or CrashLoopBackOff.
+     *
+     * @param pod     the pod to inspect
+     * @param allPods all release pods (passed to diagnostics on failure)
+     * @throws RuntimeException if the pod has a terminal error
+     */
     private void checkTerminalErrors(Pod pod, List<Pod> allPods) {
         String error = PodUtils.findTerminalError(pod);
         if (error != null) {
@@ -120,6 +153,17 @@ final class DeploymentWaiter {
         }
     }
 
+    /**
+     * Checks if a pod has the {@code PodScheduled=False} condition with reason
+     * {@code Unschedulable}.
+     *
+     * <p>This typically means the K3s node lacks sufficient CPU or memory for the pod's
+     * resource requests — a configuration issue that will not resolve by waiting.
+     *
+     * @param pod     the pod to inspect
+     * @param allPods all release pods (passed to diagnostics on failure)
+     * @throws RuntimeException if the pod is unschedulable
+     */
     private void checkUnschedulable(Pod pod, List<Pod> allPods) {
         if (PodUtils.isUnschedulable(pod)) {
             String podName = pod.getMetadata().getName();
@@ -133,6 +177,15 @@ final class DeploymentWaiter {
         }
     }
 
+    /**
+     * Logs init container progress for non-ready pods using
+     * {@link PodUtils#describeInitProgress(Pod)}.
+     *
+     * <p>Deduplicates output by only logging when a pod's progress description changes
+     * (tracked via {@link #lastLoggedProgress}). Clears tracking for pods that become ready.
+     *
+     * @param pods all release pods to inspect
+     */
     private void logInitProgress(List<Pod> pods) {
         for (Pod pod : pods) {
             if (PodUtils.isReady(pod)) {
@@ -150,6 +203,16 @@ final class DeploymentWaiter {
         }
     }
 
+    /**
+     * Streams container logs for pods stuck in a not-ready state beyond
+     * {@link #LOG_STREAM_THRESHOLD} (60 seconds).
+     *
+     * <p>Tails the last {@value #LOG_STREAM_LINES} lines of the main container's logs.
+     * Only streams once per pod (tracked via {@link #logsAlreadyStreamed}). Requires the
+     * main container to be running — cannot tail logs for containers still in init phase.
+     *
+     * @param pods all release pods to inspect
+     */
     private void streamLogsForStuckPods(List<Pod> pods) {
         long now = System.currentTimeMillis();
         for (Pod pod : pods) {
@@ -163,6 +226,8 @@ final class DeploymentWaiter {
             podFirstSeenNotReady.putIfAbsent(podName, now);
             long notReadyDuration = now - podFirstSeenNotReady.get(podName);
 
+            // Only tail logs when the main container is running — init containers run before
+            // the main container starts, and tailing would fail or return empty
             if (notReadyDuration > LOG_STREAM_THRESHOLD.toMillis()
                     && !logsAlreadyStreamed.contains(podName)
                     && PodUtils.hasRunningMainContainer(pod)) {
@@ -182,9 +247,24 @@ final class DeploymentWaiter {
         }
     }
 
+    /**
+     * Detects deployment stalls by tracking two progress metrics: ready pod count and
+     * completed init container count.
+     *
+     * <p>If neither metric improves within {@link #STALL_TIMEOUT} (120 seconds), the
+     * deployment is considered stalled. Both metrics must stall simultaneously — init
+     * container completions alone count as progress even if no new pods become fully ready.
+     *
+     * @param pods       all release pods
+     * @param readyCount number of pods currently in ready state
+     * @throws RuntimeException if the deployment is stalled
+     */
     private void checkProgressStall(List<Pod> pods, int readyCount) {
         int initCompletedCount = countCompletedInitContainers(pods);
 
+        // Either metric advancing counts as progress — init completions matter because a pod
+        // with 3 init containers (e.g., wait-for-mysql, wait-for-kafka, wait-for-schema-registry)
+        // progresses through them before the main container can become ready
         if (readyCount > lastReadyCount || initCompletedCount > lastInitCompletedCount) {
             lastReadyCount = readyCount;
             lastInitCompletedCount = initCompletedCount;
@@ -205,17 +285,43 @@ final class DeploymentWaiter {
         }
     }
 
+    /**
+     * Dumps pod diagnostics (status, logs, events) via {@link PodDiagnostics}, then throws
+     * a {@link RuntimeException}.
+     *
+     * <p>Called by all failure paths to ensure diagnostic output is available before the
+     * exception propagates.
+     *
+     * @param message the error message for the exception
+     * @param pods    all release pods to include in the diagnostic dump
+     * @throws RuntimeException always
+     */
     private void failWithDiagnostics(String message, List<Pod> pods) {
         diagnostics.dumpForPods(pods);
         throw new RuntimeException(message);
     }
 
+    /**
+     * Queries all pods in the namespace with the {@code app.kubernetes.io/instance} label
+     * matching the Helm release name.
+     *
+     * @return list of pods belonging to this Helm release
+     */
     private List<Pod> listReleasePods() {
         return client.pods().inNamespace(namespace)
                 .withLabel("app.kubernetes.io/instance", releaseLabel)
                 .list().getItems();
     }
 
+    /**
+     * Counts init containers across all pods that have terminated successfully (exit code 0).
+     *
+     * <p>Used by {@link #checkProgressStall(List, int)} to track init progress separately
+     * from overall pod readiness.
+     *
+     * @param pods all release pods to inspect
+     * @return total number of successfully completed init containers
+     */
     private static int countCompletedInitContainers(List<Pod> pods) {
         int count = 0;
         for (Pod pod : pods) {
@@ -233,6 +339,15 @@ final class DeploymentWaiter {
         return count;
     }
 
+    /**
+     * Counts all init containers declared in pod specs.
+     *
+     * <p>Used alongside {@link #countCompletedInitContainers(List)} for the progress ratio
+     * in stall error messages.
+     *
+     * @param pods all release pods to inspect
+     * @return total number of declared init containers across all pods
+     */
     private static int countTotalInitContainers(List<Pod> pods) {
         int count = 0;
         for (Pod pod : pods) {
@@ -243,6 +358,14 @@ final class DeploymentWaiter {
         return count;
     }
 
+    /**
+     * {@link Thread#sleep(long)} wrapper that converts {@link InterruptedException} to
+     * {@link RuntimeException} while preserving the interrupt flag via
+     * {@link Thread#currentThread()}.{@link Thread#interrupt() interrupt()}.
+     *
+     * @param duration the duration to sleep
+     * @throws RuntimeException if the thread is interrupted during sleep
+     */
     private static void sleep(Duration duration) {
         try {
             Thread.sleep(duration.toMillis());

@@ -19,6 +19,17 @@ final class HelmRenderer {
     private HelmRenderer() {
     }
 
+    /**
+     * Renders all non-hook templates from the Helm chart by shelling out to {@code helm template}.
+     * Returns the rendered YAML as a string for downstream processing by
+     * {@link K3sClusterManager#applyManifests}.
+     *
+     * @param releaseName Helm release name
+     * @param chartPath   path to the chart directory
+     * @param valuesFile  path to the values YAML
+     * @return rendered multi-document YAML
+     * @throws Exception if helm exits non-zero or times out
+     */
     static String render(String releaseName, String chartPath, String valuesFile) throws Exception {
         return executeHelm(releaseName, chartPath, valuesFile, false);
     }
@@ -32,6 +43,24 @@ final class HelmRenderer {
         return executeHelm(releaseName, chartPath, valuesFile, true);
     }
 
+    /**
+     * Builds and executes a {@code helm template} process. When {@code showOnlyHooks} is
+     * {@code true}, adds {@code --show-only templates/kafka/job-create-topics.yaml} to render
+     * only the Kafka topic-creation hook. Merges stderr into stdout via
+     * {@link ProcessBuilder#redirectErrorStream(boolean)} to prevent deadlock from sequential
+     * stream reads. Waits up to 60 seconds for process completion.
+     *
+     * <p>For hook rendering, a "could not find template" error is expected (standalone profile
+     * has no Kafka hook) and returns empty string instead of throwing.
+     *
+     * @param releaseName   Helm release name
+     * @param chartPath     path to the chart directory
+     * @param valuesFile    path to the values YAML
+     * @param showOnlyHooks if {@code true}, renders only the Kafka topic-creation hook template
+     * @return rendered YAML, or empty string if hook template is absent
+     * @throws RuntimeException if helm exits non-zero (unless expected hook absence) or times out
+     * @throws Exception        if the process cannot be started
+     */
     private static String executeHelm(String releaseName, String chartPath, String valuesFile,
                                        boolean showOnlyHooks) throws Exception {
         ProcessBuilder pb;

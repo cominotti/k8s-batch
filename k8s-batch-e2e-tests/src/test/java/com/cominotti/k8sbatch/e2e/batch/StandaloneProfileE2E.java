@@ -26,11 +26,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class StandaloneProfileE2E extends AbstractE2ETest {
 
+    /** {@inheritDoc} Deploys the standalone profile — app and MySQL only, no Kafka. */
     @Override
     protected String valuesFile() {
         return "e2e-standalone.yaml";
     }
 
+    /**
+     * Verifies that the standalone Helm values produce a deployment with only app and MySQL
+     * pods — no Kafka or Schema Registry. This confirms the Helm chart correctly disables
+     * Kafka resources when {@code kafka.enabled=false} and {@code features.kafka=false}.
+     */
     @Test
     @Order(1)
     void shouldDeployWithoutKafkaPods() {
@@ -54,6 +60,11 @@ class StandaloneProfileE2E extends AbstractE2ETest {
         assertThat(hasMysql).as("MySQL pod should exist").isTrue();
     }
 
+    /**
+     * Verifies that the file-range ETL job completes successfully using in-process
+     * {@code TaskExecutorPartitionHandler} instead of Kafka-based remote partitioning.
+     * Processes a 10-row CSV and confirms all records are written to MySQL.
+     */
     @Test
     @Order(2)
     void shouldRunFileRangeJobInStandaloneMode() throws Exception {
@@ -68,6 +79,11 @@ class StandaloneProfileE2E extends AbstractE2ETest {
         assertThat(recordCount).isEqualTo(10);
     }
 
+    /**
+     * Verifies that the multi-file ETL job completes in standalone mode, processing all
+     * three CSV files (120 rows total) without Kafka. Confirms that the standalone
+     * partitioning path handles multiple files correctly.
+     */
     @Test
     @Order(3)
     void shouldRunMultiFileJobInStandaloneMode() throws Exception {

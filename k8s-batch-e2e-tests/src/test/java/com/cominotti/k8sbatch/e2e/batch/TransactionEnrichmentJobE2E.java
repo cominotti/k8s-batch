@@ -26,16 +26,22 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class TransactionEnrichmentJobE2E extends AbstractE2ETest {
 
+    /** {@inheritDoc} Deploys the full stack — Kafka is both the event source and output sink. */
     @Override
     protected String valuesFile() {
         return "e2e-remote.yaml";
     }
 
+    /** {@inheritDoc} Kafka is required as the source of TransactionEvent messages. */
     @Override
     protected boolean requiresKafka() {
         return true;
     }
 
+    /**
+     * Cleans enriched transaction data before each test, in addition to the base class's
+     * {@code target_records} cleanup. Both tables must be empty to verify correct row counts.
+     */
     @BeforeEach
     void cleanTransactionData() throws Exception {
         if (mysqlVerifier != null) {
@@ -43,6 +49,10 @@ class TransactionEnrichmentJobE2E extends AbstractE2ETest {
         }
     }
 
+    /**
+     * Verifies that the {@code enriched_transactions} table exists, confirming that
+     * Flyway migration V2 ran successfully during application startup.
+     */
     @Test
     void shouldCreateEnrichedTransactionsTable() throws Exception {
         assertThat(mysqlVerifier.tableExists("enriched_transactions"))
@@ -50,6 +60,12 @@ class TransactionEnrichmentJobE2E extends AbstractE2ETest {
                 .isTrue();
     }
 
+    /**
+     * Full end-to-end test: seeds 5 Avro TransactionEvent messages into Kafka via a K8s Job
+     * running {@code kafka-avro-console-producer}, launches the enrichment batch job via
+     * the REST API, and verifies that all 5 events are enriched (exchange rate + risk score)
+     * and persisted to the {@code enriched_transactions} MySQL table.
+     */
     @Test
     void shouldProcessTransactionEventsEndToEnd() throws Exception {
         // Seed 5 test events via K8s Job (kafka-avro-console-producer inside K3s)
@@ -74,6 +90,15 @@ class TransactionEnrichmentJobE2E extends AbstractE2ETest {
                 .isEqualTo(5);
     }
 
+    /**
+     * Generates test TransactionEvent JSON objects with random UUIDs and sequential amounts.
+     * Each event has a unique transactionId (UUID), sequential accountId, increasing amount,
+     * USD currency, and the current timestamp. The JSON format matches the Avro schema
+     * expected by {@code kafka-avro-console-producer}.
+     *
+     * @param count number of test events to generate
+     * @return list of JSON strings, one per event
+     */
     private List<String> createTestEventsJson(int count) {
         List<String> events = new ArrayList<>();
         for (int i = 0; i < count; i++) {
