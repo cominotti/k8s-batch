@@ -127,11 +127,11 @@ schemaRegistry:
   replicaCount: 1
   resources:
     requests:
-      cpu: 50m
-      memory: 128Mi
-    limits:
-      cpu: 250m
+      cpu: 100m
       memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
 
 # Gateway proxies requests to the backend app via Spring Cloud Gateway routes.
 # pullPolicy: Never because the image is built locally and loaded into K3s via
