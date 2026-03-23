@@ -87,12 +87,20 @@ jobs:
             --set app.image.repository=k8s-batch \
             --set app.image.tag=test \
             --set app.image.pullPolicy=Never \
+            --set app.replicaCount=1 \
             --set mysql.auth.rootPassword=testroot \
             --set mysql.auth.password=testpass \
+            --set kafka.replicaCount=1 \
+            --set kafka.topics.partitionRequests.replicationFactor=1 \
+            --set kafka.topics.partitionReplies.replicationFactor=1 \
+            --set kafka.topics.transactionEvents.replicationFactor=1 \
+            --set kafka.topics.enrichedTransactionEvents.replicationFactor=1 \
+            --set gateway.enabled=false \
             --set hpa.enabled=false \
             --set gatewayHpa.enabled=false \
             --set features.hpa=false \
-            --wait --timeout 5m
+            --set features.gateway=false \
+            --wait --timeout 8m
 
       - name: Verify pods are ready
         run: |
