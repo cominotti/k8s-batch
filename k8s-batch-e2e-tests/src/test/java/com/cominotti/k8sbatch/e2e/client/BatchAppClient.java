@@ -28,6 +28,13 @@ public final class BatchAppClient {
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
 
+    /**
+     * Creates an HTTP client for the batch job REST API.
+     * Uses {@link java.net.http.HttpClient} with a 10-second connect timeout.
+     * No Spring dependencies — pure JDK HTTP client.
+     *
+     * @param baseUrl the base URL including scheme and port (e.g., "http://localhost:8080")
+     */
     public BatchAppClient(String baseUrl) {
         this.baseUrl = baseUrl;
         this.httpClient = HttpClient.newBuilder()
@@ -36,6 +43,13 @@ public final class BatchAppClient {
         this.objectMapper = new ObjectMapper();
     }
 
+    /**
+     * Convenience constructor that builds a localhost URL from the given port.
+     * Typically used with the port returned by
+     * {@link com.cominotti.k8sbatch.e2e.cluster.PortForwardManager#forwardToApp()}.
+     *
+     * @param localPort the locally-forwarded port number
+     */
     public BatchAppClient(int localPort) {
         this("http://localhost:" + localPort);
     }
@@ -43,7 +57,10 @@ public final class BatchAppClient {
     /**
      * Launches a batch job.
      *
-     * @return the parsed response containing executionId and status
+     * @param jobName    the Spring Batch job bean name (e.g., "fileRangeEtlJob")
+     * @param parameters job parameters as key-value pairs passed to the job
+     * @return the parsed response containing executionId and initial status
+     * @throws Exception if the HTTP request or JSON parsing fails
      */
     public JobResponse launchJob(String jobName, Map<String, String> parameters) throws Exception {
         String body = objectMapper.writeValueAsString(parameters);
@@ -62,6 +79,11 @@ public final class BatchAppClient {
 
     /**
      * Gets the status of a job execution.
+     *
+     * @param jobName     the job bean name
+     * @param executionId the execution ID returned by {@link #launchJob}
+     * @return the current execution status, or {@code null} if the execution is not found (HTTP 404)
+     * @throws Exception on HTTP or parse errors
      */
     public JobResponse getExecution(String jobName, long executionId) throws Exception {
         HttpRequest request = HttpRequest.newBuilder()
@@ -79,6 +101,12 @@ public final class BatchAppClient {
 
     /**
      * Launches a job and polls until it reaches COMPLETED or FAILED.
+     *
+     * @param jobName    the job bean name
+     * @param parameters job parameters
+     * @param timeout    maximum time to wait for completion
+     * @return the final execution response with COMPLETED or FAILED status
+     * @throws org.awaitility.core.ConditionTimeoutException if the job does not complete within the timeout
      */
     public JobResponse launchJobAndWaitForCompletion(String jobName, Map<String, String> parameters,
                                                       Duration timeout) throws Exception {
@@ -88,6 +116,8 @@ public final class BatchAppClient {
         log.info("Waiting for job completion | jobName={} | executionId={} | timeout={}",
                 jobName, executionId, timeout);
 
+        // Single-element array used to capture the latest poll result inside the Awaitility lambda —
+        // lambdas require effectively-final variables, so a mutable container is needed
         final JobResponse[] result = new JobResponse[1];
         await().atMost(timeout)
                 .pollInterval(Duration.ofSeconds(2))
@@ -122,6 +152,9 @@ public final class BatchAppClient {
 
     /**
      * Checks /actuator/health.
+     *
+     * @return the raw JSON response body from /actuator/health
+     * @throws Exception on HTTP errors
      */
     public String getHealth() throws Exception {
         HttpRequest request = HttpRequest.newBuilder()
@@ -134,6 +167,14 @@ public final class BatchAppClient {
         return response.body();
     }
 
+    /**
+     * Parses a JSON response string from the batch job REST API into a {@link JobResponse} record.
+     * Extracts executionId, jobName, status, and optional exitCode/exitDescription fields.
+     *
+     * @param json the raw JSON response body
+     * @return the parsed response
+     * @throws Exception if JSON parsing fails
+     */
     private JobResponse parseJobResponse(String json) throws Exception {
         JsonNode node = objectMapper.readTree(json);
         return new JobResponse(

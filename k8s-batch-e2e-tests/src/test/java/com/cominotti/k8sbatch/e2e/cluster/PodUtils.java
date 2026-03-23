@@ -24,6 +24,14 @@ public final class PodUtils {
     private PodUtils() {
     }
 
+    /**
+     * Returns {@code true} if the pod has a condition with type "Ready" and status "True". This
+     * is the standard Kubernetes readiness check — a pod is ready when all its containers have
+     * passed their readiness probes and are accepting traffic.
+     *
+     * @param pod the pod to check
+     * @return {@code true} if the pod is ready
+     */
     public static boolean isReady(Pod pod) {
         if (pod.getStatus() == null || pod.getStatus().getConditions() == null) {
             return false;
@@ -116,6 +124,19 @@ public final class PodUtils {
                 .anyMatch(cs -> cs.getState() != null && cs.getState().getRunning() != null);
     }
 
+    /**
+     * Scans a list of container statuses (init or main) for terminal waiting reasons
+     * (ImagePullBackOff, ErrImageNeverPull, CrashLoopBackOff, InvalidImageName) or terminal
+     * terminated reasons (OOMKilled). Returns a formatted error string identifying the pod,
+     * container type, container name, and the specific failure reason, or {@code null} if no
+     * terminal error is found.
+     *
+     * @param podName       name of the pod (used in error message formatting)
+     * @param containerType {@code "initContainer"} or {@code "container"} (used only for the
+     *                      error message formatting)
+     * @param statuses      list of container statuses to scan, may be {@code null}
+     * @return formatted error string, or {@code null} if no terminal error is found
+     */
     private static String checkContainerStatuses(String podName, String containerType,
                                                   List<ContainerStatus> statuses) {
         if (statuses == null) {
@@ -142,6 +163,15 @@ public final class PodUtils {
         return null;
     }
 
+    /**
+     * Maps a Kubernetes {@link ContainerState} to a concise human-readable string for progress
+     * logging. Returns {@code "running"}, {@code "waiting:Reason"},
+     * {@code "terminated:exit=N"}, or {@code "unknown"} depending on which state field is set.
+     * Returns {@code null} if state itself is {@code null}.
+     *
+     * @param state the container state to describe, may be {@code null}
+     * @return human-readable state description, or {@code null} if state is {@code null}
+     */
     private static String describeState(ContainerState state) {
         if (state == null) {
             return null;

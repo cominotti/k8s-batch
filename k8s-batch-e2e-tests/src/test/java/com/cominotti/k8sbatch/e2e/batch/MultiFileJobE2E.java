@@ -19,16 +19,23 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class MultiFileJobE2E extends AbstractE2ETest {
 
+    /** {@inheritDoc} Deploys the remote-partitioning stack with Kafka for file-per-partition distribution. */
     @Override
     protected String valuesFile() {
         return "e2e-remote.yaml";
     }
 
+    /** {@inheritDoc} Kafka is required for distributing one file per partition to workers. */
     @Override
     protected boolean requiresKafka() {
         return true;
     }
 
+    /**
+     * Verifies that all records across three CSV files (file-a: 30, file-b: 40, file-c: 50)
+     * are processed and written to MySQL, totaling 120 rows. This validates the complete
+     * multi-file data path from ConfigMap-mounted files through Kafka partitioning to JDBC writes.
+     */
     @Test
     void shouldProcessMultipleFilesAndWriteAllRecords() throws Exception {
         // Multi-file data is mounted at /data/test/multi/ via ConfigMap
@@ -45,6 +52,12 @@ class MultiFileJobE2E extends AbstractE2ETest {
         assertThat(recordCount).isEqualTo(120);
     }
 
+    /**
+     * Verifies the partition-to-file mapping: exactly 3 worker step executions should be
+     * created within this job execution (one per CSV file). This confirms that the
+     * MultiFilePartitioner correctly assigns one partition per file rather than splitting
+     * files into sub-ranges.
+     */
     @Test
     void shouldCreateOneWorkerStepPerFile() throws Exception {
         JobResponse result = appClient.launchJobAndWaitForCompletion(

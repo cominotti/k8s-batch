@@ -76,6 +76,8 @@ public final class KafkaEventSeeder {
                     .withNamespace(namespace)
                 .endMetadata()
                 .withNewSpec()
+                    // Allow 3 retries — Kafka or Schema Registry may still be initializing
+                    // when the seeder Job starts
                     .withBackoffLimit(3)
                     .withNewTemplate()
                         .withNewSpec()
@@ -128,6 +130,14 @@ public final class KafkaEventSeeder {
         log.info("Seeder Job completed successfully | events={}", eventsJson.size());
     }
 
+    /**
+     * Deletes the previous seeder Job (with background propagation to clean up its pods) and
+     * ConfigMap if they exist. Ignores 404 errors which are expected on the first run when no
+     * previous seeder resources exist. Must run before creating new resources to avoid conflicts.
+     *
+     * @param client    Fabric8 Kubernetes client
+     * @param namespace target namespace
+     */
     private static void cleanupPrevious(KubernetesClient client, String namespace) {
         try {
             client.batch().v1().jobs().inNamespace(namespace).withName(SEEDER_JOB)

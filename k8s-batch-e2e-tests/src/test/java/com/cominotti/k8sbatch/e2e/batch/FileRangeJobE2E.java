@@ -19,16 +19,23 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class FileRangeJobE2E extends AbstractE2ETest {
 
+    /** {@inheritDoc} Deploys the remote-partitioning stack with Kafka for partition distribution. */
     @Override
     protected String valuesFile() {
         return "e2e-remote.yaml";
     }
 
+    /** {@inheritDoc} Kafka is required for remote partitioning of CSV file ranges. */
     @Override
     protected boolean requiresKafka() {
         return true;
     }
 
+    /**
+     * Verifies the basic happy path: a 10-row CSV processed through the file-range job
+     * produces exactly 10 records in MySQL. This is a small input that fits in a single
+     * partition, validating the end-to-end data path without multi-partition complexity.
+     */
     @Test
     void shouldProcessFileRangeJobWith10Rows() throws Exception {
         // The CSV file is mounted at /data/test/sample-10rows.csv via ConfigMap
@@ -45,6 +52,12 @@ class FileRangeJobE2E extends AbstractE2ETest {
         assertThat(recordCount).isEqualTo(10);
     }
 
+    /**
+     * Verifies that a 100-row CSV triggers multiple worker step executions through Kafka
+     * remote partitioning. The partitioner splits the file into line ranges, each assigned
+     * to a separate worker step. Asserts that all 100 records are written and that at least
+     * 2 worker steps were created (confirming partitioning actually occurred).
+     */
     @Test
     void shouldCreateMultipleWorkerSteps() throws Exception {
         // Use 100-row file to ensure multiple partitions
