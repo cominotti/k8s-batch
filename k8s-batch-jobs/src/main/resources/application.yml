@@ -13,7 +13,7 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/k8sbatch?useSSL=false&allowPublicKeyRetrieval=true}
     username: ${SPRING_DATASOURCE_USERNAME:k8sbatch}
     password: ${SPRING_DATASOURCE_PASSWORD:k8sbatch_secret}
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:com.mysql.cj.jdbc.Driver}
 
   batch:
     jdbc:
@@ -24,13 +24,9 @@ spring:
       # Prevent auto-launching jobs at startup — jobs are triggered via the REST API
       enabled: false
 
-  flyway:
+  liquibase:
     enabled: true
-    locations: classpath:db/migration
-    # baseline-on-migrate is needed because the Spring Batch tables are created by the MySQL
-    # init script (not Flyway), so Flyway must treat the pre-existing schema as baseline
-    baseline-on-migrate: true
-    baseline-version: 0
+    change-log: classpath:db/changelog/db.changelog-master.xml
 
 management:
   endpoints:

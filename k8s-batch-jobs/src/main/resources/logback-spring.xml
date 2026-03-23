@@ -45,7 +45,7 @@
         <logger name="org.testcontainers" level="${TEST_LOG_LEVEL}"/>
         <logger name="org.kie" level="${TEST_LOG_LEVEL}"/>
         <logger name="org.drools" level="${TEST_LOG_LEVEL}"/>
-        <logger name="org.flywaydb" level="${TEST_LOG_LEVEL}"/>
+        <logger name="liquibase" level="${TEST_LOG_LEVEL}"/>
         <logger name="com.zaxxer.hikari" level="${TEST_LOG_LEVEL}"/>
         <root level="${TEST_LOG_LEVEL}">
             <appender-ref ref="CONSOLE"/>

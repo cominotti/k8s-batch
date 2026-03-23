@@ -7,12 +7,12 @@ Spring Boot 4.0.3 + Spring Batch 6.x reference project for horizontally-scalable
 ## Tech Stack
 
 - **Java 21**, **Spring Boot 4.0.3**, **Spring Batch 6.0.2**
-- **MySQL 8.0** — JobRepository + application data
+- **MySQL 8.0 / Oracle DB** — JobRepository + application data
 - **Kafka (Confluent Platform 7.9.0, KRaft mode)** — remote partitioning messaging + event streaming
 - **Avro 1.12 + Confluent Schema Registry** — event serialization for transaction enrichment job
 - **Helm 3** — Kubernetes deployment
 - **Testcontainers 2.0.3** — integration tests
-- **Flyway** — database migrations
+- **Liquibase** — database migrations (MySQL + Oracle compatible XML changelogs)
 - **Drools 10.x (classic + rule units) + EVRete + KIE DMN** — rules engine PoC (toggled via `batch.rules.engine` property)
 
 ## Prerequisites
@@ -115,7 +115,7 @@ Use `JacksonJsonSerializer` / `JacksonJsonDeserializer` for Kafka partition requ
 - `TestRestTemplate` is removed. Use `RestClient` with `@LocalServerPort`.
 - `spring-boot-starter-batch-jdbc` is required explicitly for database-backed `JobRepository`.
 - `spring.batch.job.enabled: false` prevents auto-launching jobs at startup.
-- **Auto-configuration modules extracted**: `spring-boot-flyway`, `spring-boot-integration`, `spring-boot-kafka` are separate dependencies in SB4 (not in `spring-boot-autoconfigure`).
+- **Auto-configuration modules extracted**: `spring-boot-liquibase`, `spring-boot-integration`, `spring-boot-kafka` are separate dependencies in SB4 (not in `spring-boot-autoconfigure`).
 - **Multi-module `@SpringBootTest`**: always use `classes = K8sBatchApplication.class` — Spring can't find it by package scanning across modules.
 - **`spring-boot-maven-plugin` classifier**: use `<classifier>exec</classifier>` so dependent modules see the original JAR, not the fat JAR.
 

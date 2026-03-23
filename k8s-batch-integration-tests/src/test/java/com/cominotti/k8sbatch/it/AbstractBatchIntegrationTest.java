@@ -49,14 +49,14 @@ public abstract class AbstractBatchIntegrationTest {
     @Autowired
     protected JdbcTemplate jdbcTemplate;
 
-    /** Fails fast with a clear message if the Flyway migration didn't create the target table. */
+    /** Fails fast with a clear message if the Liquibase migration didn't create the target table. */
     @BeforeEach
     void verifySchemaReady() {
         log.debug("Verifying target_records table exists...");
         Integer tableCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'k8sbatch' AND table_name = 'target_records'",
                 Integer.class);
-        assertThat(tableCount).as("target_records table must exist (Flyway migration)").isEqualTo(1);
+        assertThat(tableCount).as("target_records table must exist (Liquibase migration)").isEqualTo(1);
         log.debug("Schema verification passed: target_records table exists");
     }
 

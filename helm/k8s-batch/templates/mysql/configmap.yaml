@@ -1,4 +1,4 @@
-{{- if .Values.mysql.enabled }}
+{{- if and .Values.mysql.enabled (ne .Values.database.type "oracle") }}
 apiVersion: v1
 kind: ConfigMap
 metadata:

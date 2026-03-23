@@ -14,6 +14,8 @@ public final class TestContainerImages {
     public static final String MYSQL_IMAGE = "mysql:8.0";
     /** IT-module only — Redpanda is not used in E2E tests (which use real Confluent Kafka). */
     public static final String REDPANDA_IMAGE = "docker.redpanda.com/redpandadata/redpanda:v25.1.9";
+    /** Oracle Free for Oracle-specific integration tests. */
+    public static final String ORACLE_FREE_IMAGE = "gvenzl/oracle-free:23-slim-faststart";
 
     private TestContainerImages() {
     }

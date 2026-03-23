@@ -96,6 +96,8 @@ spec:
                 secretKeyRef:
                   name: {{ include "k8s-batch.mysql.secretName" . }}
                   key: password
+            - name: SPRING_DATASOURCE_DRIVER_CLASS_NAME
+              value: {{ include "k8s-batch.datasource.driverClassName" . | quote }}
             - name: SPRING_BATCH_JDBC_INITIALIZE_SCHEMA
               value: {{ .Values.app.config.batchInitializeSchema | quote }}
             {{- if and .Values.kafka.enabled .Values.features.kafka }}

@@ -127,7 +127,7 @@ mvn -pl k8s-batch-integration-tests -am verify -Dit.test=FileRangePartitionStand
 | Batch Standalone | 12 | CSV jobs without Kafka, recovery, skip policies |
 | Batch Remote (CSV) | 10 | CSV jobs with real Kafka partitioning |
 | Batch Remote (Transaction) | 5 | Transaction enrichment job: end-to-end enrichment, exchange rate/risk score validation, upsert idempotency, Kafka transaction verification |
-| Database | 7 | Batch schema, Flyway migrations, constraints |
+| Database | 7 | Batch schema, Liquibase migrations, constraints |
 | Infrastructure | 6 | MySQL/Kafka connectivity smoke tests |
 
 ### Container Startup Optimization
@@ -292,7 +292,7 @@ k8s-batch/
 │       │   └── web/                 # REST controller
 │       └── resources/
 │           ├── application*.yml     # Config per profile
-│           └── db/migration/        # Flyway SQL migrations
+│           └── db/changelog/        # Liquibase XML changelogs
 ├── k8s-batch-integration-tests/     # Integration tests (Redpanda + MySQL)
 │   ├── pom.xml
 │   └── src/test/

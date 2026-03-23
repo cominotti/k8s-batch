@@ -46,7 +46,7 @@ class TransactionEnrichmentJobE2E extends AbstractE2ETest {
     @Test
     void shouldCreateEnrichedTransactionsTable() throws Exception {
         assertThat(mysqlVerifier.tableExists("enriched_transactions"))
-                .as("Flyway V2 migration should create enriched_transactions table")
+                .as("Liquibase migration should create enriched_transactions table")
                 .isTrue();
     }
 

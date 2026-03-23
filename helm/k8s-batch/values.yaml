@@ -221,6 +221,14 @@ hpa:
           periodSeconds: 60
 
 # ======================================================================
+# Database
+# ======================================================================
+# Controls which DDL init scripts and JDBC configuration are rendered.
+# Supported values: "mysql" (default), "oracle"
+database:
+  type: mysql
+
+# ======================================================================
 # MySQL
 # ======================================================================
 mysql:
