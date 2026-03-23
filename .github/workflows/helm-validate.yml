@@ -4,9 +4,12 @@ on:
   push:
     paths:
       - 'helm/**'
+      - '.github/workflows/helm-validate.yml'
   pull_request:
     paths:
       - 'helm/**'
+      - '.github/workflows/helm-validate.yml'
+  workflow_dispatch:
 
 jobs:
   lint-and-unittest:
