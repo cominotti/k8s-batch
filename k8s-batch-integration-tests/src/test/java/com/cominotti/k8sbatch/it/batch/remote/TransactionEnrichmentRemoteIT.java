@@ -118,7 +118,7 @@ class TransactionEnrichmentRemoteIT extends AbstractBatchIntegrationTest {
         assertThat(((Number) row.get("amount_usd")).doubleValue())
                 .isCloseTo(5400.0, org.assertj.core.data.Offset.offset(0.01));
         // 5400 USD is MEDIUM risk (1000 <= x < 10000)
-        assertThat(row.get("risk_score")).isEqualTo("MEDIUM");
+        assertThat(row).containsEntry("risk_score", "MEDIUM");
     }
 
     @Test
@@ -235,9 +235,9 @@ class TransactionEnrichmentRemoteIT extends AbstractBatchIntegrationTest {
                     emptyPolls++;
                 } else {
                     emptyPolls = 0;
-                    records.forEach(record -> {
-                        if (record.value().getTransactionId().startsWith(txIdPrefix)) {
-                            results.add(record.value());
+                    records.forEach(consumerRecord -> {
+                        if (consumerRecord.value().getTransactionId().startsWith(txIdPrefix)) {
+                            results.add(consumerRecord.value());
                         }
                     });
                     if (results.size() >= expectedCount) {

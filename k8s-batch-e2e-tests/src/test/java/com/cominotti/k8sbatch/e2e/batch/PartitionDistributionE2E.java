@@ -70,9 +70,9 @@ class PartitionDistributionE2E extends AbstractE2ETest {
 
         // All steps should be COMPLETED
         for (Map<String, Object> step : steps) {
-            assertThat(step.get("STATUS"))
+            assertThat(step)
                     .as("Step %s should be COMPLETED", step.get("STEP_NAME"))
-                    .isEqualTo("COMPLETED");
+                    .containsEntry("STATUS", "COMPLETED");
         }
 
         // Total read count across workers should equal 100

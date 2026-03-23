@@ -376,7 +376,7 @@ final class DeploymentWaiter {
      */
     private static void sleep(Duration duration) {
         try {
-            Thread.sleep(duration.toMillis());
+            Thread.sleep(duration);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Interrupted while waiting for pods", e);

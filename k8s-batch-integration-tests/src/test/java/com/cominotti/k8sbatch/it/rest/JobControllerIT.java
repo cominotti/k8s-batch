@@ -12,7 +12,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.HttpServerErrorException;
 
 import java.nio.file.Path;
 import java.util.Map;
@@ -73,12 +72,11 @@ class JobControllerIT extends AbstractIntegrationTest {
 
     @Test
     void shouldReturnBadRequestForUnknownJob() {
-        assertThatThrownBy(() -> restClient().post()
+        var requestSpec = restClient().post()
                 .uri("/api/jobs/nonExistentJob")
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of())
-                .retrieve()
-                .body(String.class))
+                .body(Map.of());
+        assertThatThrownBy(() -> requestSpec.retrieve().body(String.class))
                 .isInstanceOf(HttpClientErrorException.class); // HTTP 400 Bad Request
     }
 

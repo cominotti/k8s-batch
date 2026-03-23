@@ -12,6 +12,7 @@ import org.evrete.api.Knowledge;
 import org.evrete.api.StatefulSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -44,6 +45,7 @@ public class EvreteTransactionRulesEvaluator implements TransactionRulesEvaluato
      * Initializes the EVRete knowledge service and compiles rules using the fluent Java API.
      * Rule constants (exchange rates, risk thresholds) are sourced from the shared domain record.
      */
+    @Autowired
     public EvreteTransactionRulesEvaluator() {
         this(EnrichmentRuleConstants.DEFAULTS);
     }

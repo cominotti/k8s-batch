@@ -87,6 +87,6 @@ class DeployHealthCheckE2E extends AbstractE2ETest {
         int count = mysqlVerifier.countTargetRecords();
 
         // Table exists and is empty initially
-        assertThat(count).isEqualTo(0);
+        assertThat(count).isZero();
     }
 }

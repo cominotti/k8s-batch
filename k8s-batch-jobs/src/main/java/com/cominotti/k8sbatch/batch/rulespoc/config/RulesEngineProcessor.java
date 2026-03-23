@@ -32,14 +32,18 @@ public class RulesEngineProcessor
      */
     public RulesEngineProcessor(TransactionRulesEvaluator rulesEvaluator) {
         this.rulesEvaluator = rulesEvaluator;
-        log.info("RulesEngineProcessor initialized | engine={}", rulesEvaluator.engineName());
+        if (log.isInfoEnabled()) {
+            log.info("RulesEngineProcessor initialized | engine={}", rulesEvaluator.engineName());
+        }
     }
 
     @Override
     public EnrichedFinancialTransaction process(FinancialTransaction transaction) {
-        log.debug("Evaluating rules | engine={} | transactionId={} | currency={} | amount={}",
-                rulesEvaluator.engineName(), transaction.transactionId(),
-                transaction.currency(), transaction.amount());
+        if (log.isDebugEnabled()) {
+            log.debug("Evaluating rules | engine={} | transactionId={} | currency={} | amount={}",
+                    rulesEvaluator.engineName(), transaction.transactionId(),
+                    transaction.currency(), transaction.amount());
+        }
 
         return rulesEvaluator.evaluate(transaction);
     }

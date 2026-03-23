@@ -36,6 +36,7 @@ import java.util.Map;
 public class JobController {
 
     private static final Logger log = LoggerFactory.getLogger(JobController.class);
+    private static final String FAILED_STATUS = "FAILED";
 
     private final JobOperator asyncJobOperator;
     private final JobRepository jobRepository;
@@ -78,7 +79,7 @@ public class JobController {
         if (job == null) {
             log.warn("Unknown job requested | jobName={} | available={}", safeJobName, jobRegistry.keySet());
             return ResponseEntity.badRequest()
-                    .body(new JobExecutionResponse(-1, jobName, "FAILED", "FAILED",
+                    .body(new JobExecutionResponse(-1, jobName, FAILED_STATUS, FAILED_STATUS,
                             "Unknown job: " + jobName + ". Available: " + jobRegistry.keySet()));
         }
 
@@ -103,7 +104,7 @@ public class JobController {
         } catch (Exception e) {
             log.error("Failed to launch job | jobName={}", safeJobName, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new JobExecutionResponse(-1, jobName, "FAILED", "FAILED", e.getMessage()));
+                    .body(new JobExecutionResponse(-1, jobName, FAILED_STATUS, FAILED_STATUS, e.getMessage()));
         }
     }
 
