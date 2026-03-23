@@ -36,6 +36,10 @@ spec:
       initContainers:
         - name: wait-for-mysql
           image: "{{ .Values.global.initImage.repository }}:{{ .Values.global.initImage.tag }}"
+          # busybox runs as root — override pod-level runAsNonRoot for init containers
+          securityContext:
+            runAsNonRoot: false
+            runAsUser: 0
           command:
             - sh
             - -c
@@ -49,6 +53,9 @@ spec:
         # ClusterIP service may not be ready before at least one Kafka pod passes readiness
         - name: wait-for-kafka
           image: "{{ .Values.global.initImage.repository }}:{{ .Values.global.initImage.tag }}"
+          securityContext:
+            runAsNonRoot: false
+            runAsUser: 0
           command:
             - sh
             - -c
@@ -62,6 +69,9 @@ spec:
         {{- if and .Values.kafka.enabled .Values.features.kafka .Values.schemaRegistry.enabled .Values.features.schemaRegistry }}
         - name: wait-for-schema-registry
           image: "{{ .Values.global.initImage.repository }}:{{ .Values.global.initImage.tag }}"
+          securityContext:
+            runAsNonRoot: false
+            runAsUser: 0
           command:
             - sh
             - -c

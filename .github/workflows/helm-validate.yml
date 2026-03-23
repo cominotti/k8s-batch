@@ -90,6 +90,7 @@ jobs:
             --set mysql.auth.rootPassword=testroot \
             --set mysql.auth.password=testpass \
             --set hpa.enabled=false \
+            --set gatewayHpa.enabled=false \
             --set features.hpa=false \
             --wait --timeout 5m
 

@@ -36,6 +36,9 @@ spec:
       initContainers:
         - name: wait-for-app
           image: "{{ .Values.global.initImage.repository }}:{{ .Values.global.initImage.tag }}"
+          securityContext:
+            runAsNonRoot: false
+            runAsUser: 0
           command:
             - sh
             - -c
