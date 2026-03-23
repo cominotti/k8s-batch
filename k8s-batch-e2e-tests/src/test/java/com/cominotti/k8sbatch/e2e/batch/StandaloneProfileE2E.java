@@ -3,6 +3,7 @@
 package com.cominotti.k8sbatch.e2e.batch;
 
 import com.cominotti.k8sbatch.e2e.AbstractE2ETest;
+import com.cominotti.k8sbatch.e2e.E2EProfile;
 import com.cominotti.k8sbatch.e2e.client.BatchAppClient.JobResponse;
 import com.cominotti.k8sbatch.e2e.cluster.K3sClusterManager;
 import io.fabric8.kubernetes.api.model.Pod;
@@ -23,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Kafka-based remote partitioning. Verifies that no Kafka pods are created, and that both
  * the file-range and multi-file ETL jobs complete successfully without messaging infrastructure.
  */
+@E2EProfile("e2e-standalone.yaml")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class StandaloneProfileE2E extends AbstractE2ETest {
 

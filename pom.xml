@@ -45,6 +45,8 @@
         <evrete.version>4.0.3</evrete.version>
         <ojdbc11.version>23.7.0.25.01</ojdbc11.version>
         <spring-cloud.version>2025.1.1</spring-cloud.version>
+        <rabbitmq-jms.version>3.5.0</rabbitmq-jms.version>
+        <amazon-sqs-jms.version>2.1.4</amazon-sqs-jms.version>
         <bucket4j.version>8.15.0</bucket4j.version>
         <!-- Test output verbosity: override with -Dtest.log.level=DEBUG -DredirectTestOutputToFile=false -->
         <test.log.level>WARN</test.log.level>
@@ -84,6 +86,17 @@
                 <version>${spring-cloud.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <!-- JMS client libraries for RabbitMQ and SQS (not BOM-managed) -->
+            <dependency>
+                <groupId>com.rabbitmq.jms</groupId>
+                <artifactId>rabbitmq-jms</artifactId>
+                <version>${rabbitmq-jms.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.amazonaws</groupId>
+                <artifactId>amazon-sqs-java-messaging-lib</artifactId>
+                <version>${amazon-sqs-jms.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.testcontainers</groupId>

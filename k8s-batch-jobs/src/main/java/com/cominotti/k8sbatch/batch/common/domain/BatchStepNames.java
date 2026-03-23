@@ -16,7 +16,7 @@ public final class BatchStepNames {
     public static final String FILE_RANGE_ETL_JOB = "fileRangeEtlJob";
     public static final String MULTI_FILE_ETL_JOB = "multiFileEtlJob";
 
-    // Manager step names — used in StandaloneJobConfig and RemotePartitioningJobConfig
+    // Manager step names — used in StandaloneJobConfig and RemotePartitioningBaseConfig
     public static final String FILE_RANGE_MANAGER_STEP = "fileRangeManagerStep";
     public static final String MULTI_FILE_MANAGER_STEP = "multiFileManagerStep";
 

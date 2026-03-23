@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package com.cominotti.k8sbatch.it.batch.remote;
+package com.cominotti.k8sbatch.it.batch.jms;
 
 import com.cominotti.k8sbatch.it.AbstractBatchIntegrationTest;
-import com.cominotti.k8sbatch.it.config.SharedContainersConfig;
+import com.cominotti.k8sbatch.it.config.JmsContainersConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.job.JobExecution;
@@ -15,10 +15,14 @@ import org.springframework.test.context.ActiveProfiles;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Validates the file-range ETL job under Kafka-based remote partitioning (Redpanda). */
-@Import(SharedContainersConfig.class)
-@ActiveProfiles({"integration-test", "remote-partitioning", "remote-kafka"})
-class FileRangePartitionRemoteIT extends AbstractBatchIntegrationTest {
+/**
+ * Validates the file-range ETL job under JMS-based remote partitioning (RabbitMQ via JMS client).
+ * The same {@code RemotePartitioningJmsConfig} would work with SQS — this test validates the
+ * JMS transport layer is functionally correct.
+ */
+@Import(JmsContainersConfig.class)
+@ActiveProfiles({"integration-test", "remote-partitioning", "remote-jms"})
+class FileRangePartitionJmsIT extends AbstractBatchIntegrationTest {
 
     @Autowired
     @Qualifier("fileRangeJobOperatorTestUtils")
@@ -45,18 +49,6 @@ class FileRangePartitionRemoteIT extends AbstractBatchIntegrationTest {
     }
 
     @Test
-    void shouldDistributePartitionsEvenly() throws Exception {
-        String inputFile = testResourcePath("test-data/csv/single/sample-100rows.csv");
-
-        JobExecution execution = jobOperatorTestUtils.startJob(fileRangeJobParams(inputFile));
-
-        long workerSteps = execution.getStepExecutions().stream()
-                .filter(s -> s.getStepName().contains("Worker"))
-                .count();
-        assertThat(workerSteps).isGreaterThan(1);
-    }
-
-    @Test
     void shouldPersistPartitionMetadata() throws Exception {
         String inputFile = testResourcePath("test-data/csv/single/sample-100rows.csv");
 
@@ -66,5 +58,17 @@ class FileRangePartitionRemoteIT extends AbstractBatchIntegrationTest {
                 "SELECT COUNT(*) FROM BATCH_STEP_EXECUTION WHERE STEP_NAME LIKE '%Worker%'",
                 Integer.class);
         assertThat(stepCount).isGreaterThan(0);
+    }
+
+    @Test
+    void shouldDistributePartitionsEvenly() throws Exception {
+        String inputFile = testResourcePath("test-data/csv/single/sample-100rows.csv");
+
+        JobExecution execution = jobOperatorTestUtils.startJob(fileRangeJobParams(inputFile));
+
+        long workerSteps = execution.getStepExecutions().stream()
+                .filter(s -> s.getStepName().contains("Worker"))
+                .count();
+        assertThat(workerSteps).isGreaterThan(1);
     }
 }

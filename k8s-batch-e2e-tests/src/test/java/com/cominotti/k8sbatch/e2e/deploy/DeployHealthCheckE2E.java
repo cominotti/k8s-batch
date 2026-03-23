@@ -3,6 +3,7 @@
 package com.cominotti.k8sbatch.e2e.deploy;
 
 import com.cominotti.k8sbatch.e2e.AbstractE2ETest;
+import com.cominotti.k8sbatch.e2e.E2EProfile;
 import com.cominotti.k8sbatch.e2e.cluster.K3sClusterManager;
 import com.cominotti.k8sbatch.e2e.cluster.PodUtils;
 import io.fabric8.kubernetes.api.model.Pod;
@@ -21,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * endpoint returns UP, and the MySQL target table is accessible. This test runs before any batch
  * job tests to catch deployment-level issues early.
  */
+@E2EProfile("e2e-remote.yaml")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class DeployHealthCheckE2E extends AbstractE2ETest {
 

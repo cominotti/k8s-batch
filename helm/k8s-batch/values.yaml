@@ -5,6 +5,9 @@ global:
   initImage:
     repository: busybox
     tag: "1.36"
+  # Sleep interval (seconds) for init container retry loops (nc -z, wget).
+  # Override to 1 in E2E values for faster service detection.
+  initSleepSeconds: 3
 
 # ======================================================================
 # Application

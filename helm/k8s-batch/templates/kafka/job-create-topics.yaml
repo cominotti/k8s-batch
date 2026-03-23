@@ -31,7 +31,7 @@ spec:
             - |
               until nc -z {{ include "k8s-batch.fullname" . }}-kafka {{ .Values.kafka.service.port }}; do
                 echo "Waiting for Kafka broker..."
-                sleep 5
+                sleep {{ .Values.global.initSleepSeconds }}
               done
       containers:
         - name: create-topics

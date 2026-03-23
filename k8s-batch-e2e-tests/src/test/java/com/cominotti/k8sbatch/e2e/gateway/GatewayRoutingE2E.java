@@ -3,6 +3,7 @@
 package com.cominotti.k8sbatch.e2e.gateway;
 
 import com.cominotti.k8sbatch.e2e.AbstractE2ETest;
+import com.cominotti.k8sbatch.e2e.E2EProfile;
 import com.cominotti.k8sbatch.e2e.client.BatchAppClient.JobResponse;
 import com.cominotti.k8sbatch.e2e.cluster.K3sClusterManager;
 import com.cominotti.k8sbatch.e2e.cluster.PodUtils;
@@ -24,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * MySQL, and Kafka pods, proxying HTTP traffic via Spring Cloud Gateway routes.
  * Tests are ordered: infrastructure checks first, then functional routing tests.
  */
+@E2EProfile("e2e-remote.yaml")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class GatewayRoutingE2E extends AbstractE2ETest {
 

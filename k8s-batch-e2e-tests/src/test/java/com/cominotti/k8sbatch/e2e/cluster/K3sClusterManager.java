@@ -241,7 +241,7 @@ public final class K3sClusterManager {
         log.info("Starting K3s container | memoryLimit={}MB", K3S_MEMORY_LIMIT_MB);
         k3sContainer = new K3sContainer(DockerImageName.parse(E2EContainerImages.K3S_IMAGE))
                 // Traefik disabled — the Helm chart uses NodePort/ClusterIP, not Ingress
-                .withCommand("server", "--disable=traefik")
+                .withCommand("server", "--disable=traefik,servicelb,metrics-server")
                 // Memory ceiling: OOM surfaces as pod OOMKilled (detected by DeploymentWaiter)
                 // instead of an opaque Docker daemon kill at the host level
                 .withCreateContainerCmdModifier(cmd ->

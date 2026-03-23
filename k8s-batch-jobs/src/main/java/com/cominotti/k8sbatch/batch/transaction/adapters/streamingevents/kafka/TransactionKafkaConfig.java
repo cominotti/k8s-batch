@@ -31,7 +31,7 @@ import java.util.Map;
 /**
  * Kafka factories for the transaction enrichment job using Avro serialization with Schema Registry.
  *
- * <p>These factories are completely separate from the {@code RemotePartitioningJobConfig} factories
+ * <p>These factories are completely separate from the {@code RemotePartitioningKafkaConfig} factories
  * which use {@code ByteArraySerializer/Deserializer} for {@code StepExecutionRequest} messages.
  * Bean names are explicitly qualified to avoid autowiring collisions.
  *
@@ -68,7 +68,7 @@ import java.util.Map;
  * </ul>
  */
 @Configuration
-@Profile("remote-partitioning")
+@Profile("remote-kafka")
 public class TransactionKafkaConfig {
 
     private static final Logger log = LoggerFactory.getLogger(TransactionKafkaConfig.class);

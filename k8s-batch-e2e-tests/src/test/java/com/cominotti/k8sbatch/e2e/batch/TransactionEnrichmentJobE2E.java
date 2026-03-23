@@ -4,6 +4,7 @@ package com.cominotti.k8sbatch.e2e.batch;
 
 import com.cominotti.k8sbatch.batch.transaction.domain.TransactionTopicNames;
 import com.cominotti.k8sbatch.e2e.AbstractE2ETest;
+import com.cominotti.k8sbatch.e2e.E2EProfile;
 import com.cominotti.k8sbatch.e2e.client.BatchAppClient.JobResponse;
 import com.cominotti.k8sbatch.e2e.client.KafkaEventSeeder;
 import com.cominotti.k8sbatch.e2e.cluster.K3sClusterManager;
@@ -24,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Seeds Avro TransactionEvent messages via a Kubernetes Job (kafka-avro-console-producer),
  * then launches the batch job via REST API and verifies enriched records in MySQL.
  */
+@E2EProfile("e2e-remote.yaml")
 class TransactionEnrichmentJobE2E extends AbstractE2ETest {
 
     /** {@inheritDoc} Deploys the full stack — Kafka is both the event source and output sink. */

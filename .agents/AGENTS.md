@@ -101,12 +101,15 @@ Use `JacksonJsonSerializer` / `JacksonJsonDeserializer` for Kafka partition requ
 - **MySQL**: `org.testcontainers.mysql.MySQLContainer` (not `org.testcontainers.containers.MySQLContainer`). **Non-generic** — no `<?>` wildcard.
 - **Redpanda** (replaces Confluent Kafka for integration tests): `org.testcontainers.redpanda.RedpandaContainer` — Kafka-compatible broker with built-in Schema Registry. Use `getBootstrapServers()` for Kafka API, `getSchemaRegistryAddress()` for Schema Registry URL. Much faster startup (~5-10s vs 30-60s for Confluent Kafka). E2E tests still use real Confluent Kafka via the Helm chart.
 - **`@ServiceConnection`** handles JDBC wiring automatically — never use `@DynamicPropertySource` for MySQL
-- **Kafka bootstrap servers** are set via `System.setProperty` in `ContainerHolder` (Kafka `@ServiceConnection` requires `spring-boot-kafka` which conflicts with manual `RemotePartitioningJobConfig`)
+- **Kafka bootstrap servers** are set via `System.setProperty` in `ContainerHolder` (Kafka `@ServiceConnection` requires `spring-boot-kafka` which conflicts with manual `RemotePartitioningKafkaConfig`)
 - **Schema Registry URL** is set via `System.setProperty("spring.kafka.properties.schema.registry.url", REDPANDA.getSchemaRegistryAddress())` in `ContainerHolder.startAll()`
+- **RabbitMQ (JMS tests)**: `JmsContainersConfig` creates a JMS `ConnectionFactory` bean (`RMQConnectionFactory`) wired to the Testcontainer RabbitMQ instance
 - **Container lifecycle** is managed by `ContainerHolder` (not directly in config classes):
-  - `ContainerHolder.startMysqlOnly()` — standalone tests, skips Redpanda entirely
-  - `ContainerHolder.startAll()` — parallel startup via `Startables.deepStart()` for remote tests
+  - `ContainerHolder.startMysqlOnly()` — standalone tests, skips all brokers
+  - `ContainerHolder.startAll()` — parallel startup of MySQL + Redpanda for Kafka remote tests
+  - `ContainerHolder.startMysqlAndRabbitMq()` — parallel startup for JMS remote tests
   - `SharedContainersConfig` delegates to `ContainerHolder.startAll()` + creates Kafka topics
+  - `JmsContainersConfig` delegates to `ContainerHolder.startMysqlAndRabbitMq()` + creates JMS `ConnectionFactory`
   - `MysqlOnlyContainersConfig` delegates to `ContainerHolder.startMysqlOnly()`
 - **Parallel startup**: use `Startables.deepStart(Stream.of(MYSQL, REDPANDA)).join()` — not sequential `.start()` calls
 
@@ -128,11 +131,18 @@ Use `JacksonJsonSerializer` / `JacksonJsonDeserializer` for Kafka partition requ
 
 ## Profile Strategy
 
-| Profile | Activation | Kafka Required | Description |
-|---------|-----------|----------------|-------------|
-| `remote-partitioning` | Default | Yes | Remote partitioning via Kafka |
-| `standalone` | `--spring.profiles.active=standalone` | No | In-process `TaskExecutorPartitionHandler` |
+Remote partitioning uses composable profiles: a shared `remote-partitioning` base profile paired with a transport-specific sub-profile.
+
+| Profile | Activation | Broker | Description |
+|---------|-----------|--------|-------------|
+| `remote-partitioning,remote-kafka` | Default | Kafka | Kafka-based remote partitioning + transaction enrichment job |
+| `remote-partitioning,remote-jms` | `--spring.profiles.active=remote-partitioning,remote-jms` | RabbitMQ or SQS | JMS-based remote partitioning via `spring-integration-jms`. Broker selected by `ConnectionFactory` bean (`RMQConnectionFactory` for RabbitMQ, `SQSConnectionFactory` for AWS SQS). |
+| `standalone` | `--spring.profiles.active=standalone` | None | In-process `TaskExecutorPartitionHandler` |
 | `integration-test` | Test classes only | Depends on test | Test-specific config (schema auto-create, WARN logging by default — override with `-Dtest.log.level=DEBUG`) |
+
+**Architecture**: `RemotePartitioningBaseConfig` (`@Profile("remote-partitioning")`) provides shared beans (manager step factory, `DirectChannel`, `StepExecutionRequestHandler`, manager steps). Transport configs provide outbound/inbound `IntegrationFlow` beans: `RemotePartitioningKafkaConfig` (`@Profile("remote-kafka")`) for native Kafka, `RemotePartitioningJmsConfig` (`@Profile("remote-jms")`) for JMS-compatible brokers (RabbitMQ, SQS).
+
+**Transaction enrichment job** is gated on `@Profile("remote-kafka")` — it requires Kafka (Avro + Schema Registry) regardless of which transport is used for partitioning.
 
 ## Batch Job Design
 
@@ -142,14 +152,14 @@ Both CSV jobs follow the same pattern: **Partitioner → Manager Step → Worker
 
 - `FileRangePartitioner` — splits a CSV by line ranges
 - `MultiFilePartitioner` — assigns one CSV file per partition
-- Manager step: `RemotePartitioningJobConfig` (Kafka) or `StandaloneJobConfig` (local threads)
+- Manager step: `RemotePartitioningBaseConfig` (shared) + transport config (Kafka/AMQP/SQS) or `StandaloneJobConfig` (local threads)
 - Worker step: `FlatFileItemReader` → `CsvRecordProcessor` → `JdbcBatchItemWriter`
 
 ### Transaction Enrichment Job (transactionEnrichmentJob)
 
 Single chunk step (not partitioned) — reads Avro `TransactionEvent` from Kafka, enriches with exchange rate + risk score, writes to both MySQL and Kafka output topic via `CompositeItemWriter`.
 
-- **Config**: `TransactionEnrichmentJobConfig` + `TransactionKafkaConfig` (both `@Profile("remote-partitioning")`)
+- **Config**: `TransactionEnrichmentJobConfig` + `TransactionKafkaConfig` (both `@Profile("remote-kafka")`)
 - **Properties**: `TransactionJobProperties` bound to `batch.transaction.*`
 - **Avro schemas**: `k8s-batch-jobs/src/main/avro/` (generates Java classes via `avro-maven-plugin`)
 - **DB writer**: `EnrichedTransactionWriter` — upsert via `ON DUPLICATE KEY UPDATE` for idempotency
@@ -301,16 +311,17 @@ k8s-batch-jobs/src/main/java/com/cominotti/k8sbatch/
   batch/rulespoc/adapters/persistingresults/jdbc/  — EnrichedFinancialTransactionWriter
   batch/rulespoc/adapters/readingcsv/file/         — FinancialTransactionReaderFactory
   batch/rulespoc/config/      — RulesEnginePocJobConfig, RulesEngineProcessor, RulesEngineProperties
-  config/             — RemotePartitioningJobConfig, StandaloneJobConfig
+  config/             — RemotePartitioningBaseConfig, RemotePartitioningKafkaConfig, RemotePartitioningJmsConfig, StandaloneJobConfig
   web/adapters/launchingjobs/rest/ — JobController, HelloController
   web/config/         — AsyncJobOperatorConfig
   web/dto/            — JobExecutionResponse
 
 k8s-batch-integration-tests/src/test/java/com/cominotti/k8sbatch/it/
-  config/             — ContainerHolder, SharedContainersConfig, MysqlOnlyContainersConfig, BatchTestJobConfig
+  config/             — ContainerHolder, SharedContainersConfig, JmsContainersConfig, MysqlOnlyContainersConfig, BatchTestJobConfig
   rest/               — REST endpoint tests
   batch/standalone/   — standalone batch tests
-  batch/remote/       — remote partitioning tests
+  batch/remote/       — Kafka remote partitioning tests
+  batch/jms/          — JMS remote partitioning tests (RabbitMQ via JMS client)
   database/           — schema verification tests
   infra/              — connectivity smoke tests
 

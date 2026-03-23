@@ -1,0 +1,7 @@
+# Kafka transport profile for remote partitioning.
+# Excludes JMS auto-configuration since only Kafka is used for both partition request messaging
+# and the transaction enrichment job.
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jms.JmsAutoConfiguration

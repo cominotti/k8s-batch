@@ -5,9 +5,10 @@ spring:
   application:
     name: k8s-batch
   profiles:
-    # Default profile — loads RemotePartitioningJobConfig (Kafka-based).
-    # Use --spring.profiles.active=standalone to switch to TaskExecutorPartitionHandler (no Kafka).
-    default: remote-partitioning
+    # Default profiles — loads shared RemotePartitioningBaseConfig + Kafka transport.
+    # Use --spring.profiles.active=standalone to switch to TaskExecutorPartitionHandler (no broker).
+    # Use --spring.profiles.active=remote-partitioning,remote-jms for JMS transport (RabbitMQ/SQS).
+    default: remote-partitioning,remote-kafka
 
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/k8sbatch?useSSL=false&allowPublicKeyRetrieval=true}

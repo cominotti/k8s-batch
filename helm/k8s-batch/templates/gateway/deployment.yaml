@@ -45,7 +45,7 @@ spec:
             - |
               until wget --spider --timeout=2 http://{{ include "k8s-batch.fullname" . }}:{{ .Values.app.service.port }}/actuator/health/readiness 2>/dev/null; do
                 echo "Waiting for app readiness..."
-                sleep 3
+                sleep {{ .Values.global.initSleepSeconds }}
               done
       containers:
         - name: gateway

@@ -4,6 +4,7 @@ package com.cominotti.k8sbatch.it.config;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.RabbitMQContainer;
 import org.testcontainers.oracle.OracleContainer;
 import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.mysql.MySQLContainer;
@@ -20,7 +21,8 @@ import java.util.stream.Stream;
  * Holds shared Testcontainer instances with decoupled lifecycle.
  * <p>
  * Standalone tests call {@link #startMysqlOnly()} to avoid starting Redpanda.
- * Remote-partitioning tests call {@link #startAll()} to start both in parallel.
+ * Kafka remote-partitioning tests call {@link #startAll()} to start MySQL + Redpanda in parallel.
+ * JMS remote-partitioning tests call {@link #startMysqlAndRabbitMq()} to start MySQL + RabbitMQ.
  */
 final class ContainerHolder {
 
@@ -36,12 +38,17 @@ final class ContainerHolder {
             new RedpandaContainer(TestContainerImages.REDPANDA_IMAGE)
                     .withStartupTimeout(Duration.ofSeconds(120));
 
+    // Lazily initialized — RabbitMQ is only needed by JMS integration tests, so we avoid Docker
+    // daemon contact and Ryuk registration overhead for Kafka and standalone test runs.
+    private static RabbitMQContainer rabbitmq;
+
     // Lazily initialized — Oracle is only needed by OracleSchemaIT, so we avoid Docker daemon
     // contact and Ryuk registration overhead for the majority of tests that don't use Oracle.
     private static OracleContainer oracle;
 
     private static volatile boolean mysqlStarted = false;
     private static volatile boolean redpandaStarted = false;
+    private static volatile boolean rabbitmqStarted = false;
     private static volatile boolean oracleStarted = false;
 
     static synchronized void startMysqlOnly() {
@@ -90,6 +97,37 @@ final class ContainerHolder {
         log.debug("Set spring.kafka.bootstrap-servers={}", bootstrapServers);
         log.debug("Set spring.kafka.properties.schema.registry.url={}", schemaRegistryUrl);
         redpandaStarted = true;
+    }
+
+    static synchronized void startMysqlAndRabbitMq() {
+        if (mysqlStarted && rabbitmqStarted) {
+            return;
+        }
+        rabbitmq = new RabbitMQContainer(TestContainerImages.RABBITMQ_IMAGE);
+        if (!mysqlStarted && !rabbitmqStarted) {
+            log.info("Starting MySQL and RabbitMQ containers in parallel | mysqlImage={} | rabbitmqImage={}",
+                    TestContainerImages.MYSQL_IMAGE, TestContainerImages.RABBITMQ_IMAGE);
+            Startables.deepStart(Stream.of(MYSQL, rabbitmq)).join();
+            log.info("MySQL container started | jdbcUrl={} | mappedPort={}",
+                    MYSQL.getJdbcUrl(), MYSQL.getMappedPort(3306));
+            log.info("RabbitMQ container started | host={} | amqpPort={}",
+                    rabbitmq.getHost(), rabbitmq.getAmqpPort());
+            verifyMysqlReady();
+            log.info("MySQL health check passed");
+            mysqlStarted = true;
+        } else if (!rabbitmqStarted) {
+            log.info("Starting RabbitMQ container | image={}", TestContainerImages.RABBITMQ_IMAGE);
+            rabbitmq.start();
+            log.info("RabbitMQ container started | host={} | amqpPort={}",
+                    rabbitmq.getHost(), rabbitmq.getAmqpPort());
+        }
+        // No System.setProperty for spring.rabbitmq.* — JmsContainersConfig creates the
+        // ConnectionFactory bean directly using getRabbitMq() accessors.
+        rabbitmqStarted = true;
+    }
+
+    static RabbitMQContainer getRabbitMq() {
+        return rabbitmq;
     }
 
     static synchronized void startOracleOnly() {

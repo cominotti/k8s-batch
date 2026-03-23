@@ -27,7 +27,7 @@ final class DeploymentWaiter {
 
     private static final Logger log = LoggerFactory.getLogger(DeploymentWaiter.class);
 
-    private static final Duration POLL_INTERVAL = Duration.ofSeconds(5);
+    private static final Duration POLL_INTERVAL = Duration.ofSeconds(2);
     private static final Duration INITIAL_WAIT = Duration.ofSeconds(2);
     // 120s matches the remote partitioning @Timeout in integration tests
     private static final Duration STALL_TIMEOUT = Duration.ofSeconds(120);

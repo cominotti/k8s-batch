@@ -46,7 +46,7 @@ spec:
             - |
               until nc -z {{ include "k8s-batch.mysql.host" . }} {{ .Values.mysql.service.port }}; do
                 echo "Waiting for MySQL..."
-                sleep 3
+                sleep {{ .Values.global.initSleepSeconds }}
               done
         {{- if and .Values.kafka.enabled .Values.features.kafka }}
         # Uses headless service DNS (kafka-0.kafka-headless) instead of ClusterIP because the
@@ -63,7 +63,7 @@ spec:
               KAFKA_HOST="{{ include "k8s-batch.fullname" . }}-kafka-0.{{ include "k8s-batch.fullname" . }}-kafka-headless"
               until nc -z $KAFKA_HOST {{ .Values.kafka.service.port }}; do
                 echo "Waiting for Kafka..."
-                sleep 3
+                sleep {{ .Values.global.initSleepSeconds }}
               done
         {{- end }}
         {{- if and .Values.kafka.enabled .Values.features.kafka .Values.schemaRegistry.enabled .Values.features.schemaRegistry }}
@@ -78,7 +78,7 @@ spec:
             - |
               until nc -z {{ include "k8s-batch.fullname" . }}-schema-registry {{ .Values.schemaRegistry.service.port }}; do
                 echo "Waiting for Schema Registry..."
-                sleep 3
+                sleep {{ .Values.global.initSleepSeconds }}
               done
         {{- end }}
       containers:

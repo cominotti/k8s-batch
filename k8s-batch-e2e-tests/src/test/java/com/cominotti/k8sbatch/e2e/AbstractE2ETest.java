@@ -92,6 +92,7 @@ public abstract class AbstractE2ETest {
      */
     @BeforeAll
     void setUp() throws Exception {
+        validateProfileAnnotation();
         log.info("Setting up E2E test | class={} | valuesFile={}", getClass().getSimpleName(), valuesFile());
 
         K3sClusterManager.ensureClusterRunning();
@@ -146,6 +147,20 @@ public abstract class AbstractE2ETest {
     void cleanTestData() throws Exception {
         if (mysqlVerifier != null) {
             mysqlVerifier.cleanTargetRecords();
+        }
+    }
+
+    /**
+     * Validates that {@link E2EProfile} matches {@link #valuesFile()} to catch annotation drift.
+     * Mismatches would cause {@link E2EProfileClassOrderer} to group the test class incorrectly,
+     * leading to unnecessary profile switches.
+     */
+    private void validateProfileAnnotation() {
+        E2EProfile profile = getClass().getAnnotation(E2EProfile.class);
+        if (profile != null && !profile.value().equals(valuesFile())) {
+            throw new IllegalStateException(
+                    "@E2EProfile(\"" + profile.value() + "\") does not match valuesFile() \""
+                            + valuesFile() + "\" on " + getClass().getSimpleName());
         }
     }
 

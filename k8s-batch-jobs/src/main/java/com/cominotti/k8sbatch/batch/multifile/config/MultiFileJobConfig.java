@@ -37,8 +37,9 @@ import java.nio.file.Path;
  * <p>Each CSV file in a directory becomes one partition via {@link MultiFilePartitioner}. Each
  * partition's worker step reads its entire file, filters invalid records, and upserts to MySQL.
  * The manager step is <strong>not</strong> defined here — it is contributed by either
- * {@link com.cominotti.k8sbatch.config.RemotePartitioningJobConfig RemotePartitioningJobConfig}
- * (Kafka) or {@link com.cominotti.k8sbatch.config.StandaloneJobConfig StandaloneJobConfig}
+ * {@link com.cominotti.k8sbatch.config.RemotePartitioningBaseConfig RemotePartitioningBaseConfig}
+ * (with a transport sub-profile: Kafka, AMQP, or SQS) or
+ * {@link com.cominotti.k8sbatch.config.StandaloneJobConfig StandaloneJobConfig}
  * (local threads), depending on the active Spring profile.
  */
 @Configuration
@@ -81,7 +82,7 @@ public class MultiFileJobConfig {
      *
      * @param jobRepository        persists job metadata (start time, status, parameters)
      * @param multiFileManagerStep manager step injected by
-     *     {@link com.cominotti.k8sbatch.config.RemotePartitioningJobConfig RemotePartitioningJobConfig}
+     *     {@link com.cominotti.k8sbatch.config.RemotePartitioningBaseConfig RemotePartitioningBaseConfig}
      *     or {@link com.cominotti.k8sbatch.config.StandaloneJobConfig StandaloneJobConfig}
      * @return the fully configured {@code multiFileEtlJob}
      */

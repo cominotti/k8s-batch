@@ -16,6 +16,8 @@ public final class TestContainerImages {
     public static final String REDPANDA_IMAGE = "docker.redpanda.com/redpandadata/redpanda:v25.1.9";
     /** Oracle Free for Oracle-specific integration tests. */
     public static final String ORACLE_FREE_IMAGE = "gvenzl/oracle-free:23-slim-faststart";
+    /** RabbitMQ for JMS remote partitioning integration tests. */
+    public static final String RABBITMQ_IMAGE = "rabbitmq:4.1-management";
 
     private TestContainerImages() {
     }

@@ -27,7 +27,7 @@ spec:
             - |
               until nc -z {{ include "k8s-batch.fullname" . }}-kafka {{ .Values.kafka.service.port }}; do
                 echo "Waiting for Kafka broker..."
-                sleep 3
+                sleep {{ .Values.global.initSleepSeconds }}
               done
       containers:
         - name: schema-registry

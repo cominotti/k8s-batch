@@ -55,7 +55,7 @@ import java.util.Properties;
  * <p>Activated only under the {@code remote-partitioning} profile because the job requires Kafka.
  */
 @Configuration
-@Profile("remote-partitioning")
+@Profile("remote-kafka")
 public class TransactionEnrichmentJobConfig {
 
     private static final Logger log = LoggerFactory.getLogger(TransactionEnrichmentJobConfig.class);

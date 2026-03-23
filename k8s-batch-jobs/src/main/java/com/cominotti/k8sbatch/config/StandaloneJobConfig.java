@@ -26,7 +26,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
  *
  * <p>Activated only under the {@code standalone} profile. When absent, the default
  * {@code remote-partitioning} profile activates
- * {@link com.cominotti.k8sbatch.config.RemotePartitioningJobConfig RemotePartitioningJobConfig}
+ * {@link RemotePartitioningBaseConfig}
  * instead — the two configs are mutually exclusive.
  */
 @Configuration

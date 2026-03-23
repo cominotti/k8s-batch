@@ -54,7 +54,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * existing rows.
  */
 @Import({SharedContainersConfig.class, TransactionTestConfig.class})
-@ActiveProfiles({"integration-test", "remote-partitioning"})
+@ActiveProfiles({"integration-test", "remote-partitioning", "remote-kafka"})
 class TransactionEnrichmentRemoteIT extends AbstractBatchIntegrationTest {
 
     private static final String INPUT_TOPIC = TransactionTopicNames.TRANSACTION_EVENTS;
