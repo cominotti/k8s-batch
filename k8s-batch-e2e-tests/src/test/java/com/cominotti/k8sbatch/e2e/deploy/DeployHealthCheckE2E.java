@@ -24,16 +24,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class DeployHealthCheckE2E extends AbstractE2ETest {
 
+    /** {@inheritDoc} Deploys the full remote-partitioning stack (app, MySQL, Kafka, Schema Registry). */
     @Override
     protected String valuesFile() {
         return "e2e-remote.yaml";
     }
 
+    /** {@inheritDoc} Kafka is required for the full deployment health check. */
     @Override
     protected boolean requiresKafka() {
         return true;
     }
 
+    /**
+     * Verifies that every pod in the Helm release has reached the Ready condition.
+     * This is the most basic deployment validation — if any pod is not ready, no
+     * batch jobs can run.
+     */
     @Test
     @Order(1)
     void allPodsShouldBeReady() {
@@ -50,6 +57,11 @@ class DeployHealthCheckE2E extends AbstractE2ETest {
         }
     }
 
+    /**
+     * Verifies that the Spring Boot actuator health endpoint returns UP, confirming
+     * the application context started successfully and all health indicators (DB, Kafka)
+     * are reporting healthy.
+     */
     @Test
     @Order(2)
     void actuatorHealthShouldReturnUp() throws Exception {
@@ -58,6 +70,10 @@ class DeployHealthCheckE2E extends AbstractE2ETest {
         assertThat(health).contains("\"status\":\"UP\"");
     }
 
+    /**
+     * Verifies that the MySQL instance is accessible via JDBC port-forward and that the
+     * {@code target_records} table exists (created by Flyway migrations) and is initially empty.
+     */
     @Test
     @Order(3)
     void mysqlShouldBeAccessible() throws Exception {

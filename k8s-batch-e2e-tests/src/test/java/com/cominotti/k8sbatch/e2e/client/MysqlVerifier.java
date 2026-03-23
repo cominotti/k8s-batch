@@ -26,6 +26,16 @@ public final class MysqlVerifier {
     private final String username;
     private final String password;
 
+    /**
+     * Creates a JDBC verifier that connects to MySQL via a port-forwarded connection. Opens a new
+     * connection per method call (no pooling) — acceptable overhead for E2E test verification where
+     * simplicity trumps connection reuse.
+     *
+     * @param localPort the locally-forwarded MySQL port
+     * @param database  the MySQL database name
+     * @param username  the MySQL username
+     * @param password  the MySQL password
+     */
     public MysqlVerifier(int localPort, String database, String username, String password) {
         this.jdbcUrl = "jdbc:mysql://localhost:" + localPort + "/" + database
                 // allowPublicKeyRetrieval=true is required for MySQL 8 when not using SSL —
@@ -45,6 +55,15 @@ public final class MysqlVerifier {
 
     /**
      * Counts step executions matching a name pattern within a specific job execution.
+     *
+     * <p>Always scopes by JOB_EXECUTION_ID to avoid counting step executions from other test
+     * runs — multiple test methods launch the same job, and step executions accumulate across
+     * runs in the shared MySQL instance.
+     *
+     * @param jobExecutionId the job execution ID to scope by
+     * @param stepNamePattern SQL LIKE pattern for step names (e.g., "worker:%")
+     * @return the number of matching step executions
+     * @throws SQLException on database errors
      */
     public int countStepExecutionsForJob(long jobExecutionId, String stepNamePattern) throws SQLException {
         try (Connection conn = getConnection();
@@ -61,6 +80,12 @@ public final class MysqlVerifier {
 
     /**
      * Queries step executions for a job execution.
+     *
+     * @param jobExecutionId the job execution ID to query
+     * @return a list of maps, each containing keys STEP_NAME ({@code String}), STATUS
+     *         ({@code String}), EXIT_CODE ({@code String}), READ_COUNT ({@code int}),
+     *         WRITE_COUNT ({@code int}), COMMIT_COUNT ({@code int})
+     * @throws SQLException on database errors
      */
     public List<Map<String, Object>> queryStepExecutions(long jobExecutionId) throws SQLException {
         List<Map<String, Object>> results = new ArrayList<>();
@@ -139,10 +164,25 @@ public final class MysqlVerifier {
         }
     }
 
+    /**
+     * Counts all rows in the given table via {@code SELECT COUNT(*)}. Delegates to
+     * {@link #queryCount(String)}.
+     *
+     * @param tableName the table to count rows in
+     * @return the row count
+     * @throws SQLException on database errors
+     */
     private int countRows(String tableName) throws SQLException {
         return queryCount("SELECT COUNT(*) FROM " + tableName);
     }
 
+    /**
+     * Deletes all rows from the given table via {@code DELETE FROM}. Logs the number of deleted
+     * rows at DEBUG level.
+     *
+     * @param tableName the table to clean
+     * @throws SQLException on database errors
+     */
     private void cleanTable(String tableName) throws SQLException {
         try (Connection conn = getConnection();
              var stmt = conn.createStatement()) {
@@ -151,6 +191,14 @@ public final class MysqlVerifier {
         }
     }
 
+    /**
+     * Executes a single-column, single-row count query and returns the integer result. Used by
+     * {@link #countRows(String)} and other counting methods.
+     *
+     * @param sql the SQL count query to execute
+     * @return the count result
+     * @throws SQLException on database errors
+     */
     private int queryCount(String sql) throws SQLException {
         try (Connection conn = getConnection();
              var stmt = conn.createStatement();
@@ -160,7 +208,14 @@ public final class MysqlVerifier {
         }
     }
 
-    // Opens a new connection per call (no pooling needed for test verification)
+    /**
+     * Opens a new JDBC connection using the configured URL, username, and password. No connection
+     * pooling — each call creates a fresh connection. This is intentional: E2E verification makes
+     * infrequent queries where connection setup overhead is negligible.
+     *
+     * @return a new JDBC connection
+     * @throws SQLException if the connection cannot be established
+     */
     private Connection getConnection() throws SQLException {
         return DriverManager.getConnection(jdbcUrl, username, password);
     }

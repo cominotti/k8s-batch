@@ -20,16 +20,28 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class PartitionDistributionE2E extends AbstractE2ETest {
 
+    /** {@inheritDoc} Deploys the remote-partitioning stack to test partition metadata. */
     @Override
     protected String valuesFile() {
         return "e2e-remote.yaml";
     }
 
+    /** {@inheritDoc} Kafka is required for remote partition request/reply messaging. */
     @Override
     protected boolean requiresKafka() {
         return true;
     }
 
+    /**
+     * Runs a 100-row file-range job and validates the partition metadata stored in
+     * Spring Batch's {@code BATCH_STEP_EXECUTION} table. Asserts:
+     * <ul>
+     *   <li>Exactly 1 manager step ({@code fileRangeManagerStep})</li>
+     *   <li>At least 2 worker steps ({@code fileRangeWorkerStep:partition*})</li>
+     *   <li>All steps have COMPLETED status</li>
+     *   <li>The sum of READ_COUNT across all workers equals 100 (no lost or duplicated rows)</li>
+     * </ul>
+     */
     @Test
     void shouldDistributeWorkAcrossPartitions() throws Exception {
         JobResponse result = appClient.launchJobAndWaitForCompletion(

@@ -16,11 +16,11 @@ app:
         - ALL
   resources:
     requests:
-      cpu: 250m
-      memory: 512Mi
+      cpu: 100m
+      memory: 256Mi
     limits:
-      cpu: "2"
-      memory: 1Gi
+      cpu: "1"
+      memory: 384Mi
   livenessProbe:
     httpGet:
       path: /actuator/health/liveness
@@ -74,11 +74,11 @@ mysql:
     password: e2e_pass
   resources:
     requests:
-      cpu: 250m
-      memory: 512Mi
+      cpu: 100m
+      memory: 256Mi
     limits:
-      cpu: "1"
-      memory: 1Gi
+      cpu: 500m
+      memory: 512Mi
   persistence:
     storageClass: local-path
     size: 1Gi
@@ -92,11 +92,11 @@ kafka:
   replicaCount: 1
   resources:
     requests:
-      cpu: 250m
-      memory: 512Mi
+      cpu: 100m
+      memory: 256Mi
     limits:
-      cpu: "1"
-      memory: 1536Mi
+      cpu: 500m
+      memory: 768Mi
   persistence:
     storageClass: local-path
     size: 1Gi
@@ -127,11 +127,11 @@ schemaRegistry:
   replicaCount: 1
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 50m
+      memory: 128Mi
     limits:
-      cpu: 500m
-      memory: 512Mi
+      cpu: 250m
+      memory: 256Mi
 
 features:
   kafka: true
