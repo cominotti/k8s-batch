@@ -334,32 +334,32 @@ mysql:
   # docker-entrypoint-initdb.d DDL scripts (Spring Batch schema).
   # Max init window = periodSeconds * failureThreshold.
   # Increase failureThreshold for environments with slow I/O (e.g., CI runners).
+  # Uses tcpSocket instead of mysqladmin — avoids Unix socket path mismatches across
+  # MySQL versions (mysqladmin -h localhost uses the socket, not TCP). Port 3306 only
+  # opens after the Docker entrypoint finishes init (temporary mysqld uses --skip-networking).
   startupProbe:
-    exec:
-      command: ["mysqladmin", "ping", "-h", "localhost"]
+    tcpSocket:
+      port: 3306
     periodSeconds: 5
     failureThreshold: 120
-    timeoutSeconds: 3      # avoid false failures on slow/loaded disks
 
   # -- Liveness probe: restarts the container if MySQL becomes unresponsive.
   # Only fires after startupProbe succeeds, so initialDelaySeconds can be low.
   livenessProbe:
-    exec:
-      command: ["mysqladmin", "ping", "-h", "localhost"]
+    tcpSocket:
+      port: 3306
     initialDelaySeconds: 10
     periodSeconds: 10
     failureThreshold: 3
-    timeoutSeconds: 3
 
   # -- Readiness probe: controls when MySQL receives traffic via its Service.
   # A failure removes the pod from Service endpoints but does NOT restart it.
   readinessProbe:
-    exec:
-      command: ["mysqladmin", "ping", "-h", "localhost"]
+    tcpSocket:
+      port: 3306
     initialDelaySeconds: 5
     periodSeconds: 10
     failureThreshold: 3
-    timeoutSeconds: 3
 
 # ======================================================================
 # Kafka (KRaft mode, no Zookeeper)
