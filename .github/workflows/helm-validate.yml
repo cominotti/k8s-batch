@@ -73,6 +73,9 @@ jobs:
           version: v1.30
           k3d-args: --no-lb
 
+      # Pre-pull and import infrastructure images so K3s doesn't pull from the internet
+      # during helm install (eliminates network I/O from the deployment timeout window).
+      # Image versions must match values.yaml — see CLAUDE.md "CI validation" rule.
       - name: Pre-pull infrastructure images
         run: |
           docker pull mysql:8.4 &
@@ -116,6 +119,8 @@ jobs:
             --set features.gateway=false \
             --wait --timeout 15m
 
+      # field-selector excludes Completed Job pods (e.g., kafka-topics) — their Ready
+      # condition is False after the container exits, so kubectl wait would always time out.
       - name: Verify pods are ready
         run: |
           kubectl wait --for=condition=ready pod -l app.kubernetes.io/instance=test-release --field-selector=status.phase=Running --timeout=120s

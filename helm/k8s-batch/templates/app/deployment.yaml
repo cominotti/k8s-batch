@@ -11,6 +11,8 @@ spec:
   replicas: {{ .Values.app.replicaCount }}
   {{- end }}
   {{- if .Values.app.progressDeadlineSeconds }}
+  # Raised from K8s default (600s) — init containers can block for minutes waiting
+  # for MySQL first-start, causing K8s to mark the Deployment as Failed prematurely
   progressDeadlineSeconds: {{ .Values.app.progressDeadlineSeconds }}
   {{- end }}
   selector:
