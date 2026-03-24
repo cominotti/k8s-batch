@@ -1,0 +1,75 @@
+{{- if .Values.gateway.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "k8s-batch.fullname" . }}-gateway
+  labels:
+    {{- include "k8s-batch.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  {{- if not .Values.gatewayHpa.enabled }}
+  # Omit replicas when HPA is enabled to prevent Helm/HPA conflicts
+  replicas: {{ .Values.gateway.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "k8s-batch.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: gateway
+  template:
+    metadata:
+      labels:
+        {{- include "k8s-batch.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: gateway
+      annotations:
+        # Triggers rolling restart when ConfigMap content changes
+        checksum/config: {{ include (print .Template.BasePath "/gateway/configmap.yaml") . | sha256sum }}
+        {{- with .Values.gateway.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.app.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.gateway.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: wait-for-app
+          image: "{{ .Values.global.initImage.repository }}:{{ .Values.global.initImage.tag }}"
+          securityContext:
+            runAsNonRoot: false
+            runAsUser: 0
+          command:
+            - sh
+            - -c
+            - |
+              until wget --spider --timeout=2 http://{{ include "k8s-batch.fullname" . }}:{{ .Values.app.service.port }}/actuator/health/readiness 2>/dev/null; do
+                echo "Waiting for app readiness..."
+                sleep {{ .Values.global.initSleepSeconds }}
+              done
+      containers:
+        - name: gateway
+          image: "{{ .Values.gateway.image.repository }}:{{ .Values.gateway.image.tag }}"
+          imagePullPolicy: {{ .Values.gateway.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.gateway.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.gateway.config.serverPort }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "k8s-batch.fullname" . }}-gateway-config
+          livenessProbe:
+            {{- toYaml .Values.gateway.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.gateway.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.gateway.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+{{- end }}

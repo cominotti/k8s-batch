@@ -3,6 +3,7 @@
 package com.cominotti.k8sbatch.e2e.batch;
 
 import com.cominotti.k8sbatch.e2e.AbstractE2ETest;
+import com.cominotti.k8sbatch.e2e.E2EProfile;
 import com.cominotti.k8sbatch.e2e.client.BatchAppClient.JobResponse;
 import org.junit.jupiter.api.Test;
 
@@ -17,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * to workers through Kafka, and writes records to MySQL. Validates both small (10-row) and
  * large (100-row, multi-partition) inputs to ensure correct data throughput and worker scaling.
  */
+@E2EProfile("e2e-remote.yaml")
 class FileRangeJobE2E extends AbstractE2ETest {
 
     /** {@inheritDoc} Deploys the remote-partitioning stack with Kafka for partition distribution. */

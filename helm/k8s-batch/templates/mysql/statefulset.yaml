@@ -56,16 +56,12 @@ spec:
             - name: init-scripts
               mountPath: /docker-entrypoint-initdb.d
               readOnly: true
+          startupProbe:
+            {{- toYaml .Values.mysql.startupProbe | nindent 12 }}
           livenessProbe:
-            exec:
-              command: ["mysqladmin", "ping", "-h", "localhost"]
-            initialDelaySeconds: 30
-            periodSeconds: 10
+            {{- toYaml .Values.mysql.livenessProbe | nindent 12 }}
           readinessProbe:
-            exec:
-              command: ["mysqladmin", "ping", "-h", "localhost"]
-            initialDelaySeconds: 15
-            periodSeconds: 10
+            {{- toYaml .Values.mysql.readinessProbe | nindent 12 }}
       volumes:
         - name: init-scripts
           configMap:

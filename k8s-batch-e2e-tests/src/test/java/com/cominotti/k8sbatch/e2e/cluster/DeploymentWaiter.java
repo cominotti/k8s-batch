@@ -27,7 +27,7 @@ final class DeploymentWaiter {
 
     private static final Logger log = LoggerFactory.getLogger(DeploymentWaiter.class);
 
-    private static final Duration POLL_INTERVAL = Duration.ofSeconds(5);
+    private static final Duration POLL_INTERVAL = Duration.ofSeconds(2);
     private static final Duration INITIAL_WAIT = Duration.ofSeconds(2);
     // 120s matches the remote partitioning @Timeout in integration tests
     private static final Duration STALL_TIMEOUT = Duration.ofSeconds(120);
@@ -302,15 +302,23 @@ final class DeploymentWaiter {
     }
 
     /**
-     * Queries all pods in the namespace with the {@code app.kubernetes.io/instance} label
-     * matching the Helm release name.
+     * Lists release pods, excluding completed Job pods.
      *
-     * @return list of pods belonging to this Helm release
+     * <p>Kubernetes sets {@code pod.status.phase = "Succeeded"} for Job pods that exit
+     * normally (e.g., the Kafka topic-creation Job). These pods carry the same
+     * {@code app.kubernetes.io/instance} label as long-running pods, so they appear
+     * in the pod list. However, a Succeeded pod never has a {@code Ready=True} condition,
+     * which makes the {@code readyCount == pods.size()} termination check impossible
+     * to satisfy — causing a false stall timeout after 120s.
+     *
+     * @return list of non-terminated pods belonging to this Helm release
      */
     private List<Pod> listReleasePods() {
         return client.pods().inNamespace(namespace)
                 .withLabel("app.kubernetes.io/instance", releaseLabel)
-                .list().getItems();
+                .list().getItems().stream()
+                .filter(pod -> !"Succeeded".equals(pod.getStatus().getPhase()))
+                .toList();
     }
 
     /**
@@ -368,7 +376,7 @@ final class DeploymentWaiter {
      */
     private static void sleep(Duration duration) {
         try {
-            Thread.sleep(duration.toMillis());
+            Thread.sleep(duration);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Interrupted while waiting for pods", e);

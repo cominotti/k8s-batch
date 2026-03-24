@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** Validates the multi-file ETL job under Kafka-based remote partitioning (Redpanda). */
 @Import(SharedContainersConfig.class)
-@ActiveProfiles({"integration-test", "remote-partitioning"})
+@ActiveProfiles({"integration-test", "remote-partitioning", "remote-kafka"})
 class MultiFilePartitionRemoteIT extends AbstractBatchIntegrationTest {
 
     @Autowired

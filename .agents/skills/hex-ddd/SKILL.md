@@ -1,6 +1,6 @@
 ---
 name: hex-ddd
-description: "Evaluate Java code changes against Hexagonal Architecture, CQS, and DDD. Auto-invoked on Java file changes in k8s-batch-app/src/main/java. Pragmatically assesses domain model richness, port/adapter boundaries, CQS compliance, dependency direction, Java Records usage, and package structure. Use whenever Java files are created, modified, or refactored, or when the user asks about architecture, DDD compliance, or separation of concerns."
+description: "Evaluate Java code changes against Hexagonal Architecture, CQS, and DDD. Auto-invoked on Java file changes in k8s-batch-jobs/src/main/java. Pragmatically assesses domain model richness, port/adapter boundaries, CQS compliance, dependency direction, Java Records usage, and package structure. Use whenever Java files are created, modified, or refactored, or when the user asks about architecture, DDD compliance, or separation of concerns."
 disable-model-invocation: false
 ---
 
@@ -103,7 +103,7 @@ com.cominotti.k8sbatch/
 
 ## Step 0: Identify Changed Files and Classify by Zone
 
-Determine which files changed using git (try `git diff --name-only`, then `--cached`, then `HEAD~1`, then `git status --porcelain`). Filter to Java files in `k8s-batch-app/src/main/java/`. Skip deleted files, renamed-away paths, test files (`*IT.java`, `*E2E.java`, `*Test.java`), generated code (`target/generated-sources/`), and `K8sBatchApplication.java`.
+Determine which files changed using git (try `git diff --name-only`, then `--cached`, then `HEAD~1`, then `git status --porcelain`). Filter to Java files in `k8s-batch-jobs/src/main/java/`. Skip deleted files, renamed-away paths, test files (`*IT.java`, `*E2E.java`, `*Test.java`), generated code (`target/generated-sources/`), and `K8sBatchApplication.java`.
 
 **Classify each file into a zone** based on its responsibilities (not its current location — the classification is prescriptive):
 

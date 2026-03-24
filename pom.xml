@@ -20,9 +20,12 @@
     <description>Spring Boot + Spring Batch reference project for Kubernetes horizontal scaling</description>
 
     <modules>
-        <module>k8s-batch-app</module>
+        <module>k8s-batch-rules-kie</module>
+        <module>k8s-batch-jobs</module>
         <module>k8s-batch-integration-tests</module>
         <module>k8s-batch-e2e-tests</module>
+        <module>k8s-batch-api-gateway</module>
+        <module>k8s-batch-api-gateway-tests</module>
     </modules>
 
     <properties>
@@ -40,6 +43,14 @@
         <confluent.version>7.9.0</confluent.version>
         <drools.version>10.1.0</drools.version>
         <evrete.version>4.0.3</evrete.version>
+        <ojdbc11.version>23.7.0.25.01</ojdbc11.version>
+        <spring-cloud.version>2025.1.1</spring-cloud.version>
+        <rabbitmq-jms.version>3.5.0</rabbitmq-jms.version>
+        <amazon-sqs-jms.version>2.1.4</amazon-sqs-jms.version>
+        <bucket4j.version>8.15.0</bucket4j.version>
+        <!-- Test output verbosity: override with -Dtest.log.level=DEBUG -DredirectTestOutputToFile=false -->
+        <test.log.level>WARN</test.log.level>
+        <redirectTestOutputToFile>true</redirectTestOutputToFile>
     </properties>
 
     <repositories>
@@ -56,8 +67,36 @@
         <dependencies>
             <dependency>
                 <groupId>com.cominotti.k8sbatch</groupId>
-                <artifactId>k8s-batch-app</artifactId>
+                <artifactId>k8s-batch-rules-kie</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.cominotti.k8sbatch</groupId>
+                <artifactId>k8s-batch-jobs</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.cominotti.k8sbatch</groupId>
+                <artifactId>k8s-batch-api-gateway</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- JMS client libraries for RabbitMQ and SQS (not BOM-managed) -->
+            <dependency>
+                <groupId>com.rabbitmq.jms</groupId>
+                <artifactId>rabbitmq-jms</artifactId>
+                <version>${rabbitmq-jms.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.amazonaws</groupId>
+                <artifactId>amazon-sqs-java-messaging-lib</artifactId>
+                <version>${amazon-sqs-jms.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.testcontainers</groupId>
@@ -87,7 +126,13 @@
                 <artifactId>drools-xml-support</artifactId>
                 <version>${drools.version}</version>
             </dependency>
-            <!-- KIE DMN Runtime (decision table evaluation for Kogito adapter) -->
+            <!-- Drools Rule Units (typed data scoping for rule-unit adapter) -->
+            <dependency>
+                <groupId>org.drools</groupId>
+                <artifactId>drools-ruleunits-engine</artifactId>
+                <version>${drools.version}</version>
+            </dependency>
+            <!-- KIE DMN Runtime (decision table evaluation for DMN adapter) -->
             <dependency>
                 <groupId>org.kie</groupId>
                 <artifactId>kie-dmn-core</artifactId>
@@ -98,6 +143,18 @@
                 <groupId>org.evrete</groupId>
                 <artifactId>evrete-core</artifactId>
                 <version>${evrete.version}</version>
+            </dependency>
+            <!-- Oracle JDBC driver (Java 21 compatible) -->
+            <dependency>
+                <groupId>com.oracle.database.jdbc</groupId>
+                <artifactId>ojdbc11</artifactId>
+                <version>${ojdbc11.version}</version>
+            </dependency>
+            <!-- Bucket4j in-memory rate limiting for API gateway -->
+            <dependency>
+                <groupId>com.bucket4j</groupId>
+                <artifactId>bucket4j_jdk17-core</artifactId>
+                <version>${bucket4j.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

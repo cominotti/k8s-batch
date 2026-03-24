@@ -1,0 +1,84 @@
+suite: gateway ConfigMap
+templates:
+  - templates/gateway/configmap.yaml
+release:
+  name: test-release
+tests:
+  - it: should render when gateway is enabled
+    set:
+      gateway.enabled: true
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: metadata.name
+          value: test-release-k8s-batch-gateway-config
+
+  - it: should not render when gateway is disabled
+    set:
+      gateway.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should set GATEWAY_BACKEND_URL pointing to app service
+    set:
+      gateway.enabled: true
+      app.service.port: 8080
+    asserts:
+      - equal:
+          path: data.GATEWAY_BACKEND_URL
+          value: "http://test-release-k8s-batch:8080"
+
+  - it: should set SERVER_PORT from config
+    set:
+      gateway.enabled: true
+      gateway.config.serverPort: 9090
+    asserts:
+      - equal:
+          path: data.SERVER_PORT
+          value: "9090"
+
+  - it: should set JAVA_OPTS with container support
+    set:
+      gateway.enabled: true
+    asserts:
+      - equal:
+          path: data.JAVA_OPTS
+          value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+
+  - it: should enable actuator probes
+    set:
+      gateway.enabled: true
+    asserts:
+      - equal:
+          path: data.MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED
+          value: "true"
+      - equal:
+          path: data.MANAGEMENT_HEALTH_LIVENESSSTATE_ENABLED
+          value: "true"
+      - equal:
+          path: data.MANAGEMENT_HEALTH_READINESSSTATE_ENABLED
+          value: "true"
+
+  - it: should include extra config entries
+    set:
+      gateway.enabled: true
+      gateway.config.extra:
+        CUSTOM_KEY: custom-value
+        ANOTHER_KEY: another-value
+    asserts:
+      - equal:
+          path: data.CUSTOM_KEY
+          value: "custom-value"
+      - equal:
+          path: data.ANOTHER_KEY
+          value: "another-value"
+
+  - it: should set component label
+    set:
+      gateway.enabled: true
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: gateway

@@ -82,7 +82,7 @@ Images are defined in `E2EContainerImages` — never hardcoded in test classes:
 | Constant | Image | Notes |
 |----------|-------|-------|
 | `APP_IMAGE` | `k8s-batch:e2e` | Locally built — `docker build -t k8s-batch:e2e .` |
-| `MYSQL_IMAGE` | `mysql:8.0` | Must match `TestContainerImages.MYSQL_IMAGE` in IT module |
+| `MYSQL_IMAGE` | `mysql:8.4` | Must match `TestContainerImages.MYSQL_IMAGE` in IT module |
 | `KAFKA_IMAGE` | `confluentinc/cp-kafka:7.9.0` | Only loaded when `requiresKafka()` returns true |
 | `SCHEMA_REGISTRY_IMAGE` | `confluentinc/cp-schema-registry:7.9.0` | Only loaded when `requiresKafka()` returns true |
 | `BUSYBOX_IMAGE` | `busybox:1.36` | Used by init containers |

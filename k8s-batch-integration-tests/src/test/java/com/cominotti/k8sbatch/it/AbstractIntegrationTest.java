@@ -30,7 +30,7 @@ import java.util.concurrent.TimeUnit;
  */
 @SpringBootTest(classes = K8sBatchApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(SharedContainersConfig.class)
-@ActiveProfiles({"integration-test", "remote-partitioning"})
+@ActiveProfiles({"integration-test", "remote-partitioning", "remote-kafka"})
 @Timeout(value = 120, unit = TimeUnit.SECONDS)
 public abstract class AbstractIntegrationTest {
 

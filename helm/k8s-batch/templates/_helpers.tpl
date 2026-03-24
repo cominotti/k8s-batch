@@ -32,10 +32,25 @@ MySQL host
 {{- end }}
 
 {{/*
-MySQL JDBC URL
+Database JDBC URL (MySQL or Oracle based on database.type)
 */}}
 {{- define "k8s-batch.mysql.jdbcUrl" -}}
+{{- if eq .Values.database.type "oracle" -}}
+jdbc:oracle:thin:@//{{ include "k8s-batch.mysql.host" . }}:{{ .Values.mysql.service.port }}/{{ .Values.mysql.auth.database }}
+{{- else -}}
 jdbc:mysql://{{ include "k8s-batch.mysql.host" . }}:{{ .Values.mysql.service.port }}/{{ .Values.mysql.auth.database }}?useSSL=false&allowPublicKeyRetrieval=true
+{{- end -}}
+{{- end }}
+
+{{/*
+Database JDBC driver class name
+*/}}
+{{- define "k8s-batch.datasource.driverClassName" -}}
+{{- if eq .Values.database.type "oracle" -}}
+oracle.jdbc.OracleDriver
+{{- else -}}
+com.mysql.cj.jdbc.Driver
+{{- end -}}
 {{- end }}
 
 {{/*

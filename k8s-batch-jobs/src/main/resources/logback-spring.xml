@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <property name="LOG_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{40} - %msg%n"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- test.log.level: configurable threshold for integration tests (default WARN, override -Dtest.log.level=DEBUG) -->
+    <variable name="TEST_LOG_LEVEL" value="${test.log.level:-WARN}"/>
+
+    <!-- Default / remote-partitioning: suppress per-chunk SQL (batch) and consumer
+         group rebalancing noise (kafka) to keep production logs readable -->
+    <springProfile name="default | remote-partitioning">
+        <logger name="com.cominotti.k8sbatch" level="INFO"/>
+        <logger name="org.springframework.batch" level="WARN"/>
+        <logger name="org.springframework.integration" level="WARN"/>
+        <logger name="org.apache.kafka" level="WARN"/>
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <!-- Standalone: DEBUG on the standalone subpackage for TaskExecutorPartitionHandler
+         thread diagnostics (partition execution, thread pool activity) -->
+    <springProfile name="standalone">
+        <logger name="com.cominotti.k8sbatch" level="INFO"/>
+        <logger name="com.cominotti.k8sbatch.config.StandaloneJobConfig" level="DEBUG"/>
+        <logger name="org.springframework.batch" level="WARN"/>
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <!-- Integration test: all loggers gated by TEST_LOG_LEVEL (default WARN, override -Dtest.log.level=DEBUG) -->
+    <springProfile name="integration-test">
+        <logger name="com.cominotti.k8sbatch" level="${TEST_LOG_LEVEL}"/>
+        <logger name="org.springframework.batch" level="${TEST_LOG_LEVEL}"/>
+        <logger name="org.springframework.integration" level="${TEST_LOG_LEVEL}"/>
+        <logger name="org.apache.kafka" level="${TEST_LOG_LEVEL}"/>
+        <logger name="org.testcontainers" level="${TEST_LOG_LEVEL}"/>
+        <logger name="org.kie" level="${TEST_LOG_LEVEL}"/>
+        <logger name="org.drools" level="${TEST_LOG_LEVEL}"/>
+        <logger name="liquibase" level="${TEST_LOG_LEVEL}"/>
+        <logger name="com.zaxxer.hikari" level="${TEST_LOG_LEVEL}"/>
+        <root level="${TEST_LOG_LEVEL}">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+</configuration>

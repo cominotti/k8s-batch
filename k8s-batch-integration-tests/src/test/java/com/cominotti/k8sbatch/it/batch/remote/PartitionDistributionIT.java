@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * partition completion, and per-partition read/write counts.
  */
 @Import(SharedContainersConfig.class)
-@ActiveProfiles({"integration-test", "remote-partitioning"})
+@ActiveProfiles({"integration-test", "remote-partitioning", "remote-kafka"})
 class PartitionDistributionIT extends AbstractBatchIntegrationTest {
 
     @Autowired

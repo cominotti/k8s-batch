@@ -56,7 +56,7 @@ public final class K3sImageLoader {
      * Loads a single Docker image into K3s.
      *
      * @param container the K3s container to load the image into
-     * @param imageName the Docker image name (e.g., {@code "mysql:8.0"})
+     * @param imageName the Docker image name (e.g., {@code "mysql:8.4"})
      * @throws Exception if saving, copying, or importing the image fails
      */
     public static synchronized void loadImage(K3sContainer container, String imageName) throws Exception {

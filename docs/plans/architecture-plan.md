@@ -4,7 +4,7 @@
 
 Create a **greenfield Maven-based reference project** demonstrating how to combine Spring Batch with Kubernetes for horizontally-scalable batch processing. The project deploys via Helm 3 charts with MySQL (JobRepository + app data) and Kafka (remote partitioning messaging). It includes two CSV-to-DB ETL sample jobs, REST/Actuator endpoints, and extensive Testcontainers integration tests.
 
-**Tech stack**: Java 21, Spring Boot 4.0.3, Spring Batch 6.x, Spring Integration Kafka, MySQL 8.0, Kafka (KRaft), Helm 3, Testcontainers 2.x.
+**Tech stack**: Java 21, Spring Boot 4.0.3, Spring Batch 6.x, Spring Integration Kafka, MySQL 8.4, Kafka (KRaft), Helm 3, Testcontainers 2.x.
 
 ---
 
@@ -47,7 +47,7 @@ k8s-batch/
 ├── Dockerfile                           # Multi-stage (Maven build → JRE 21 runtime)
 ├── .dockerignore
 ├── docker-compose.yml                   # Local dev: app + MySQL + Kafka (KRaft)
-├── k8s-batch-app/
+├── k8s-batch-jobs/
 │   ├── pom.xml                          # Main app module
 │   └── src/main/
 │       ├── java/com/cominotti/k8sbatch/
@@ -153,11 +153,11 @@ k8s-batch/
 
 ### Parent POM (`pom.xml`)
 - `spring-boot-starter-parent:4.0.3` as parent
-- Modules: `k8s-batch-app`, `k8s-batch-integration-tests`
+- Modules: `k8s-batch-jobs`, `k8s-batch-integration-tests`
 - Java 21 compiler settings
 - Managed dependency versions for Spring Batch, Spring Integration, Testcontainers
 
-### App Module (`k8s-batch-app/pom.xml`)
+### App Module (`k8s-batch-jobs/pom.xml`)
 Key dependencies:
 - `spring-boot-starter-web` — REST endpoints
 - `spring-boot-starter-actuator` — health/metrics
@@ -171,7 +171,7 @@ Key dependencies:
 
 ### Integration Tests Module (`k8s-batch-integration-tests/pom.xml`)
 Key dependencies:
-- `k8s-batch-app` (scope: test)
+- `k8s-batch-jobs` (scope: test)
 - `spring-boot-starter-test`
 - `spring-boot-testcontainers` — `@ServiceConnection` support
 - `org.testcontainers:mysql`

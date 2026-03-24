@@ -1,0 +1,13 @@
+# JMS transport profile for remote partitioning (RabbitMQ or AWS SQS).
+# Excludes Kafka auto-configuration since only the JMS broker is used for partition request
+# messaging. The JMS ConnectionFactory is auto-configured by Spring Boot JMS based on which
+# JMS client library is configured (RMQConnectionFactory for RabbitMQ, SQSConnectionFactory
+# for AWS SQS).
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+
+batch:
+  jms:
+    requests-queue: ${BATCH_JMS_REQUESTS_QUEUE:batch-partition-requests}

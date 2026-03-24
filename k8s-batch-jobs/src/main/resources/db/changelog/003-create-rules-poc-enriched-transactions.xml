@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="003-create-rules-poc-enriched-transactions" author="cominotti">
+        <createTable tableName="rules_poc_enriched_transactions">
+            <column name="transaction_id" type="varchar(36)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="account_id" type="varchar(36)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="amount" type="decimal(15,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="currency" type="varchar(3)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="exchange_rate" type="decimal(15,6)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="amount_usd" type="decimal(15,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="risk_score" type="varchar(10)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="compliance_flag" type="boolean">
+                <constraints nullable="false"/>
+            </column>
+            <column name="rules_engine" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="original_timestamp" type="varchar(30)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="processed_at" type="timestamp(3)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP"/>
+        </createTable>
+    </changeSet>
+
+</databaseChangeLog>

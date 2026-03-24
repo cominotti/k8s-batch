@@ -13,6 +13,13 @@ metadata:
 spec:
   backoffLimit: 5
   template:
+    metadata:
+      # Explicit pod labels are required because E2E tests apply this Job via Fabric8
+      # createOr(update) which uses PUT — K8s auto-generates selectors only on POST,
+      # so PUT without labels fails with "spec.selector: Required value"
+      labels:
+        {{- include "k8s-batch.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: kafka-topics
     spec:
       restartPolicy: OnFailure
       initContainers:
@@ -24,7 +31,7 @@ spec:
             - |
               until nc -z {{ include "k8s-batch.fullname" . }}-kafka {{ .Values.kafka.service.port }}; do
                 echo "Waiting for Kafka broker..."
-                sleep 5
+                sleep {{ .Values.global.initSleepSeconds }}
               done
       containers:
         - name: create-topics

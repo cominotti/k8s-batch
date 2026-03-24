@@ -3,6 +3,7 @@
 package com.cominotti.k8sbatch.e2e.batch;
 
 import com.cominotti.k8sbatch.e2e.AbstractE2ETest;
+import com.cominotti.k8sbatch.e2e.E2EProfile;
 import com.cominotti.k8sbatch.e2e.client.BatchAppClient.JobResponse;
 import org.junit.jupiter.api.Test;
 
@@ -18,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * a 100-row file-range job, and queries MySQL to verify that the manager step created
  * multiple worker partitions whose total read counts sum to exactly 100 rows.
  */
+@E2EProfile("e2e-remote.yaml")
 class PartitionDistributionE2E extends AbstractE2ETest {
 
     /** {@inheritDoc} Deploys the remote-partitioning stack to test partition metadata. */
@@ -68,9 +70,9 @@ class PartitionDistributionE2E extends AbstractE2ETest {
 
         // All steps should be COMPLETED
         for (Map<String, Object> step : steps) {
-            assertThat(step.get("STATUS"))
+            assertThat(step)
                     .as("Step %s should be COMPLETED", step.get("STEP_NAME"))
-                    .isEqualTo("COMPLETED");
+                    .containsEntry("STATUS", "COMPLETED");
         }
 
         // Total read count across workers should equal 100

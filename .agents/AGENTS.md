@@ -2,18 +2,18 @@
 
 ## Project Overview
 
-Spring Boot 4.0.3 + Spring Batch 6.x reference project for horizontally-scalable batch processing on Kubernetes. Four batch jobs demonstrate different patterns: two CSV-to-DB ETL jobs use remote partitioning via Kafka (with standalone fallback), a transaction enrichment job reads Avro events from Kafka, enriches them, and writes to both MySQL and a Kafka output topic, and a rules engine PoC job applies financial business rules using Drools, EVRete, or a Kogito hybrid (Java + DMN decision tables), toggled via `batch.rules.engine` property.
+Spring Boot 4.0.3 + Spring Batch 6.x reference project for horizontally-scalable batch processing on Kubernetes. Four batch jobs demonstrate different patterns: two CSV-to-DB ETL jobs use remote partitioning via Kafka (with standalone fallback), a transaction enrichment job reads Avro events from Kafka, enriches them, and writes to both MySQL and a Kafka output topic, and a rules engine PoC job applies financial business rules using Drools, EVRete, KIE DMN decision tables, or Drools rule units, toggled via `batch.rules.engine` property.
 
 ## Tech Stack
 
 - **Java 21**, **Spring Boot 4.0.3**, **Spring Batch 6.0.2**
-- **MySQL 8.0** — JobRepository + application data
+- **MySQL 8.4 / Oracle DB** — JobRepository + application data
 - **Kafka (Confluent Platform 7.9.0, KRaft mode)** — remote partitioning messaging + event streaming
 - **Avro 1.12 + Confluent Schema Registry** — event serialization for transaction enrichment job
 - **Helm 3** — Kubernetes deployment
 - **Testcontainers 2.0.3** — integration tests
-- **Flyway** — database migrations
-- **Drools 10.x + EVRete + KIE DMN** — rules engine PoC (toggled via `batch.rules.engine` property)
+- **Liquibase** — database migrations (MySQL + Oracle compatible XML changelogs)
+- **Drools 10.x (classic + rule units) + EVRete + KIE DMN** — rules engine PoC (toggled via `batch.rules.engine` property)
 
 ## Prerequisites
 
@@ -27,9 +27,10 @@ Spring Boot 4.0.3 + Spring Batch 6.x reference project for horizontally-scalable
 ```bash
 mvn clean compile                              # compile all modules
 mvn test-compile                               # compile including test sources
-mvn -pl k8s-batch-integration-tests -am verify  # run integration tests (requires Docker)
-mvn -pl k8s-batch-e2e-tests -am verify          # run E2E tests (requires Docker + helm CLI)
+mvn -pl k8s-batch-integration-tests -am verify  # run integration tests (quiet: output in target/failsafe-reports/)
+mvn -pl k8s-batch-e2e-tests -am verify          # run E2E tests (quiet: output in target/failsafe-reports/)
 mvn verify -DskipE2E=true                      # run integration tests, skip E2E
+mvn -pl k8s-batch-integration-tests -am verify -Dtest.log.level=DEBUG -DredirectTestOutputToFile=false  # verbose: full output on console
 mvn package -DskipTests                        # build JAR without tests
 docker build -t k8s-batch:e2e .                # build Docker image for E2E tests
 docker-compose up -d                           # local stack (app + MySQL + Kafka)
@@ -46,7 +47,8 @@ mvn validate -Dskip.checkstyle=true            # skip JavaDoc checks entirely
 
 | Module | Purpose |
 |--------|---------|
-| `k8s-batch-app` | Main Spring Boot application (REST, batch jobs, config) |
+| `k8s-batch-rules-kie` | KIE-based rules engine adapters (DMN + Drools Rule Units) and rules PoC domain types |
+| `k8s-batch-jobs` | Main Spring Boot application (REST, batch jobs, config). Depends on `k8s-batch-rules-kie` |
 | `k8s-batch-integration-tests` | Testcontainers integration tests (separate to keep test infra out of production artifact) |
 | `k8s-batch-e2e-tests` | E2E tests using Testcontainers K3s — deploys Helm chart into real K8s cluster |
 
@@ -99,12 +101,15 @@ Use `JacksonJsonSerializer` / `JacksonJsonDeserializer` for Kafka partition requ
 - **MySQL**: `org.testcontainers.mysql.MySQLContainer` (not `org.testcontainers.containers.MySQLContainer`). **Non-generic** — no `<?>` wildcard.
 - **Redpanda** (replaces Confluent Kafka for integration tests): `org.testcontainers.redpanda.RedpandaContainer` — Kafka-compatible broker with built-in Schema Registry. Use `getBootstrapServers()` for Kafka API, `getSchemaRegistryAddress()` for Schema Registry URL. Much faster startup (~5-10s vs 30-60s for Confluent Kafka). E2E tests still use real Confluent Kafka via the Helm chart.
 - **`@ServiceConnection`** handles JDBC wiring automatically — never use `@DynamicPropertySource` for MySQL
-- **Kafka bootstrap servers** are set via `System.setProperty` in `ContainerHolder` (Kafka `@ServiceConnection` requires `spring-boot-kafka` which conflicts with manual `RemotePartitioningJobConfig`)
+- **Kafka bootstrap servers** are set via `System.setProperty` in `ContainerHolder` (Kafka `@ServiceConnection` requires `spring-boot-kafka` which conflicts with manual `RemotePartitioningKafkaConfig`)
 - **Schema Registry URL** is set via `System.setProperty("spring.kafka.properties.schema.registry.url", REDPANDA.getSchemaRegistryAddress())` in `ContainerHolder.startAll()`
+- **RabbitMQ (JMS tests)**: `JmsContainersConfig` creates a JMS `ConnectionFactory` bean (`RMQConnectionFactory`) wired to the Testcontainer RabbitMQ instance
 - **Container lifecycle** is managed by `ContainerHolder` (not directly in config classes):
-  - `ContainerHolder.startMysqlOnly()` — standalone tests, skips Redpanda entirely
-  - `ContainerHolder.startAll()` — parallel startup via `Startables.deepStart()` for remote tests
+  - `ContainerHolder.startMysqlOnly()` — standalone tests, skips all brokers
+  - `ContainerHolder.startAll()` — parallel startup of MySQL + Redpanda for Kafka remote tests
+  - `ContainerHolder.startMysqlAndRabbitMq()` — parallel startup for JMS remote tests
   - `SharedContainersConfig` delegates to `ContainerHolder.startAll()` + creates Kafka topics
+  - `JmsContainersConfig` delegates to `ContainerHolder.startMysqlAndRabbitMq()` + creates JMS `ConnectionFactory`
   - `MysqlOnlyContainersConfig` delegates to `ContainerHolder.startMysqlOnly()`
 - **Parallel startup**: use `Startables.deepStart(Stream.of(MYSQL, REDPANDA)).join()` — not sequential `.start()` calls
 
@@ -113,7 +118,7 @@ Use `JacksonJsonSerializer` / `JacksonJsonDeserializer` for Kafka partition requ
 - `TestRestTemplate` is removed. Use `RestClient` with `@LocalServerPort`.
 - `spring-boot-starter-batch-jdbc` is required explicitly for database-backed `JobRepository`.
 - `spring.batch.job.enabled: false` prevents auto-launching jobs at startup.
-- **Auto-configuration modules extracted**: `spring-boot-flyway`, `spring-boot-integration`, `spring-boot-kafka` are separate dependencies in SB4 (not in `spring-boot-autoconfigure`).
+- **Auto-configuration modules extracted**: `spring-boot-liquibase`, `spring-boot-integration`, `spring-boot-kafka` are separate dependencies in SB4 (not in `spring-boot-autoconfigure`).
 - **Multi-module `@SpringBootTest`**: always use `classes = K8sBatchApplication.class` — Spring can't find it by package scanning across modules.
 - **`spring-boot-maven-plugin` classifier**: use `<classifier>exec</classifier>` so dependent modules see the original JAR, not the fat JAR.
 
@@ -126,11 +131,18 @@ Use `JacksonJsonSerializer` / `JacksonJsonDeserializer` for Kafka partition requ
 
 ## Profile Strategy
 
-| Profile | Activation | Kafka Required | Description |
-|---------|-----------|----------------|-------------|
-| `remote-partitioning` | Default | Yes | Remote partitioning via Kafka |
-| `standalone` | `--spring.profiles.active=standalone` | No | In-process `TaskExecutorPartitionHandler` |
-| `integration-test` | Test classes only | Depends on test | Test-specific config (schema auto-create, debug logging) |
+Remote partitioning uses composable profiles: a shared `remote-partitioning` base profile paired with a transport-specific sub-profile.
+
+| Profile | Activation | Broker | Description |
+|---------|-----------|--------|-------------|
+| `remote-partitioning,remote-kafka` | Default | Kafka | Kafka-based remote partitioning + transaction enrichment job |
+| `remote-partitioning,remote-jms` | `--spring.profiles.active=remote-partitioning,remote-jms` | RabbitMQ or SQS | JMS-based remote partitioning via `spring-integration-jms`. Broker selected by `ConnectionFactory` bean (`RMQConnectionFactory` for RabbitMQ, `SQSConnectionFactory` for AWS SQS). |
+| `standalone` | `--spring.profiles.active=standalone` | None | In-process `TaskExecutorPartitionHandler` |
+| `integration-test` | Test classes only | Depends on test | Test-specific config (schema auto-create, WARN logging by default — override with `-Dtest.log.level=DEBUG`) |
+
+**Architecture**: `RemotePartitioningBaseConfig` (`@Profile("remote-partitioning")`) provides shared beans (manager step factory, `DirectChannel`, `StepExecutionRequestHandler`, manager steps). Transport configs provide outbound/inbound `IntegrationFlow` beans: `RemotePartitioningKafkaConfig` (`@Profile("remote-kafka")`) for native Kafka, `RemotePartitioningJmsConfig` (`@Profile("remote-jms")`) for JMS-compatible brokers (RabbitMQ, SQS).
+
+**Transaction enrichment job** is gated on `@Profile("remote-kafka")` — it requires Kafka (Avro + Schema Registry) regardless of which transport is used for partitioning.
 
 ## Batch Job Design
 
@@ -140,16 +152,16 @@ Both CSV jobs follow the same pattern: **Partitioner → Manager Step → Worker
 
 - `FileRangePartitioner` — splits a CSV by line ranges
 - `MultiFilePartitioner` — assigns one CSV file per partition
-- Manager step: `RemotePartitioningJobConfig` (Kafka) or `StandaloneJobConfig` (local threads)
+- Manager step: `RemotePartitioningBaseConfig` (shared) + transport config (Kafka/AMQP/SQS) or `StandaloneJobConfig` (local threads)
 - Worker step: `FlatFileItemReader` → `CsvRecordProcessor` → `JdbcBatchItemWriter`
 
 ### Transaction Enrichment Job (transactionEnrichmentJob)
 
 Single chunk step (not partitioned) — reads Avro `TransactionEvent` from Kafka, enriches with exchange rate + risk score, writes to both MySQL and Kafka output topic via `CompositeItemWriter`.
 
-- **Config**: `TransactionEnrichmentJobConfig` + `TransactionKafkaConfig` (both `@Profile("remote-partitioning")`)
+- **Config**: `TransactionEnrichmentJobConfig` + `TransactionKafkaConfig` (both `@Profile("remote-kafka")`)
 - **Properties**: `TransactionJobProperties` bound to `batch.transaction.*`
-- **Avro schemas**: `k8s-batch-app/src/main/avro/` (generates Java classes via `avro-maven-plugin`)
+- **Avro schemas**: `k8s-batch-jobs/src/main/avro/` (generates Java classes via `avro-maven-plugin`)
 - **DB writer**: `EnrichedTransactionWriter` — upsert via `ON DUPLICATE KEY UPDATE` for idempotency
 - **Kafka transactions**: `batch.transaction.kafka-transactions-enabled` (default: `false`). When `true`, `ProducerFactory` gets a `transactionIdPrefix`, enabling best-effort 1PC coordination with `DataSourceTransactionManager` via Spring's `TransactionSynchronizationManager`. Consumer uses `read_committed` isolation.
 - **Parallelism**: comes from Kafka partition assignment across pod replicas, not Spring Batch partitioning
@@ -163,16 +175,18 @@ Single chunk step (not partitioned) — reads Avro `TransactionEvent` from Kafka
 
 ### Rules Engine PoC Job (rulesEnginePocJob)
 
-Single non-partitioned chunk step — reads financial transactions from CSV, applies business rules via Drools DRL, EVRete Java API, or Kogito hybrid (Java + DMN), writes enriched results to MySQL. PoC for evaluating rules engine alternatives.
+Single non-partitioned chunk step — reads financial transactions from CSV, applies business rules via Drools DRL, EVRete Java API, KIE DMN decision tables, or Drools rule units, writes enriched results to MySQL. PoC for evaluating rules engine alternatives.
 
-- **Toggle**: `batch.rules.engine=drools` (default), `evrete`, or `kogito` — selects the active `TransactionRulesEvaluator` implementation via `@ConditionalOnProperty`
-- **Config**: `RulesEnginePocJobConfig` + `RulesEngineProperties` (bound to `batch.rules.*`)
-- **Domain port**: `TransactionRulesEvaluator` interface — custom driven port with three adapter implementations
-- **Domain constants**: `EnrichmentRuleConstants` record — exchange rates, risk thresholds, compliance rules. Shared by Drools (DRL `global`) and EVRete (constructor injection). Kogito adapter uses it for exchange rates; risk/compliance thresholds are in the DMN model.
-- **DRL**: `src/main/resources/rules/transaction-enrichment.drl` — 4 rules using `EnrichmentRuleConstants` global (not hardcoded constants)
-- **DMN**: `src/main/resources/dmn/risk-assessment.dmn` — two decision tables (Risk Score, Compliance Review) with dependency graph. Used by Kogito adapter via `DMNRuntime` API loaded through `KieFileSystem`.
-- **Adapter fact**: `TransactionFact` — mutable JavaBean for rules engine sessions (required by Drools DRL `then` blocks). Uses `RiskScore` enum (not String). Factory methods: `from(FinancialTransaction)` and `toEnrichedTransaction(engineName, processedAt)`
-- **Kogito adapter note**: Rule units (`RuleUnitData` + `DataStore`) require `kie-maven-plugin` for build-time code generation, but the plugin's embedded ECJ compiler doesn't support Java 21 records/text blocks (Drools 10.1.0 limitation). The Kogito adapter uses Java for the sequential part (exchange rate + conversion) and DMN for the tabular part instead.
+- **Module split**: Domain types (port, value objects, shared fact) and KIE-based adapters (DMN, Drools Rule Units) live in `k8s-batch-rules-kie`. Classic Drools DRL and EVRete adapters stay in `k8s-batch-jobs`. Dependency direction: `k8s-batch-jobs` → `k8s-batch-rules-kie` (one-directional). Same Java packages are preserved — Spring Boot auto-scans `@Component` beans across both modules.
+- **Toggle**: `batch.rules.engine=drools` (default), `evrete`, `dmn`, or `drools-ruleunit` — selects the active `TransactionRulesEvaluator` implementation via `@ConditionalOnProperty`
+- **Config**: `RulesEnginePocJobConfig` + `RulesEngineProperties` (bound to `batch.rules.*`) — stay in `k8s-batch-jobs`
+- **Domain port**: `TransactionRulesEvaluator` interface — custom driven port with four adapter implementations (in `k8s-batch-rules-kie`)
+- **Domain constants**: `EnrichmentRuleConstants` record — exchange rates, risk thresholds, compliance rules (in `k8s-batch-rules-kie`). Shared by Drools (DRL `global`), EVRete (constructor injection), and Drools rule units (plain field on `TransactionEnrichmentUnit`). DMN adapter uses it for exchange rates; risk/compliance thresholds are in the DMN model.
+- **DRL**: `k8s-batch-jobs/src/main/resources/rules/transaction-enrichment.drl` — 4 rules using `EnrichmentRuleConstants` global (not hardcoded constants). Imports resolve from `k8s-batch-rules-kie` at DRL compile time.
+- **DMN**: `k8s-batch-rules-kie/src/main/resources/dmn/risk-assessment.dmn` — two decision tables (Risk Score, Compliance Review) with dependency graph. Used by DMN adapter via `DMNRuntime` API loaded through `KieFileSystem`.
+- **Adapter fact**: `TransactionFact` — mutable JavaBean in `k8s-batch-rules-kie` for rules engine sessions (required by Drools DRL `then` blocks). Uses `RiskScore` enum (not String). Factory methods: `from(FinancialTransaction)` and `toEnrichedTransaction(engineName, processedAt)`
+- **Rule-unit adapter**: `DroolsRuleUnitTransactionRulesEvaluator` in `k8s-batch-rules-kie` uses `RuleUnitProvider` API with `TransactionEnrichmentUnit` (`RuleUnitData` + `DataStore`). FX/USD conversion in Java, risk scoring + compliance in DRL with OOPath syntax. No `kie-maven-plugin` needed — DRL is discovered at runtime. Designed for future decomposition into multiple units as the rule set grows.
+- **Rule-unit DRL**: co-located with the unit class package at `k8s-batch-rules-kie/src/main/resources/com/cominotti/.../droolsruleunit/transaction-enrichment-unit.drl` — 2 rules (risk scoring, compliance) using OOPath and unit-scoped field access instead of globals. Must be on the classpath matching the unit's Java package for `RuleUnitProvider` auto-discovery.
 - **Path validation**: `BatchFileProperties.requireWithinAllowedBase()` — shared CWE-22 path traversal prevention (used by all job configs)
 
 ## Job REST API
@@ -226,10 +240,35 @@ log.info("Starting Redpanda container (redpanda:v25.1.9)...");
 - **Logger declaration**: plain SLF4J `private static final Logger log = LoggerFactory.getLogger(ClassName.class)` — no Lombok
 - **Log format**: `key=value | key=value` pipe-separated structured fields for machine parseability
 - **Configuration**: `logback-spring.xml` with `<springProfile>` blocks — do NOT use `logging.level` in application YAML files (avoids precedence confusion)
-- **Profile levels**: production=INFO, standalone=INFO (`StandaloneJobConfig` at DEBUG), integration-test=DEBUG
+- **Profile levels**: production=INFO, standalone=INFO (`StandaloneJobConfig` at DEBUG), integration-test=WARN (override with `-Dtest.log.level=DEBUG`)
 - **Batch listeners**: `LoggingJobExecutionListener` and `LoggingStepExecutionListener` are `@Component` beans — register via `.listener()` on `JobBuilder` and `StepBuilder`/`RemotePartitioningManagerStepBuilder` respectively
 - **Duration utility**: `BatchDurationUtils.between(start, end)` for null-safe `Duration.between()` — shared by both listeners
 - **Log levels**: INFO for business events (job/step lifecycle, partition creation, config init), DEBUG for per-item details (filtered records, reader/writer creation), ERROR for failures, WARN for unexpected-but-non-fatal statuses
+
+## AutoCloseable / Resource Management
+
+**Always use try-with-resources** for objects that implement `AutoCloseable` or `Closeable`. Never use manual `try-finally` with `.close()` or `.dispose()`.
+
+```java
+// CORRECT
+try (KieSession session = kieContainer.newKieSession()) {
+    session.insert(fact);
+    session.fireAllRules();
+}
+
+// WRONG — manual try-finally
+KieSession session = kieContainer.newKieSession();
+try {
+    session.insert(fact);
+    session.fireAllRules();
+} finally {
+    session.dispose();
+}
+```
+
+**Scope**: sessions (KieSession, StatefulSession, RuleUnitInstance), streams, connections, prepared statements, readers/writers — any short-lived resource acquired and released within a method.
+
+**Exception**: long-lived resources managed by Spring's bean lifecycle (e.g., `KnowledgeService` cleaned up via `@PreDestroy`) do not use try-with-resources.
 
 ## Helm Chart Conventions
 
@@ -243,12 +282,23 @@ log.info("Starting Redpanda container (redpanda:v25.1.9)...");
 - **Init container image** (`busybox`) is parameterized via `global.initImage` in `values.yaml` — never hardcode it in templates
 - **Helm unit tests**: `helm/k8s-batch/tests/*_test.yaml` using `helm-unittest` plugin. Run with `helm unittest helm/k8s-batch`
 - **Template dependencies**: when a template references another (e.g., deployment includes configmap for checksum), both must be listed in `templates:` in the test file, and use `documentSelector` with `skipEmptyTemplates: true` to target the correct document
-- **CI validation**: `.github/workflows/helm-validate.yml` runs helm lint, unittest, kubeconform, and K3s smoke test
+- **CI validation**: `.github/workflows/helm-validate.yml` runs helm lint, unittest, kubeconform, and K3s smoke test. The K3s smoke test pre-pulls infrastructure images (`docker pull`) and imports them into K3s (`k3d image import`) before `helm install`. **Image versions in the CI workflow must always match their source of truth**: `values.yaml` for Helm-managed images (`mysql`, `kafka`, `schemaRegistry`, `global.initImage`) and `E2EContainerImages` / `TestContainerImages` for test-managed images. When bumping an image version, update both the source of truth and the CI workflow's pre-pull step in the same commit
+- **`values.yaml` documentation**: every non-trivial parameter must have a YAML comment explaining what it does, why the value was chosen, and how it relates to other parameters. Use `# --` prefix for block-level descriptions above a parameter group, and inline `#` comments on individual fields when the reasoning is not obvious from the name alone. This is especially important for probes, resource limits, timeouts, and any value derived from a formula (e.g., `periodSeconds * failureThreshold = max init window`)
+- **MySQL probes must use `tcpSocket`, not `mysqladmin`**: `mysqladmin ping -h localhost` connects via Unix socket, but the MySQL Docker image creates the socket at `/var/lib/mysql/mysql.sock` while `mysqladmin` looks for it at the compiled-in default path — causing probe failures even when MySQL is listening on port 3306. `tcpSocket` on port 3306 avoids this entirely. This applies to all three probes (startup, liveness, readiness).
+- **MySQL `startupProbe` is required**: MySQL first-start initialization (data dir creation, InnoDB init, `docker-entrypoint-initdb.d` DDL scripts) can take 5-10 minutes on CI runners. Without a startup probe, the liveness probe kills the container before init completes, causing crash-loops. The startup probe gates liveness/readiness during this phase. The Docker entrypoint runs the temporary init mysqld with `--skip-networking`, so port 3306 only opens after init finishes — making `tcpSocket` safe for startup detection.
+- **App Deployment `progressDeadlineSeconds`**: defaults to 900s (configurable via `app.progressDeadlineSeconds`). Kubernetes's default of 600s is too short when init containers wait for slow MySQL first-start — the Deployment declares itself `Failed` before the Helm timeout fires.
+- **CI `kubectl wait` must exclude Job pods**: The `Verify pods are ready` step uses `--field-selector=status.phase=Running` to skip `Completed` Job pods (e.g., `kafka-topics`). A completed pod's `Ready` condition is `False` (container exited), so `kubectl wait --for=condition=ready` without this filter always times out.
 
 ## Key Directories
 
 ```
-k8s-batch-app/src/main/java/com/cominotti/k8sbatch/
+k8s-batch-rules-kie/src/main/java/com/cominotti/k8sbatch/
+  batch/rulespoc/domain/      — TransactionRulesEvaluator port, FinancialTransaction, EnrichedFinancialTransaction, RiskScore, EnrichmentRuleConstants
+  batch/rulespoc/adapters/evaluatingrules/         — TransactionFact (shared mutable fact)
+  batch/rulespoc/adapters/evaluatingrules/dmn/     — DmnTransactionRulesEvaluator (Java + DMN hybrid)
+  batch/rulespoc/adapters/evaluatingrules/droolsruleunit/ — DroolsRuleUnitTransactionRulesEvaluator, TransactionEnrichmentUnit
+
+k8s-batch-jobs/src/main/java/com/cominotti/k8sbatch/
   batch/common/domain/    — CsvRecord, CsvRecordProcessor, BatchStepNames, BatchPartitionProperties
   batch/common/adapters/readingcsv/file/          — CsvRecordReaderFactory
   batch/common/adapters/persistingrecords/jdbc/   — CsvRecordWriter
@@ -261,24 +311,22 @@ k8s-batch-app/src/main/java/com/cominotti/k8sbatch/
   batch/transaction/adapters/streamingevents/kafka/           — TransactionKafkaConfig
   batch/transaction/adapters/persistingtransactions/jdbc/     — EnrichedTransactionWriter
   batch/transaction/config/   — TransactionEnrichmentJobConfig
-  batch/rulespoc/domain/      — FinancialTransaction, EnrichedFinancialTransaction, RiskScore, EnrichmentRuleConstants, TransactionRulesEvaluator
-  batch/rulespoc/adapters/evaluatingrules/         — TransactionFact (shared)
   batch/rulespoc/adapters/evaluatingrules/drools/  — DroolsTransactionRulesEvaluator
   batch/rulespoc/adapters/evaluatingrules/evrete/  — EvreteTransactionRulesEvaluator
-  batch/rulespoc/adapters/evaluatingrules/kogito/  — KogitoTransactionRulesEvaluator (Java + DMN hybrid)
   batch/rulespoc/adapters/persistingresults/jdbc/  — EnrichedFinancialTransactionWriter
   batch/rulespoc/adapters/readingcsv/file/         — FinancialTransactionReaderFactory
   batch/rulespoc/config/      — RulesEnginePocJobConfig, RulesEngineProcessor, RulesEngineProperties
-  config/             — RemotePartitioningJobConfig, StandaloneJobConfig
+  config/             — RemotePartitioningBaseConfig, RemotePartitioningKafkaConfig, RemotePartitioningJmsConfig, StandaloneJobConfig
   web/adapters/launchingjobs/rest/ — JobController, HelloController
   web/config/         — AsyncJobOperatorConfig
   web/dto/            — JobExecutionResponse
 
 k8s-batch-integration-tests/src/test/java/com/cominotti/k8sbatch/it/
-  config/             — ContainerHolder, SharedContainersConfig, MysqlOnlyContainersConfig, BatchTestJobConfig
+  config/             — ContainerHolder, SharedContainersConfig, JmsContainersConfig, MysqlOnlyContainersConfig, BatchTestJobConfig
   rest/               — REST endpoint tests
   batch/standalone/   — standalone batch tests
-  batch/remote/       — remote partitioning tests
+  batch/remote/       — Kafka remote partitioning tests
+  batch/jms/          — JMS remote partitioning tests (RabbitMQ via JMS client)
   database/           — schema verification tests
   infra/              — connectivity smoke tests
 

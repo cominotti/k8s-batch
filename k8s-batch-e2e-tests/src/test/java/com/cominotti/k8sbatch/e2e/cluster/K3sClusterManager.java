@@ -6,6 +6,7 @@ import com.cominotti.k8sbatch.e2e.diagnostics.PodDiagnostics;
 import io.fabric8.kubernetes.api.model.ConfigMap;
 import io.fabric8.kubernetes.api.model.ConfigMapBuilder;
 import io.fabric8.kubernetes.api.model.HasMetadata;
+import io.fabric8.kubernetes.api.model.batch.v1.Job;
 import io.fabric8.kubernetes.client.Config;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientBuilder;
@@ -172,7 +173,7 @@ public final class K3sClusterManager {
      * Loads a single Docker image into K3s.
      * Delegates to {@link K3sImageLoader#loadImage(K3sContainer, String)}.
      *
-     * @param imageName the Docker image name (e.g., {@code "mysql:8.0"})
+     * @param imageName the Docker image name (e.g., {@code "mysql:8.4"})
      * @throws Exception if saving, copying, or importing the image fails
      */
     public static void loadImage(String imageName) throws Exception {
@@ -240,7 +241,7 @@ public final class K3sClusterManager {
         log.info("Starting K3s container | memoryLimit={}MB", K3S_MEMORY_LIMIT_MB);
         k3sContainer = new K3sContainer(DockerImageName.parse(E2EContainerImages.K3S_IMAGE))
                 // Traefik disabled — the Helm chart uses NodePort/ClusterIP, not Ingress
-                .withCommand("server", "--disable=traefik")
+                .withCommand("server", "--disable=traefik,servicelb,metrics-server")
                 // Memory ceiling: OOM surfaces as pod OOMKilled (detected by DeploymentWaiter)
                 // instead of an opaque Docker daemon kill at the host level
                 .withCreateContainerCmdModifier(cmd ->
@@ -329,7 +330,18 @@ public final class K3sClusterManager {
         List<HasMetadata> resources = kubernetesClient.load(
                 new ByteArrayInputStream(manifests.getBytes(StandardCharsets.UTF_8))).items();
         for (HasMetadata resource : resources) {
-            kubernetesClient.resource(resource).inNamespace(NAMESPACE).unlock().createOr(NonDeletingOperation::update);
+            if (resource instanceof Job) {
+                // Jobs are immutable after creation (spec.selector, spec.template) —
+                // delete before re-creating. Mirrors helm.sh/hook-delete-policy: before-hook-creation.
+                try {
+                    kubernetesClient.resource(resource).inNamespace(NAMESPACE).delete();
+                } catch (Exception e) {
+                    log.debug("Job not found for pre-delete | name={}", resource.getMetadata().getName());
+                }
+                kubernetesClient.resource(resource).inNamespace(NAMESPACE).create();
+            } else {
+                kubernetesClient.resource(resource).inNamespace(NAMESPACE).unlock().createOr(NonDeletingOperation::update);
+            }
             log.debug("Applied | kind={} | name={}", resource.getKind(), resource.getMetadata().getName());
         }
         log.info("Applied {} K8s resources", resources.size());

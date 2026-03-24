@@ -3,6 +3,7 @@
 package com.cominotti.k8sbatch.e2e.deploy;
 
 import com.cominotti.k8sbatch.e2e.AbstractE2ETest;
+import com.cominotti.k8sbatch.e2e.E2EProfile;
 import com.cominotti.k8sbatch.e2e.cluster.K3sClusterManager;
 import com.cominotti.k8sbatch.e2e.cluster.PodUtils;
 import io.fabric8.kubernetes.api.model.Pod;
@@ -21,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * endpoint returns UP, and the MySQL target table is accessible. This test runs before any batch
  * job tests to catch deployment-level issues early.
  */
+@E2EProfile("e2e-remote.yaml")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class DeployHealthCheckE2E extends AbstractE2ETest {
 
@@ -44,10 +46,15 @@ class DeployHealthCheckE2E extends AbstractE2ETest {
     @Test
     @Order(1)
     void allPodsShouldBeReady() {
+        // Filter out Succeeded pods (e.g., completed Kafka topic-creation Job) —
+        // they carry the same release label but are not long-running services.
+        // A Succeeded pod never has Ready=True, so including it would always fail.
         List<Pod> pods = K3sClusterManager.client().pods()
                 .inNamespace(K3sClusterManager.namespace())
                 .withLabel("app.kubernetes.io/instance", K3sClusterManager.releaseName())
-                .list().getItems();
+                .list().getItems().stream()
+                .filter(pod -> !"Succeeded".equals(pod.getStatus().getPhase()))
+                .toList();
 
         assertThat(pods).isNotEmpty();
         for (Pod pod : pods) {
@@ -80,6 +87,6 @@ class DeployHealthCheckE2E extends AbstractE2ETest {
         int count = mysqlVerifier.countTargetRecords();
 
         // Table exists and is empty initially
-        assertThat(count).isEqualTo(0);
+        assertThat(count).isZero();
     }
 }

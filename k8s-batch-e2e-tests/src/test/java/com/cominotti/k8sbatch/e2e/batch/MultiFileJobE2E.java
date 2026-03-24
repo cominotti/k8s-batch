@@ -3,6 +3,7 @@
 package com.cominotti.k8sbatch.e2e.batch;
 
 import com.cominotti.k8sbatch.e2e.AbstractE2ETest;
+import com.cominotti.k8sbatch.e2e.E2EProfile;
 import com.cominotti.k8sbatch.e2e.client.BatchAppClient.JobResponse;
 import org.junit.jupiter.api.Test;
 
@@ -17,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * per CSV file (file-a: 30, file-b: 40, file-c: 50 rows). Verifies that all 120 records are
  * written to MySQL and that exactly three worker step executions are created (one per file).
  */
+@E2EProfile("e2e-remote.yaml")
 class MultiFileJobE2E extends AbstractE2ETest {
 
     /** {@inheritDoc} Deploys the remote-partitioning stack with Kafka for file-per-partition distribution. */

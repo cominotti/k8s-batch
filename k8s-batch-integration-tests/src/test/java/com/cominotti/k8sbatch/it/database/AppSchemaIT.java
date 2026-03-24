@@ -11,7 +11,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** Validates that Flyway-managed application schema (target_records table) is correctly created. */
+/** Validates that Liquibase-managed application schema (target_records table) is correctly created. */
 class AppSchemaIT extends AbstractIntegrationTest {
 
     @Test
@@ -26,7 +26,7 @@ class AppSchemaIT extends AbstractIntegrationTest {
     @Test
     void shouldApplyAllMigrations() {
         Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM flyway_schema_history WHERE success = 1",
+                "SELECT COUNT(*) FROM DATABASECHANGELOG WHERE EXECTYPE = 'EXECUTED'",
                 Integer.class);
         assertThat(count).isGreaterThanOrEqualTo(1);
     }

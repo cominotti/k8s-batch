@@ -11,7 +11,7 @@ Review documentation quality for changed files. The target audience is developer
 Before AI-driven review, run Checkstyle to get a deterministic list of structural JavaDoc gaps.
 
 1. Run `mvn checkstyle:check -Dcheckstyle.failOnViolation=false` (report-only — don't fail on violations during review)
-2. Read the XML reports at `<module>/target/checkstyle-javadoc.xml` for each module (e.g., `k8s-batch-app/target/checkstyle-javadoc.xml`)
+2. Read the XML reports at `<module>/target/checkstyle-javadoc.xml` for each module (e.g., `k8s-batch-jobs/target/checkstyle-javadoc.xml`)
 3. Parse `<file>` and `<error>` elements — each error has `line`, `column`, `severity`, `message`, and `source` (the check class name)
 4. Map each Checkstyle violation to the appropriate severity for the final report:
    - `MissingJavadocType` / `MissingJavadocMethod` → **[MISSING]**

@@ -19,7 +19,7 @@ A reference project demonstrating **Spring Batch horizontal scaling on Kubernete
      +------------------------------------------------+
               |                           |
      +--------v-----------+   +-----------v-----------+
-     |     MySQL 8.0      |   |   Schema Registry     |
+     |     MySQL 8.4      |   |   Schema Registry     |
      |  JobRepository +   |   |  (Confluent, stores   |
      |  Application data  |   |   in _schemas topic)  |
      +--------------------+   +-----------------------+
@@ -34,7 +34,7 @@ Every pod runs the same image and can act as both **manager** (partitions work) 
 | Java | 21 |
 | Spring Boot | 4.0.3 |
 | Spring Batch | 6.0.2 |
-| MySQL | 8.0 |
+| MySQL | 8.4 |
 | Kafka | Confluent Platform 7.9.0 (KRaft, no Zookeeper) |
 | Avro | 1.12 |
 | Schema Registry | Confluent 7.9.0 |
@@ -127,7 +127,7 @@ mvn -pl k8s-batch-integration-tests -am verify -Dit.test=FileRangePartitionStand
 | Batch Standalone | 12 | CSV jobs without Kafka, recovery, skip policies |
 | Batch Remote (CSV) | 10 | CSV jobs with real Kafka partitioning |
 | Batch Remote (Transaction) | 5 | Transaction enrichment job: end-to-end enrichment, exchange rate/risk score validation, upsert idempotency, Kafka transaction verification |
-| Database | 7 | Batch schema, Flyway migrations, constraints |
+| Database | 7 | Batch schema, Liquibase migrations, constraints |
 | Infrastructure | 6 | MySQL/Kafka connectivity smoke tests |
 
 ### Container Startup Optimization
@@ -281,7 +281,7 @@ k8s-batch/
 ├── pom.xml                          # Parent POM
 ├── Dockerfile                       # Multi-stage build
 ├── docker-compose.yml               # Local dev stack
-├── k8s-batch-app/                   # Main application
+├── k8s-batch-jobs/                   # Main application
 │   ├── pom.xml
 │   └── src/main/
 │       ├── avro/                    # Avro schemas (TransactionEvent, EnrichedTransactionEvent)
@@ -292,7 +292,7 @@ k8s-batch/
 │       │   └── web/                 # REST controller
 │       └── resources/
 │           ├── application*.yml     # Config per profile
-│           └── db/migration/        # Flyway SQL migrations
+│           └── db/changelog/        # Liquibase XML changelogs
 ├── k8s-batch-integration-tests/     # Integration tests (Redpanda + MySQL)
 │   ├── pom.xml
 │   └── src/test/

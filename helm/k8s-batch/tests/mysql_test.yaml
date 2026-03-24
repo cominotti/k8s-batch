@@ -31,16 +31,22 @@ tests:
             configMap:
               name: test-release-k8s-batch-mysql-init
 
-  - it: should configure liveness and readiness probes
+  - it: should configure startup, liveness and readiness probes with tcpSocket
     set:
       mysql.enabled: true
     asserts:
       - equal:
-          path: spec.template.spec.containers[0].livenessProbe.exec.command
-          value: ["mysqladmin", "ping", "-h", "localhost"]
+          path: spec.template.spec.containers[0].startupProbe.tcpSocket.port
+          value: 3306
       - equal:
-          path: spec.template.spec.containers[0].readinessProbe.exec.command
-          value: ["mysqladmin", "ping", "-h", "localhost"]
+          path: spec.template.spec.containers[0].startupProbe.failureThreshold
+          value: 120
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.tcpSocket.port
+          value: 3306
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.tcpSocket.port
+          value: 3306
 
   - it: should use single replica
     set:

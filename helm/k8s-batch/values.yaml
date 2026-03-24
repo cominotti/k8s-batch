@@ -2,14 +2,22 @@
 # Global
 # ======================================================================
 global:
+  # -- Shared image for all init containers (wait-for-mysql, wait-for-kafka, wait-for-schema-registry).
+  # Uses nc (netcat) and wget for TCP/HTTP readiness checks before the main container starts.
   initImage:
     repository: busybox
     tag: "1.36"
+  # -- Sleep interval (seconds) for init container retry loops (nc -z, wget).
+  # Override to 1 in E2E values for faster service detection.
+  initSleepSeconds: 3
 
 # ======================================================================
 # Application
 # ======================================================================
 app:
+  # -- Ignored when HPA is enabled (features.hpa=true) — the Deployment template omits the
+  # replicas field to avoid conflicts with HPA's own scaling decisions. Only takes effect
+  # when features.hpa=false (e.g., standalone or CI smoke tests).
   replicaCount: 2
 
   image:
@@ -21,10 +29,12 @@ app:
 
   serviceAccount:
     create: true
-    name: ""
+    name: ""    # empty = auto-generated from release name
     annotations: {}
 
   podAnnotations: {}
+  # -- Least-privilege security context. runAsNonRoot prevents root in the container,
+  # fsGroup ensures volume mounts (e.g., /tmp for Spring Boot) are group-writable.
   podSecurityContext:
     runAsNonRoot: true
     fsGroup: 1000
@@ -37,6 +47,8 @@ app:
       drop:
         - ALL
 
+  # -- JVM heap defaults to ~25% of memory limit (256Mi of 1Gi). The remainder covers
+  # metaspace, thread stacks, and Spring Batch chunk buffers during parallel partitions.
   resources:
     requests:
       cpu: 500m
@@ -45,12 +57,27 @@ app:
       cpu: "2"
       memory: 1Gi
 
+  # -- Active Spring profile(s). Controls partitioning transport and available jobs.
+  # Options: "remote-partitioning" (+ remote-kafka or remote-jms), "standalone".
+  # See CLAUDE.md "Profile Strategy" for the full profile matrix.
   springProfile: remote-partitioning
 
+  # -- Kubernetes Deployment progressDeadlineSeconds. The Deployment is marked Failed if no
+  # new pods become available within this window. Must be longer than the total time for
+  # init containers to complete (which depends on MySQL/Kafka/SR startup times).
+  # Default K8s value is 600s (10 min) — raised here to accommodate slow MySQL first-start
+  # on resource-constrained environments (CI runners).
+  progressDeadlineSeconds: 900
+
+  # -- Extension points: inject extra environment variables, volume mounts, and volumes
+  # without modifying the Deployment template (e.g., secrets, config files, sidecars).
   extraEnv: []
   extraVolumeMounts: []
   extraVolumes: []
 
+  # -- Liveness probe: restarts the container if the Spring Boot app becomes unresponsive.
+  # initialDelaySeconds is high (60s) because the JVM + Spring context + Batch schema
+  # validation can take 30-50s on first startup, especially with remote-partitioning profile.
   livenessProbe:
     httpGet:
       path: /actuator/health/liveness
@@ -60,6 +87,9 @@ app:
     failureThreshold: 5
     timeoutSeconds: 5
 
+  # -- Readiness probe: controls when the app receives traffic via its Service.
+  # Lower initialDelaySeconds than liveness — the app can start serving health checks
+  # before all batch infrastructure is fully warmed.
   readinessProbe:
     httpGet:
       path: /actuator/health/readiness
@@ -76,26 +106,82 @@ app:
   config:
     serverPort: 8080
     batchInitializeSchema: never  # DDL created by the MySQL init ConfigMap, not Spring Batch auto-config
+    # -- Arbitrary key-value pairs merged into the app ConfigMap.
+    # Use for one-off overrides (e.g., extra: { LOGGING_LEVEL_ROOT: DEBUG }).
     extra: {}
 
 # ======================================================================
-# Ingress
+# API Gateway
 # ======================================================================
-ingress:
-  enabled: false
-  className: nginx
-  annotations: {}
-  hosts:
-    - host: k8s-batch.local
-      paths:
-        - path: /
-          pathType: Prefix
-  tls: []
+gateway:
+  # -- Set to false to skip the gateway Deployment entirely (e.g., CI smoke tests).
+  # Also requires features.gateway=false to suppress related resources (HPA, Service).
+  enabled: true
+
+  image:
+    repository: ghcr.io/cominotti/k8s-batch-api-gateway
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  # -- Ignored when HPA is enabled (features.hpa=true).
+  replicaCount: 2
+
+  podAnnotations: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    fsGroup: 1000
+
+  securityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+  # -- Gateway is lightweight (routing only, no batch processing), so lower limits than app.
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+
+  # -- Liveness probe: lower initialDelaySeconds because the gateway has no batch/Kafka/DB
+  # initialization overhead — its Spring context is lightweight (routing only).
+  livenessProbe:
+    httpGet:
+      path: /actuator/health/liveness
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 15
+    failureThreshold: 5
+    timeoutSeconds: 5
+
+  readinessProbe:
+    httpGet:
+      path: /actuator/health/readiness
+      port: http
+    initialDelaySeconds: 15
+    periodSeconds: 10
+    failureThreshold: 3
+    timeoutSeconds: 5
+
+  service:
+    type: ClusterIP
+    port: 9090
+
+  config:
+    serverPort: 9090
+    extra: {}
 
 # ======================================================================
-# HPA
+# Gateway HPA
 # ======================================================================
-hpa:
+# -- Mirrors the app HPA pattern. Same conservative scale-down / fast scale-up strategy.
+# Kept as a separate section (not merged with gateway.*) so HPA can be toggled independently.
+gatewayHpa:
   enabled: true
   minReplicas: 2
   maxReplicas: 10
@@ -112,9 +198,68 @@ hpa:
         target:
           type: Utilization
           averageUtilization: 80
+  # -- Asymmetric behavior: conservative scale-down avoids flapping; fast scale-up handles traffic spikes.
   behavior:
     scaleDown:
-      stabilizationWindowSeconds: 300  # 5-minute cooldown prevents HPA thrashing during batch bursts
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 120
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Pods
+          value: 3
+          periodSeconds: 60
+
+# ======================================================================
+# Ingress
+# ======================================================================
+ingress:
+  # -- Disabled by default — enable for external access outside the cluster.
+  # Requires features.ingress=true AND an Ingress controller installed in the cluster.
+  enabled: false
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: k8s-batch.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# ======================================================================
+# HPA (App)
+# ======================================================================
+# -- Controls the HorizontalPodAutoscaler for the batch app Deployment.
+# When enabled (features.hpa=true), app.replicaCount is ignored — the Deployment template
+# omits the replicas field entirely to avoid HPA/Helm conflicts on scale.
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  # -- Dual-metric scaling: scales out when EITHER CPU or memory exceeds the target.
+  # CPU triggers on batch chunk processing bursts; memory triggers on large partition buffers.
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  # -- Asymmetric behavior: scale-down is conservative, scale-up is fast.
+  # Batch workloads are spiky — scaling up quickly handles partition bursts, while slow
+  # scale-down avoids flapping when jobs complete in waves.
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
       policies:
         - type: Pods
           value: 1
@@ -127,23 +272,38 @@ hpa:
           periodSeconds: 60
 
 # ======================================================================
+# Database
+# ======================================================================
+# -- Controls which DDL init scripts and JDBC configuration are rendered.
+# Supported values: "mysql" (default), "oracle"
+database:
+  type: mysql
+
+# ======================================================================
 # MySQL
 # ======================================================================
 mysql:
+  # -- Set to false when using an external MySQL or Oracle database (see database.type).
   enabled: true
 
   image:
     repository: mysql
-    tag: "8.0"
+    tag: "8.4"
     pullPolicy: IfNotPresent
 
+  # -- Credentials for the MySQL instance. Leave rootPassword/password empty in values
+  # and pass via --set at deploy time, or use existingSecret to reference a pre-created
+  # K8s Secret (takes precedence over inline values when non-empty).
   auth:
     rootPassword: ""
     database: k8sbatch
     username: k8sbatch
     password: ""
-    existingSecret: ""
+    existingSecret: ""    # name of an existing Secret with keys: root-password, username, password
 
+  # -- MySQL 8.4 memory: 512Mi request covers InnoDB buffer pool defaults (128Mi) + connection
+  # buffers + OS overhead. 1Gi limit provides headroom for docker-entrypoint-initdb.d scripts
+  # and concurrent batch job connections.
   resources:
     requests:
       cpu: 250m
@@ -153,7 +313,7 @@ mysql:
       memory: 1Gi
 
   persistence:
-    storageClass: ""
+    storageClass: ""      # empty = cluster default StorageClass
     size: 10Gi
     accessModes:
       - ReadWriteOnce
@@ -162,9 +322,44 @@ mysql:
     type: ClusterIP
     port: 3306
 
+  # -- Character set and collation for the MySQL server. utf8mb4 supports full Unicode
+  # (including emojis); utf8mb4_unicode_ci provides case-insensitive, accent-insensitive ordering.
   config:
     mysqlCharacterSetServer: utf8mb4
     mysqlCollationServer: utf8mb4_unicode_ci
+
+  # -- Startup probe: gates liveness/readiness during MySQL first-start initialization.
+  # While this probe is running, Kubernetes disables liveness and readiness checks,
+  # giving MySQL time to create the data directory, run InnoDB init, and execute the
+  # docker-entrypoint-initdb.d DDL scripts (Spring Batch schema).
+  # Max init window = periodSeconds * failureThreshold.
+  # Increase failureThreshold for environments with slow I/O (e.g., CI runners).
+  # Uses tcpSocket instead of mysqladmin — avoids Unix socket path mismatches across
+  # MySQL versions (mysqladmin -h localhost uses the socket, not TCP). Port 3306 only
+  # opens after the Docker entrypoint finishes init (temporary mysqld uses --skip-networking).
+  startupProbe:
+    tcpSocket:
+      port: 3306
+    periodSeconds: 5
+    failureThreshold: 120
+
+  # -- Liveness probe: restarts the container if MySQL becomes unresponsive.
+  # Only fires after startupProbe succeeds, so initialDelaySeconds can be low.
+  livenessProbe:
+    tcpSocket:
+      port: 3306
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    failureThreshold: 3
+
+  # -- Readiness probe: controls when MySQL receives traffic via its Service.
+  # A failure removes the pod from Service endpoints but does NOT restart it.
+  readinessProbe:
+    tcpSocket:
+      port: 3306
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    failureThreshold: 3
 
 # ======================================================================
 # Kafka (KRaft mode, no Zookeeper)
@@ -177,8 +372,13 @@ kafka:
     tag: "7.9.0"
     pullPolicy: IfNotPresent
 
+  # -- Number of Kafka brokers. Also controls internal topic replication factors
+  # (offsets, transaction state) via min(replicaCount, 3) in the StatefulSet template.
+  # E2E tests override to 1 for single-broker deployments.
   replicaCount: 3
 
+  # -- Memory: Kafka JVM heap (~512Mi) + OS page cache for log segment reads.
+  # 1536Mi limit = 512Mi heap + ~1Gi page cache headroom. Increase for high-throughput.
   resources:
     requests:
       cpu: 250m
@@ -188,7 +388,7 @@ kafka:
       memory: 1536Mi
 
   persistence:
-    storageClass: ""
+    storageClass: ""      # empty = cluster default StorageClass
     size: 10Gi
     accessModes:
       - ReadWriteOnce
@@ -198,13 +398,16 @@ kafka:
     port: 9092
 
   kraft:
-    clusterId: ""  # Empty = auto-generated UUID. First pod generates it, shares via /shared emptyDir volume
+    clusterId: ""  # empty = auto-generated UUID; first pod generates it, shares via /shared emptyDir
 
+  # -- Topic definitions rendered by job-create-topics.yaml via range loop.
+  # Adding a new topic is a values-only change — no template editing needed.
+  # replicationFactor must be <= kafka.replicaCount (Kafka rejects higher values).
   topics:
     partitionRequests:
       name: batch-partition-requests
-      partitions: 10
-      replicationFactor: 2  # Must be <= kafka.replicaCount (E2E overrides to 1 for single-broker)
+      partitions: 10            # matches default app.replicaCount * partitions-per-replica
+      replicationFactor: 2      # must be <= kafka.replicaCount
     partitionReplies:
       name: batch-partition-replies
       partitions: 10
@@ -217,12 +420,16 @@ kafka:
       name: enriched-transaction-events
       partitions: 10
       replicationFactor: 2
+    # -- Extra topics not used by the main batch jobs. Each entry needs: name, partitions,
+    # replicationFactor. Rendered by the same range loop in job-create-topics.yaml.
     extra: []
 
 # ======================================================================
 # Schema Registry (Confluent)
 # ======================================================================
 schemaRegistry:
+  # -- Required by the transaction enrichment job (Avro serialization).
+  # Also requires features.schemaRegistry=true to render the Deployment + Service.
   enabled: true
 
   image:
@@ -230,8 +437,11 @@ schemaRegistry:
     tag: "7.9.0"
     pullPolicy: IfNotPresent
 
-  replicaCount: 1  # Stateless (schemas stored in _schemas Kafka topic); scale for availability only
+  # -- Stateless — schemas are stored in the _schemas Kafka topic, not locally.
+  # Scale beyond 1 only for high-availability (active-passive via leader election).
+  replicaCount: 1
 
+  # -- Lightweight JVM service. Lower resource allocation than Kafka or the app.
   resources:
     requests:
       cpu: 100m
@@ -247,8 +457,13 @@ schemaRegistry:
 # ======================================================================
 # Feature flags
 # ======================================================================
+# -- Top-level feature toggles. These control which Kubernetes resources are rendered,
+# independent of each component's own enabled flag. Both must be true for a resource
+# to appear (e.g., Schema Registry needs schemaRegistry.enabled=true AND features.schemaRegistry=true).
+# Disable groups of features for lightweight deployments (e.g., CI: hpa=false, gateway=false).
 features:
-  kafka: true
-  schemaRegistry: true
-  hpa: true
-  ingress: false
+  kafka: true             # Kafka StatefulSet, Services, topic-creation Job
+  schemaRegistry: true    # Schema Registry Deployment + Service (required for Avro jobs)
+  hpa: true               # HPA for app (when false, app.replicaCount takes effect)
+  gateway: true           # API gateway Deployment + Service + HPA
+  ingress: false          # Ingress resource (requires an Ingress controller in the cluster)

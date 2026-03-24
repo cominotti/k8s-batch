@@ -1,3 +1,6 @@
+global:
+  initSleepSeconds: 1
+
 app:
   replicaCount: 1
   image:
@@ -25,7 +28,7 @@ app:
     httpGet:
       path: /actuator/health/liveness
       port: http
-    initialDelaySeconds: 90
+    initialDelaySeconds: 45
     periodSeconds: 15
     failureThreshold: 10
     timeoutSeconds: 5
@@ -33,7 +36,7 @@ app:
     httpGet:
       path: /actuator/health/readiness
       port: http
-    initialDelaySeconds: 60
+    initialDelaySeconds: 25
     periodSeconds: 10
     failureThreshold: 10
     timeoutSeconds: 5
@@ -86,8 +89,18 @@ kafka:
 schemaRegistry:
   enabled: false
 
+# Gateway disabled in standalone profile — standalone tests validate batch jobs
+# running in-process without Kafka, and the gateway requires the backend app
+# to be reachable which is already covered by direct appClient access.
+gateway:
+  enabled: false
+
+gatewayHpa:
+  enabled: false
+
 features:
   kafka: false
   schemaRegistry: false
+  gateway: false
   hpa: false
   ingress: false

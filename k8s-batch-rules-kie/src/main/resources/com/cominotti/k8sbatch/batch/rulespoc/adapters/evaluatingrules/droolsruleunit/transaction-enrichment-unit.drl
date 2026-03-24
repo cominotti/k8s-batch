@@ -1,0 +1,37 @@
+// SPDX-License-Identifier: Apache-2.0
+
+package com.cominotti.k8sbatch.batch.rulespoc.adapters.evaluatingrules.droolsruleunit;
+
+unit TransactionEnrichmentUnit;
+
+import com.cominotti.k8sbatch.batch.rulespoc.adapters.evaluatingrules.TransactionFact;
+import com.cominotti.k8sbatch.batch.rulespoc.domain.EnrichmentRuleConstants;
+
+// Only tabular business decisions live here — exchange rate lookup and USD conversion
+// are sequential computations handled in Java by the evaluator before firing this unit.
+
+// ── Risk Score Assignment ─────────────────────────────────────────────────────
+// Delegates to ruleConstants.riskScoreFor() for precision-safe threshold comparisons.
+// Fires when amountUsd is set (by Java) and riskScore is not yet assigned.
+
+rule "Risk Score Assignment"
+    when
+        $tx: /transactions[ amountUsd != null, riskScore == null ]
+    then
+        $tx.setRiskScore(ruleConstants.riskScoreFor($tx.getAmountUsd()));
+        transactions.update($tx);
+end
+
+// ── Compliance Flag ───────────────────────────────────────────────────────────
+// Fires after risk score is assigned. The actual business decision is delegated
+// to ruleConstants.requiresComplianceReview() — flags HIGH risk or large amounts.
+
+rule "Compliance Flag"
+    when
+        $tx: /transactions[ riskScore != null, complianceFlag == false ]
+    then
+        if (ruleConstants.requiresComplianceReview($tx.getRiskScore(), $tx.getAmountUsd())) {
+            $tx.setComplianceFlag(true);
+            transactions.update($tx);
+        }
+end

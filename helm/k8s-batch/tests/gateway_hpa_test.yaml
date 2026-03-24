@@ -1,0 +1,60 @@
+suite: gateway HPA
+templates:
+  - templates/gateway/hpa.yaml
+release:
+  name: test-release
+tests:
+  - it: should render when both gatewayHpa.enabled and gateway.enabled are true
+    set:
+      gateway.enabled: true
+      gatewayHpa.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: HorizontalPodAutoscaler
+      - equal:
+          path: apiVersion
+          value: autoscaling/v2
+
+  - it: should not render when gatewayHpa.enabled is false
+    set:
+      gateway.enabled: true
+      gatewayHpa.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render when gateway.enabled is false
+    set:
+      gateway.enabled: false
+      gatewayHpa.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should target the gateway deployment
+    set:
+      gateway.enabled: true
+      gatewayHpa.enabled: true
+    asserts:
+      - equal:
+          path: spec.scaleTargetRef.kind
+          value: Deployment
+      - equal:
+          path: spec.scaleTargetRef.name
+          value: test-release-k8s-batch-gateway
+
+  - it: should set min and max replicas from values
+    set:
+      gateway.enabled: true
+      gatewayHpa.enabled: true
+      gatewayHpa.minReplicas: 3
+      gatewayHpa.maxReplicas: 15
+    asserts:
+      - equal:
+          path: spec.minReplicas
+          value: 3
+      - equal:
+          path: spec.maxReplicas
+          value: 15

@@ -51,10 +51,10 @@ public class BatchTestJobConfig {
         return utils;
     }
 
-    // Only created under remote-partitioning profile — standalone tests don't load the
-    // transactionEnrichmentJob bean, so this must be profile-gated to avoid NoSuchBeanException.
+    // Only created under remote-kafka profile — the transactionEnrichmentJob bean requires Kafka,
+    // so this must be profile-gated to avoid NoSuchBeanException in standalone/AMQP/SQS contexts.
     @Bean
-    @Profile("remote-partitioning")
+    @Profile("remote-kafka")
     public JobOperatorTestUtils transactionJobOperatorTestUtils(
             JobOperator jobOperator,
             JobRepository jobRepository,

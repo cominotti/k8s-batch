@@ -10,6 +10,11 @@ spec:
   # Omit replicas when HPA is enabled to prevent Helm/HPA conflicts
   replicas: {{ .Values.app.replicaCount }}
   {{- end }}
+  {{- if .Values.app.progressDeadlineSeconds }}
+  # Raised from K8s default (600s) — init containers can block for minutes waiting
+  # for MySQL first-start, causing K8s to mark the Deployment as Failed prematurely
+  progressDeadlineSeconds: {{ .Values.app.progressDeadlineSeconds }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "k8s-batch.selectorLabels" . | nindent 6 }}
@@ -36,19 +41,26 @@ spec:
       initContainers:
         - name: wait-for-mysql
           image: "{{ .Values.global.initImage.repository }}:{{ .Values.global.initImage.tag }}"
+          # busybox runs as root — override pod-level runAsNonRoot for init containers
+          securityContext:
+            runAsNonRoot: false
+            runAsUser: 0
           command:
             - sh
             - -c
             - |
               until nc -z {{ include "k8s-batch.mysql.host" . }} {{ .Values.mysql.service.port }}; do
                 echo "Waiting for MySQL..."
-                sleep 3
+                sleep {{ .Values.global.initSleepSeconds }}
               done
         {{- if and .Values.kafka.enabled .Values.features.kafka }}
         # Uses headless service DNS (kafka-0.kafka-headless) instead of ClusterIP because the
         # ClusterIP service may not be ready before at least one Kafka pod passes readiness
         - name: wait-for-kafka
           image: "{{ .Values.global.initImage.repository }}:{{ .Values.global.initImage.tag }}"
+          securityContext:
+            runAsNonRoot: false
+            runAsUser: 0
           command:
             - sh
             - -c
@@ -56,19 +68,22 @@ spec:
               KAFKA_HOST="{{ include "k8s-batch.fullname" . }}-kafka-0.{{ include "k8s-batch.fullname" . }}-kafka-headless"
               until nc -z $KAFKA_HOST {{ .Values.kafka.service.port }}; do
                 echo "Waiting for Kafka..."
-                sleep 3
+                sleep {{ .Values.global.initSleepSeconds }}
               done
         {{- end }}
         {{- if and .Values.kafka.enabled .Values.features.kafka .Values.schemaRegistry.enabled .Values.features.schemaRegistry }}
         - name: wait-for-schema-registry
           image: "{{ .Values.global.initImage.repository }}:{{ .Values.global.initImage.tag }}"
+          securityContext:
+            runAsNonRoot: false
+            runAsUser: 0
           command:
             - sh
             - -c
             - |
               until nc -z {{ include "k8s-batch.fullname" . }}-schema-registry {{ .Values.schemaRegistry.service.port }}; do
                 echo "Waiting for Schema Registry..."
-                sleep 3
+                sleep {{ .Values.global.initSleepSeconds }}
               done
         {{- end }}
       containers:
@@ -96,6 +111,8 @@ spec:
                 secretKeyRef:
                   name: {{ include "k8s-batch.mysql.secretName" . }}
                   key: password
+            - name: SPRING_DATASOURCE_DRIVER_CLASS_NAME
+              value: {{ include "k8s-batch.datasource.driverClassName" . | quote }}
             - name: SPRING_BATCH_JDBC_INITIALIZE_SCHEMA
               value: {{ .Values.app.config.batchInitializeSchema | quote }}
             {{- if and .Values.kafka.enabled .Values.features.kafka }}

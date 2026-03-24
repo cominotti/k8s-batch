@@ -39,6 +39,7 @@ public abstract class AbstractE2ETest {
 
     protected PortForwardManager portForwardManager;
     protected BatchAppClient appClient;
+    protected BatchAppClient gatewayClient;
     protected MysqlVerifier mysqlVerifier;
 
     /**
@@ -67,6 +68,15 @@ public abstract class AbstractE2ETest {
     }
 
     /**
+     * Whether to load the gateway Docker image into K3s. Defaults to {@link #requiresKafka()}
+     * because the gateway is always co-deployed in the remote profile ({@code e2e-remote.yaml}).
+     * Standalone tests skip both Kafka and gateway.
+     */
+    protected boolean requiresGateway() {
+        return requiresKafka();
+    }
+
+    /**
      * One-time setup for all test methods in this class ({@code @TestInstance(PER_CLASS)}).
      *
      * <p>Execution order:
@@ -82,6 +92,7 @@ public abstract class AbstractE2ETest {
      */
     @BeforeAll
     void setUp() throws Exception {
+        validateProfileAnnotation();
         log.info("Setting up E2E test | class={} | valuesFile={}", getClass().getSimpleName(), valuesFile());
 
         K3sClusterManager.ensureClusterRunning();
@@ -97,6 +108,12 @@ public abstract class AbstractE2ETest {
         appClient = new BatchAppClient(appPort);
         // Credentials must match the Helm values file (mysql.auth.database/username/password)
         mysqlVerifier = new MysqlVerifier(mysqlPort, "k8sbatch", "k8sbatch", "e2e_pass");
+
+        if (requiresGateway()) {
+            int gatewayPort = portForwardManager.forwardToGateway(9090);
+            gatewayClient = new BatchAppClient(gatewayPort);
+            log.info("Gateway port-forward established | gatewayPort={}", gatewayPort);
+        }
 
         log.info("E2E test setup complete | appPort={} | mysqlPort={}", appPort, mysqlPort);
     }
@@ -134,6 +151,20 @@ public abstract class AbstractE2ETest {
     }
 
     /**
+     * Validates that {@link E2EProfile} matches {@link #valuesFile()} to catch annotation drift.
+     * Mismatches would cause {@link E2EProfileClassOrderer} to group the test class incorrectly,
+     * leading to unnecessary profile switches.
+     */
+    private void validateProfileAnnotation() {
+        E2EProfile profile = getClass().getAnnotation(E2EProfile.class);
+        if (profile != null && !profile.value().equals(valuesFile())) {
+            throw new IllegalStateException(
+                    "@E2EProfile(\"" + profile.value() + "\") does not match valuesFile() \""
+                            + valuesFile() + "\" on " + getClass().getSimpleName());
+        }
+    }
+
+    /**
      * Returns the list of Docker images required by this test class.
      * Override to customize for tests that need fewer (or additional) images.
      *
@@ -148,6 +179,10 @@ public abstract class AbstractE2ETest {
         if (requiresKafka()) {
             images.add(E2EContainerImages.KAFKA_IMAGE);
             images.add(E2EContainerImages.SCHEMA_REGISTRY_IMAGE);
+        }
+
+        if (requiresGateway()) {
+            images.add(E2EContainerImages.GATEWAY_IMAGE);
         }
         return images;
     }

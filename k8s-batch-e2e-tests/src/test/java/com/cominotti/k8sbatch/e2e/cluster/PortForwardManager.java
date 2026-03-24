@@ -69,6 +69,15 @@ public final class PortForwardManager implements Closeable {
     }
 
     /**
+     * Port-forwards to the gateway pod (component=gateway).
+     */
+    public int forwardToGateway(int containerPort) {
+        return forwardToService(Map.of(
+                "app.kubernetes.io/instance", K3sClusterManager.releaseName(),
+                "app.kubernetes.io/component", "gateway"), containerPort);
+    }
+
+    /**
      * Port-forwards to the MySQL pod (component=mysql).
      */
     public int forwardToMysql(int containerPort) {

@@ -1,0 +1,101 @@
+suite: database type
+templates:
+  - templates/mysql/configmap.yaml
+  - templates/mysql/configmap-oracle.yaml
+release:
+  name: test-release
+tests:
+  - it: should render MySQL init ConfigMap by default
+    documentSelector:
+      path: metadata.name
+      value: test-release-k8s-batch-mysql-init
+      skipEmptyTemplates: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["01-spring-batch-schema.sql"]
+          pattern: ENGINE=InnoDB
+
+  - it: should render Oracle init ConfigMap when database type is oracle
+    documentSelector:
+      path: metadata.name
+      value: test-release-k8s-batch-mysql-init
+      skipEmptyTemplates: true
+    set:
+      database.type: oracle
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["01-spring-batch-schema.sql"]
+          pattern: "NUMBER\\(19\\)"
+
+  - it: should not render MySQL ConfigMap when database type is oracle
+    set:
+      database.type: oracle
+    templates:
+      - templates/mysql/configmap.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render Oracle init ConfigMap even when mysql is disabled
+    documentSelector:
+      path: metadata.name
+      value: test-release-k8s-batch-mysql-init
+      skipEmptyTemplates: true
+    set:
+      database.type: oracle
+      mysql.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 1
+      - matchRegex:
+          path: data["01-spring-batch-schema.sql"]
+          pattern: "NUMBER\\(19\\)"
+
+  - it: should not render Oracle ConfigMap when database type is mysql
+    templates:
+      - templates/mysql/configmap-oracle.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+---
+suite: database driver class
+templates:
+  - templates/app/deployment.yaml
+  - templates/app/configmap.yaml
+release:
+  name: test-release
+tests:
+  - it: should set MySQL driver class by default
+    documentSelector:
+      path: kind
+      value: Deployment
+      skipEmptyTemplates: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SPRING_DATASOURCE_DRIVER_CLASS_NAME
+            value: "com.mysql.cj.jdbc.Driver"
+
+  - it: should set Oracle driver class when database type is oracle
+    documentSelector:
+      path: kind
+      value: Deployment
+      skipEmptyTemplates: true
+    set:
+      database.type: oracle
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SPRING_DATASOURCE_DRIVER_CLASS_NAME
+            value: "oracle.jdbc.OracleDriver"

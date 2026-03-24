@@ -1,0 +1,10 @@
+# Standalone profile: in-process partitioning via TaskExecutorPartitionHandler (no broker needed).
+# Auto-configurations for all messaging brokers must be explicitly excluded because their
+# dependencies are on the classpath transitively via spring-batch-integration,
+# spring-integration-kafka, and spring-integration-jms — simply not having a broker
+# is not enough to prevent auto-configuration from failing.
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+      - org.springframework.boot.autoconfigure.jms.JmsAutoConfiguration
