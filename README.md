@@ -19,7 +19,7 @@ A reference project demonstrating **Spring Batch horizontal scaling on Kubernete
      +------------------------------------------------+
               |                           |
      +--------v-----------+   +-----------v-----------+
-     |     MySQL 8.0      |   |   Schema Registry     |
+     |     MySQL 8.4      |   |   Schema Registry     |
      |  JobRepository +   |   |  (Confluent, stores   |
      |  Application data  |   |   in _schemas topic)  |
      +--------------------+   +-----------------------+
@@ -34,7 +34,7 @@ Every pod runs the same image and can act as both **manager** (partitions work) 
 | Java | 21 |
 | Spring Boot | 4.0.3 |
 | Spring Batch | 6.0.2 |
-| MySQL | 8.0 |
+| MySQL | 8.4 |
 | Kafka | Confluent Platform 7.9.0 (KRaft, no Zookeeper) |
 | Avro | 1.12 |
 | Schema Registry | Confluent 7.9.0 |

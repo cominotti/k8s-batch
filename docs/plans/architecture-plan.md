@@ -4,7 +4,7 @@
 
 Create a **greenfield Maven-based reference project** demonstrating how to combine Spring Batch with Kubernetes for horizontally-scalable batch processing. The project deploys via Helm 3 charts with MySQL (JobRepository + app data) and Kafka (remote partitioning messaging). It includes two CSV-to-DB ETL sample jobs, REST/Actuator endpoints, and extensive Testcontainers integration tests.
 
-**Tech stack**: Java 21, Spring Boot 4.0.3, Spring Batch 6.x, Spring Integration Kafka, MySQL 8.0, Kafka (KRaft), Helm 3, Testcontainers 2.x.
+**Tech stack**: Java 21, Spring Boot 4.0.3, Spring Batch 6.x, Spring Integration Kafka, MySQL 8.4, Kafka (KRaft), Helm 3, Testcontainers 2.x.
 
 ---
 

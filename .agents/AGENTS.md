@@ -7,7 +7,7 @@ Spring Boot 4.0.3 + Spring Batch 6.x reference project for horizontally-scalable
 ## Tech Stack
 
 - **Java 21**, **Spring Boot 4.0.3**, **Spring Batch 6.0.2**
-- **MySQL 8.0 / Oracle DB** — JobRepository + application data
+- **MySQL 8.4 / Oracle DB** — JobRepository + application data
 - **Kafka (Confluent Platform 7.9.0, KRaft mode)** — remote partitioning messaging + event streaming
 - **Avro 1.12 + Confluent Schema Registry** — event serialization for transaction enrichment job
 - **Helm 3** — Kubernetes deployment

@@ -173,7 +173,7 @@ public final class K3sClusterManager {
      * Loads a single Docker image into K3s.
      * Delegates to {@link K3sImageLoader#loadImage(K3sContainer, String)}.
      *
-     * @param imageName the Docker image name (e.g., {@code "mysql:8.0"})
+     * @param imageName the Docker image name (e.g., {@code "mysql:8.4"})
      * @throws Exception if saving, copying, or importing the image fails
      */
     public static void loadImage(String imageName) throws Exception {

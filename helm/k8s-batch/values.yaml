@@ -281,7 +281,7 @@ mysql:
 
   image:
     repository: mysql
-    tag: "8.0"
+    tag: "8.4"
     pullPolicy: IfNotPresent
 
   # -- Credentials for the MySQL instance. Leave rootPassword/password empty in values
@@ -294,7 +294,7 @@ mysql:
     password: ""
     existingSecret: ""    # name of an existing Secret with keys: root-password, username, password
 
-  # -- MySQL 8.0 memory: 512Mi request covers InnoDB buffer pool defaults (128Mi) + connection
+  # -- MySQL 8.4 memory: 512Mi request covers InnoDB buffer pool defaults (128Mi) + connection
   # buffers + OS overhead. 1Gi limit provides headroom for docker-entrypoint-initdb.d scripts
   # and concurrent batch job connections.
   resources:
