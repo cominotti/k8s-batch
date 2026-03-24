@@ -283,6 +283,7 @@ try {
 - **Helm unit tests**: `helm/k8s-batch/tests/*_test.yaml` using `helm-unittest` plugin. Run with `helm unittest helm/k8s-batch`
 - **Template dependencies**: when a template references another (e.g., deployment includes configmap for checksum), both must be listed in `templates:` in the test file, and use `documentSelector` with `skipEmptyTemplates: true` to target the correct document
 - **CI validation**: `.github/workflows/helm-validate.yml` runs helm lint, unittest, kubeconform, and K3s smoke test
+- **`values.yaml` documentation**: every non-trivial parameter must have a YAML comment explaining what it does, why the value was chosen, and how it relates to other parameters. Use `# --` prefix for block-level descriptions above a parameter group, and inline `#` comments on individual fields when the reasoning is not obvious from the name alone. This is especially important for probes, resource limits, timeouts, and any value derived from a formula (e.g., `periodSeconds * failureThreshold = max init window`)
 
 ## Key Directories
 
