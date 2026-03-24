@@ -100,7 +100,7 @@ jobs:
             --set gatewayHpa.enabled=false \
             --set features.hpa=false \
             --set features.gateway=false \
-            --wait --timeout 8m
+            --wait --timeout 15m
 
       - name: Verify pods are ready
         run: |

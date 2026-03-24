@@ -331,7 +331,7 @@ mysql:
     exec:
       command: ["mysqladmin", "ping", "-h", "localhost"]
     periodSeconds: 5
-    failureThreshold: 30
+    failureThreshold: 60
     timeoutSeconds: 3      # avoid false failures on slow/loaded disks
 
   # -- Liveness probe: restarts the container if MySQL becomes unresponsive.
