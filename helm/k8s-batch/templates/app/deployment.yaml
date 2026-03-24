@@ -10,6 +10,9 @@ spec:
   # Omit replicas when HPA is enabled to prevent Helm/HPA conflicts
   replicas: {{ .Values.app.replicaCount }}
   {{- end }}
+  {{- if .Values.app.progressDeadlineSeconds }}
+  progressDeadlineSeconds: {{ .Values.app.progressDeadlineSeconds }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "k8s-batch.selectorLabels" . | nindent 6 }}

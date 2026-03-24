@@ -62,6 +62,13 @@ app:
   # See CLAUDE.md "Profile Strategy" for the full profile matrix.
   springProfile: remote-partitioning
 
+  # -- Kubernetes Deployment progressDeadlineSeconds. The Deployment is marked Failed if no
+  # new pods become available within this window. Must be longer than the total time for
+  # init containers to complete (which depends on MySQL/Kafka/SR startup times).
+  # Default K8s value is 600s (10 min) — raised here to accommodate slow MySQL first-start
+  # on resource-constrained environments (CI runners).
+  progressDeadlineSeconds: 900
+
   # -- Extension points: inject extra environment variables, volume mounts, and volumes
   # without modifying the Deployment template (e.g., secrets, config files, sidecars).
   extraEnv: []
@@ -331,7 +338,7 @@ mysql:
     exec:
       command: ["mysqladmin", "ping", "-h", "localhost"]
     periodSeconds: 5
-    failureThreshold: 60
+    failureThreshold: 120
     timeoutSeconds: 3      # avoid false failures on slow/loaded disks
 
   # -- Liveness probe: restarts the container if MySQL becomes unresponsive.

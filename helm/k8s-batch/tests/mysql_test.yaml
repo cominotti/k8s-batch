@@ -40,7 +40,7 @@ tests:
           value: ["mysqladmin", "ping", "-h", "localhost"]
       - equal:
           path: spec.template.spec.containers[0].startupProbe.failureThreshold
-          value: 60
+          value: 120
       - equal:
           path: spec.template.spec.containers[0].livenessProbe.exec.command
           value: ["mysqladmin", "ping", "-h", "localhost"]

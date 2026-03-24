@@ -163,6 +163,18 @@ tests:
           path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
           value: false
 
+  - it: should set progressDeadlineSeconds from values
+    documentSelector:
+      path: kind
+      value: Deployment
+      skipEmptyTemplates: true
+    set:
+      app.progressDeadlineSeconds: 900
+    asserts:
+      - equal:
+          path: spec.progressDeadlineSeconds
+          value: 900
+
   - it: should include SCHEMA_REGISTRY_URL when schema registry enabled
     documentSelector:
       path: kind
