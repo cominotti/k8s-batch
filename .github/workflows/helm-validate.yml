@@ -118,7 +118,7 @@ jobs:
 
       - name: Verify pods are ready
         run: |
-          kubectl wait --for=condition=ready pod -l app.kubernetes.io/instance=test-release --timeout=120s
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/instance=test-release --field-selector=status.phase=Running --timeout=120s
           kubectl get pods -l app.kubernetes.io/instance=test-release
 
       - name: Smoke test health endpoint
