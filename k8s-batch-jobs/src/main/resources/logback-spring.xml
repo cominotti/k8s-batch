@@ -1,8 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
 
+    <!-- Bridges spring.application.name from the Spring Environment into Logback's property scope.
+         <property> would not work here — it uses Logback's own resolution (system props only),
+         which runs before the Spring Environment is available. -->
+    <springProperty scope="context" name="appName" source="spring.application.name" defaultValue="unknown"/>
+
     <property name="LOG_PATTERN"
-              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{40} - %msg%n"/>
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [${appName},%X{traceId:-},%X{spanId:-}] %logger{40} - %msg%n"/>
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>

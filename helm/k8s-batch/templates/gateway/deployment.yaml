@@ -23,6 +23,10 @@ spec:
       annotations:
         # Triggers rolling restart when ConfigMap content changes
         checksum/config: {{ include (print .Template.BasePath "/gateway/configmap.yaml") . | sha256sum }}
+        # Prometheus scraping — auto-discovered by Prometheus Operator or annotation-based scrapers
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ .Values.gateway.config.serverPort | quote }}
+        prometheus.io/path: "/actuator/prometheus"
         {{- with .Values.gateway.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

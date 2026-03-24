@@ -39,7 +39,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,prometheus,metrics
   endpoint:
     health:
       show-details: always
@@ -51,3 +51,12 @@ management:
       enabled: true
     readinessstate:
       enabled: true
+  tracing:
+    sampling:
+      # 100% sampling for development. Override to 0.1-0.3 in production via
+      # MANAGEMENT_TRACING_SAMPLING_PROBABILITY env var to control trace volume.
+      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:1.0}
+  metrics:
+    tags:
+      # Enables filtering by application in multi-service Prometheus queries
+      application: ${spring.application.name}
