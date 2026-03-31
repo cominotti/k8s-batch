@@ -3,6 +3,7 @@
 package com.cominotti.k8sbatch.e2e;
 
 import com.cominotti.k8sbatch.e2e.client.BatchAppClient;
+import com.cominotti.k8sbatch.e2e.client.CrudAppClient;
 import com.cominotti.k8sbatch.e2e.client.MysqlVerifier;
 import com.cominotti.k8sbatch.e2e.cluster.K3sClusterManager;
 import com.cominotti.k8sbatch.e2e.cluster.PortForwardManager;
@@ -40,6 +41,7 @@ public abstract class AbstractE2ETest {
     protected PortForwardManager portForwardManager;
     protected BatchAppClient appClient;
     protected BatchAppClient gatewayClient;
+    protected CrudAppClient crudClient;
     protected MysqlVerifier mysqlVerifier;
 
     /**
@@ -74,6 +76,16 @@ public abstract class AbstractE2ETest {
      */
     protected boolean requiresGateway() {
         return requiresKafka();
+    }
+
+    /**
+     * Whether to load the CRUD service Docker image into K3s and port-forward to it.
+     * Returns {@code false} by default — subclasses testing CRUD endpoints override to
+     * return {@code true}. The CRUD image is deployed in both E2E profiles since it only
+     * needs MySQL.
+     */
+    protected boolean requiresCrud() {
+        return false;
     }
 
     /**
@@ -115,6 +127,12 @@ public abstract class AbstractE2ETest {
             log.info("Gateway port-forward established | gatewayPort={}", gatewayPort);
         }
 
+        if (requiresCrud()) {
+            int crudPort = portForwardManager.forwardToCrud(8081);
+            crudClient = new CrudAppClient(crudPort);
+            log.info("CRUD port-forward established | crudPort={}", crudPort);
+        }
+
         log.info("E2E test setup complete | appPort={} | mysqlPort={}", appPort, mysqlPort);
     }
 
@@ -147,6 +165,9 @@ public abstract class AbstractE2ETest {
     void cleanTestData() throws Exception {
         if (mysqlVerifier != null) {
             mysqlVerifier.cleanTargetRecords();
+            if (requiresCrud()) {
+                mysqlVerifier.cleanCrudTables();
+            }
         }
     }
 
@@ -175,6 +196,8 @@ public abstract class AbstractE2ETest {
         images.add(E2EContainerImages.APP_IMAGE);
         images.add(E2EContainerImages.MYSQL_IMAGE);
         images.add(E2EContainerImages.BUSYBOX_IMAGE);
+        // CRUD image is always loaded because crud.enabled=true in all E2E values files
+        images.add(E2EContainerImages.CRUD_IMAGE);
 
         if (requiresKafka()) {
             images.add(E2EContainerImages.KAFKA_IMAGE);
@@ -184,6 +207,7 @@ public abstract class AbstractE2ETest {
         if (requiresGateway()) {
             images.add(E2EContainerImages.GATEWAY_IMAGE);
         }
+
         return images;
     }
 

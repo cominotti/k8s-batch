@@ -3,6 +3,7 @@
 package com.cominotti.k8sbatch.it.infra;
 
 import com.cominotti.k8sbatch.it.AbstractIntegrationTest;
+import com.cominotti.k8sbatch.it.config.TestContainerImages;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -25,7 +26,8 @@ class MysqlConnectivityIT extends AbstractIntegrationTest {
     @Test
     void shouldHaveExpectedMysqlVersion() {
         String version = jdbcTemplate.queryForObject("SELECT VERSION()", String.class);
-        // Must match TestContainerImages.MYSQL_IMAGE version
-        assertThat(version).startsWith("8.0");
+        // Extract major.minor from TestContainerImages.MYSQL_IMAGE (e.g., "mysql:8.4" → "8.4")
+        String expectedPrefix = TestContainerImages.MYSQL_IMAGE.split(":")[1];
+        assertThat(version).startsWith(expectedPrefix);
     }
 }

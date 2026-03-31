@@ -7,16 +7,20 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /**
  * Gateway configuration bound to the {@code gateway.*} properties.
  *
- * @param backendUrl         base URL of the {@code k8s-batch-jobs} backend (default: {@code http://localhost:8080})
- * @param rateLimit          rate limiting configuration for the job API routes
- * @param circuitBreakerName name of the Resilience4j circuit breaker instance (default: {@code batchBackend}).
- *                           Must match a key under {@code resilience4j.circuitbreaker.instances.*} in YAML
+ * @param backendUrl             base URL of the {@code k8s-batch-jobs} backend (default: {@code http://localhost:8080})
+ * @param rateLimit              rate limiting configuration for the job API routes
+ * @param circuitBreakerName     name of the Resilience4j circuit breaker for the batch backend (default: {@code batchBackend}).
+ *                               Must match a key under {@code resilience4j.circuitbreaker.instances.*} in YAML
+ * @param crudBackendUrl         base URL of the {@code k8s-batch-crud} backend (default: {@code http://localhost:8081})
+ * @param crudCircuitBreakerName name of the Resilience4j circuit breaker for the CRUD backend (default: {@code crudBackend})
  */
 @ConfigurationProperties(prefix = "gateway")
 public record GatewayProperties(
         String backendUrl,
         RateLimitProperties rateLimit,
-        String circuitBreakerName) {
+        String circuitBreakerName,
+        String crudBackendUrl,
+        String crudCircuitBreakerName) {
 
     // Compact constructor applies defaults because records cannot use field initializers
     public GatewayProperties {
@@ -28,6 +32,12 @@ public record GatewayProperties(
         }
         if (circuitBreakerName == null || circuitBreakerName.isBlank()) {
             circuitBreakerName = "batchBackend";
+        }
+        if (crudBackendUrl == null || crudBackendUrl.isBlank()) {
+            crudBackendUrl = "http://localhost:8081";
+        }
+        if (crudCircuitBreakerName == null || crudCircuitBreakerName.isBlank()) {
+            crudCircuitBreakerName = "crudBackend";
         }
     }
 

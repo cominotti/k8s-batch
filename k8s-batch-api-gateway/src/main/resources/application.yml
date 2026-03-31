@@ -17,6 +17,8 @@ gateway:
     capacity: ${GATEWAY_RATE_LIMIT_CAPACITY:100}
     period-seconds: ${GATEWAY_RATE_LIMIT_PERIOD_SECONDS:60}
   circuit-breaker-name: batchBackend
+  crud-backend-url: ${GATEWAY_CRUD_BACKEND_URL:http://localhost:8081}
+  crud-circuit-breaker-name: crudBackend
 
 # ── Resilience4j ────────────────────────────────────────────────────────
 # Circuit breaker thresholds for the batchBackend instance referenced by
@@ -29,6 +31,12 @@ resilience4j:
         failure-rate-threshold: ${GATEWAY_CB_FAILURE_RATE_THRESHOLD:50}
         minimum-number-of-calls: ${GATEWAY_CB_MIN_CALLS:5}
         wait-duration-in-open-state: ${GATEWAY_CB_WAIT_DURATION_SECONDS:30}s
+        sliding-window-size: 10
+        permitted-number-of-calls-in-half-open-state: 3
+      crudBackend:
+        failure-rate-threshold: ${GATEWAY_CRUD_CB_FAILURE_RATE_THRESHOLD:50}
+        minimum-number-of-calls: ${GATEWAY_CRUD_CB_MIN_CALLS:5}
+        wait-duration-in-open-state: ${GATEWAY_CRUD_CB_WAIT_DURATION_SECONDS:30}s
         sliding-window-size: 10
         permitted-number-of-calls-in-half-open-state: 3
 

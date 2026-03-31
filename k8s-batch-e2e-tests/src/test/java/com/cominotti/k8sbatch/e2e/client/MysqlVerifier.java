@@ -22,6 +22,9 @@ public final class MysqlVerifier {
 
     private static final Logger log = LoggerFactory.getLogger(MysqlVerifier.class);
 
+    private static final String CUSTOMERS_TABLE = "customers";
+    private static final String ACCOUNTS_TABLE = "accounts";
+
     private final String jdbcUrl;
     private final String username;
     private final String password;
@@ -147,6 +150,36 @@ public final class MysqlVerifier {
      */
     public void cleanEnrichedTransactions() throws SQLException {
         cleanTable("enriched_transactions");
+    }
+
+    /**
+     * Deletes all data from CRUD tables (accounts, then customers — FK order).
+     *
+     * @throws SQLException on database errors
+     */
+    public void cleanCrudTables() throws SQLException {
+        cleanTable(ACCOUNTS_TABLE);
+        cleanTable(CUSTOMERS_TABLE);
+    }
+
+    /**
+     * Checks whether the customers table exists in the database schema.
+     *
+     * @return true if the table exists
+     * @throws SQLException on database errors
+     */
+    public boolean customersTableExists() throws SQLException {
+        return tableExists(CUSTOMERS_TABLE);
+    }
+
+    /**
+     * Checks whether the accounts table exists in the database schema.
+     *
+     * @return true if the table exists
+     * @throws SQLException on database errors
+     */
+    public boolean accountsTableExists() throws SQLException {
+        return tableExists(ACCOUNTS_TABLE);
     }
 
     /**

@@ -117,6 +117,12 @@
             <artifactId>evrete-core</artifactId>
         </dependency>
 
+        <!-- Shared Liquibase changelogs (schema definitions on the classpath) -->
+        <dependency>
+            <groupId>com.cominotti.k8sbatch</groupId>
+            <artifactId>k8s-batch-common</artifactId>
+        </dependency>
+
         <!-- Database -->
         <dependency>
             <groupId>com.mysql</groupId>

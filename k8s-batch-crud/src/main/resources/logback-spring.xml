@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <springProperty scope="context" name="appName" source="spring.application.name" defaultValue="unknown"/>
+
+    <property name="LOG_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [${appName},%X{traceId:-},%X{spanId:-}] %logger{40} - %msg%n"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <variable name="TEST_LOG_LEVEL" value="${test.log.level:-WARN}"/>
+
+    <!-- Default: production-level logging -->
+    <springProfile name="default">
+        <logger name="com.cominotti.k8sbatch" level="INFO"/>
+        <logger name="org.hibernate.SQL" level="WARN"/>
+        <logger name="org.hibernate.orm.jdbc.bind" level="WARN"/>
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <!-- Test profile: gated by TEST_LOG_LEVEL (default WARN, override -Dtest.log.level=DEBUG) -->
+    <springProfile name="crud-test">
+        <logger name="com.cominotti.k8sbatch" level="${TEST_LOG_LEVEL}"/>
+        <logger name="org.hibernate.SQL" level="${TEST_LOG_LEVEL}"/>
+        <logger name="org.hibernate.orm.jdbc.bind" level="${TEST_LOG_LEVEL}"/>
+        <logger name="org.testcontainers" level="${TEST_LOG_LEVEL}"/>
+        <logger name="liquibase" level="${TEST_LOG_LEVEL}"/>
+        <logger name="com.zaxxer.hikari" level="${TEST_LOG_LEVEL}"/>
+        <root level="${TEST_LOG_LEVEL}">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+</configuration>

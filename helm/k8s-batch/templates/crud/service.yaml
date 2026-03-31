@@ -1,0 +1,18 @@
+{{- if .Values.crud.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "k8s-batch.fullname" . }}-crud
+  labels:
+    {{- include "k8s-batch.labels" . | nindent 4 }}
+    app.kubernetes.io/component: crud
+spec:
+  type: {{ .Values.crud.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.crud.service.port }}
+      targetPort: http
+  selector:
+    {{- include "k8s-batch.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: crud
+{{- end }}

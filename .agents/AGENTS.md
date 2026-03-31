@@ -6,7 +6,7 @@ Spring Boot 4.0.3 + Spring Batch 6.x reference project for horizontally-scalable
 
 ## Tech Stack
 
-- **Java 21**, **Spring Boot 4.0.3**, **Spring Batch 6.0.2**
+- **Java 21**, **Spring Boot 4.0.3**, **Spring Batch 6.0.2**, **Spring Data JPA 4.x / Hibernate 7.x** (CRUD service)
 - **MySQL 8.4 / Oracle DB** — JobRepository + application data
 - **Kafka (Confluent Platform 7.9.0, KRaft mode)** — remote partitioning messaging + event streaming
 - **Avro 1.12 + Confluent Schema Registry** — event serialization for transaction enrichment job
@@ -32,10 +32,13 @@ mvn -pl k8s-batch-e2e-tests -am verify          # run E2E tests (quiet: output i
 mvn verify -DskipE2E=true                      # run integration tests, skip E2E
 mvn -pl k8s-batch-integration-tests -am verify -Dtest.log.level=DEBUG -DredirectTestOutputToFile=false  # verbose: full output on console
 mvn package -DskipTests                        # build JAR without tests
-docker build -t k8s-batch:e2e .                # build Docker image for E2E tests
+docker build -t k8s-batch:e2e .                # build batch app Docker image for E2E tests
+docker build -f Dockerfile.gateway -t k8s-batch-api-gateway:e2e .  # build gateway image
+docker build -f Dockerfile.crud -t k8s-batch-crud:e2e .            # build CRUD service image
+mvn -pl k8s-batch-crud-tests -am verify         # run CRUD integration tests
 docker-compose up -d                           # local stack (app + MySQL + Kafka)
 helm lint helm/k8s-batch                       # validate Helm chart
-helm unittest helm/k8s-batch                   # run Helm unit tests (49 tests, ~60ms)
+helm unittest helm/k8s-batch                   # run Helm unit tests (85 tests, ~140ms)
 mvn validate                                   # verify Apache-2.0 SPDX headers + JavaDoc checks
 mvn -Plicense-fix validate                     # auto-apply missing SPDX headers
 mvn checkstyle:check                           # run JavaDoc checks only (standalone)
@@ -47,10 +50,15 @@ mvn validate -Dskip.checkstyle=true            # skip JavaDoc checks entirely
 
 | Module | Purpose |
 |--------|---------|
+| `k8s-batch-common` | Shared Liquibase changelogs for database schema management across services (zero Java code, zero dependencies) |
 | `k8s-batch-rules-kie` | KIE-based rules engine adapters (DMN + Drools Rule Units) and rules PoC domain types |
-| `k8s-batch-jobs` | Main Spring Boot application (REST, batch jobs, config). Depends on `k8s-batch-rules-kie` |
-| `k8s-batch-integration-tests` | Testcontainers integration tests (separate to keep test infra out of production artifact) |
+| `k8s-batch-jobs` | Main Spring Boot application (REST, batch jobs, config). Depends on `k8s-batch-rules-kie` and `k8s-batch-common` |
+| `k8s-batch-integration-tests` | Testcontainers integration tests for batch (separate to keep test infra out of production artifact) |
 | `k8s-batch-e2e-tests` | E2E tests using Testcontainers K3s — deploys Helm chart into real K8s cluster |
+| `k8s-batch-api-gateway` | Spring Cloud Gateway Server MVC (Servlet-based, not reactive). Routes to batch and CRUD backends |
+| `k8s-batch-api-gateway-tests` | Integration tests for the API gateway (WireMock backend, circuit breaker) |
+| `k8s-batch-crud` | JPA/Hibernate CRUD microservice for Customer/Account management. Shares same MySQL database via `k8s-batch-common` changelogs |
+| `k8s-batch-crud-tests` | Integration tests for the CRUD service (@DataJpaTest slices + @SpringBootTest REST round-trips) |
 
 ## Spring Batch 6.x Package Rules
 
@@ -119,6 +127,11 @@ Use `JacksonJsonSerializer` / `JacksonJsonDeserializer` for Kafka partition requ
 - `spring-boot-starter-batch-jdbc` is required explicitly for database-backed `JobRepository`.
 - `spring.batch.job.enabled: false` prevents auto-launching jobs at startup.
 - **Auto-configuration modules extracted**: `spring-boot-liquibase`, `spring-boot-integration`, `spring-boot-kafka` are separate dependencies in SB4 (not in `spring-boot-autoconfigure`).
+- **JPA test modules restructured in SB4**: `@DataJpaTest`, `TestEntityManager`, and `@AutoConfigureTestDatabase` moved to NEW packages and separate JARs:
+  - `@DataJpaTest` → `spring-boot-data-jpa-test` at `org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest`
+  - `TestEntityManager` → `spring-boot-jpa-test` at `org.springframework.boot.jpa.test.autoconfigure.TestEntityManager`
+  - `@AutoConfigureTestDatabase` → `spring-boot-jdbc-test` at `org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase`
+  - **All three JARs must be declared explicitly** in test module POMs — they are NOT transitive from `spring-boot-starter-test`
 - **Multi-module `@SpringBootTest`**: always use `classes = K8sBatchApplication.class` — Spring can't find it by package scanning across modules.
 - **`spring-boot-maven-plugin` classifier**: use `<classifier>exec</classifier>` so dependent modules see the original JAR, not the fat JAR.
 
@@ -129,13 +142,77 @@ Use `JacksonJsonSerializer` / `JacksonJsonDeserializer` for Kafka partition requ
 - Launch jobs with `startJob(params)` (not `launchJob`)
 - **`JobRepositoryTestUtils`** is not deprecated — use for cleanup: `removeJobExecutions()`
 
+## CRUD Service (JPA/Hibernate 7.x)
+
+The CRUD service (`k8s-batch-crud`) is a separate Spring Boot application using JPA/Hibernate 7.x for Customer/Account management.
+
+- **Hexagonal architecture**: same `adapters/<portname>/<technology>/` convention as the batch module. Spring Data JPA repositories ARE the natural persistence port (no wrapper interfaces needed)
+- **Services in `domain/`**: application services use `@Service @Transactional(readOnly=true)` at class level, write methods override with `@Transactional`. No port interfaces (one implementation = noise)
+- **Entity design**: `protected` no-arg constructor, business constructor enforcing invariants, `@NaturalId` for business keys, `@Version` on all mutable entities, `equals`/`hashCode` on natural ID
+- **`@ManyToOne(fetch = FetchType.LAZY)`** always — Hibernate defaults to EAGER which causes N+1
+- **`Set` for `@OneToMany`** — `List` without `@OrderColumn` uses bag semantics (full join table rebuild)
+- **`@EntityGraph`** for eager-fetch queries — avoids N+1 when loading associations
+- **DTO records** for REST responses — entities stay inside the transaction boundary
+
+### Hibernate 7.x SEQUENCE Emulation on MySQL
+
+MySQL 8.4 has no native `CREATE SEQUENCE`. Hibernate emulates via **individual tables per `@SequenceGenerator`** (NOT a shared `hibernate_sequences` table). Each table has a single `next_val` column.
+
+```java
+@Id
+@GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "customer_seq")
+@SequenceGenerator(name = "customer_seq", sequenceName = "customer_sequence", allocationSize = 50)
+private Long id;
+```
+
+This creates a `customer_sequence` table with one row. With `ddl-auto: validate`, Hibernate will NOT create these tables — they must be created by Liquibase changelogs (see `006-create-hibernate-sequences.xml`).
+
+### JPA Production Configuration
+
+```yaml
+spring.jpa:
+  open-in-view: false          # CRITICAL — prevents lazy loading outside @Transactional
+  hibernate.ddl-auto: validate # Schema managed by Liquibase, Hibernate only validates
+spring.datasource.hikari:
+  auto-commit: false           # Paired with provider_disables_autocommit
+  leak-detection-threshold: 60000
+hibernate.connection.provider_disables_autocommit: true  # Skips setAutoCommit(false) per TX
+```
+
+### JdbcTemplate with auto-commit=false (Test Cleanup Gotcha)
+
+When HikariCP is configured with `auto-commit: false` (the JPA production best practice), `JdbcTemplate.execute()` calls outside a Spring-managed `@Transactional` each get their own connection with an **uncommitted** transaction. Multiple DELETEs appear to succeed but are invisible to each other across connections — causing FK constraint failures even in correct FK-safe order.
+
+**Fix**: Wrap multi-statement test cleanup in `TransactionTemplate.executeWithoutResult()`:
+
+```java
+@Autowired private TransactionTemplate transactionTemplate;
+
+private void doCleanup() {
+    transactionTemplate.executeWithoutResult(status -> {
+        jdbcTemplate.execute("DELETE FROM accounts");
+        jdbcTemplate.execute("DELETE FROM customers");
+    });
+}
+```
+
+This ensures both DELETEs run in a single committed transaction on the same connection.
+
+## Shared Liquibase Changelogs (`k8s-batch-common`)
+
+All Liquibase changelogs live in `k8s-batch-common/src/main/resources/db/changelog/`. Both the batch service and CRUD service depend on `k8s-batch-common`, so changelogs are on both classpaths. Liquibase's `DATABASECHANGELOGLOCK` prevents concurrent migration races.
+
+**CRITICAL**: When moving changelogs between modules, always run `mvn clean` before compiling. Incremental builds do NOT remove files deleted from `src/` — stale changelogs in `target/classes/` cause `Found 2 files with the path` Liquibase errors.
+
+**Dockerfile COPY rules**: When adding a new module to the parent POM `<modules>`, ALL Dockerfiles must add `COPY <new-module>/pom.xml <new-module>/` for the module's POM. Maven resolves the full reactor from the parent POM and fails if any `<module>` directory is missing. Source directories (`src/`) only need to be COPYed for modules in the build's `-pl ... -am` dependency chain.
+
 ## Profile Strategy
 
-Remote partitioning uses composable profiles: a shared `remote-partitioning` base profile paired with a transport-specific sub-profile.
+Remote partitioning uses composable profiles: a shared `remote-partitioning` base profile paired with a transport-specific sub-profile. **BOTH profiles must be activated together** — `remote-partitioning` alone is NOT sufficient (the transport-specific `IntegrationFlow` beans will not be created, causing `Dispatcher has no subscribers` errors).
 
 | Profile | Activation | Broker | Description |
 |---------|-----------|--------|-------------|
-| `remote-partitioning,remote-kafka` | Default | Kafka | Kafka-based remote partitioning + transaction enrichment job |
+| `remote-partitioning,remote-kafka` | Default (Helm `values.yaml`) | Kafka | Kafka-based remote partitioning + transaction enrichment job. **Both profiles required.** |
 | `remote-partitioning,remote-jms` | `--spring.profiles.active=remote-partitioning,remote-jms` | RabbitMQ or SQS | JMS-based remote partitioning via `spring-integration-jms`. Broker selected by `ConnectionFactory` bean (`RMQConnectionFactory` for RabbitMQ, `SQSConnectionFactory` for AWS SQS). |
 | `standalone` | `--spring.profiles.active=standalone` | None | In-process `TaskExecutorPartitionHandler` |
 | `integration-test` | Test classes only | Depends on test | Test-specific config (schema auto-create, WARN logging by default — override with `-Dtest.log.level=DEBUG`) |
@@ -207,7 +284,7 @@ Single non-partitioned chunk step — reads financial transactions from CSV, app
 - **Image loading**: `docker save` → `copyFileToContainer` → `ctr images import`; guarded by `loadedImages` set to avoid redundant loads
 - **`PodUtils`** — stateless pod inspection utilities: `isReady()`, `findTerminalError()`, `isUnschedulable()`, `describeInitProgress()`, `hasRunningMainContainer()`
 - **`DeploymentWaiter`** — fast-failure polling loop (package-private, used by `K3sClusterManager`). Detects terminal errors (ImagePullBackOff, CrashLoopBackOff, OOMKilled) immediately, tracks progress stall (120s), streams container logs for stuck pods (after 60s). Delegates to `PodDiagnostics` on failure.
-- **`AbstractE2ETest`** base class provides `@BeforeEach cleanTestData()`, `requiresKafka()` override, port-forward setup
+- **`AbstractE2ETest`** base class provides `@BeforeEach cleanTestData()`, `requiresKafka()`/`requiresGateway()`/`requiresCrud()` override hooks, port-forward setup. The CRUD image is always loaded (deployed in all profiles) but `crudClient` is only created when `requiresCrud()=true`
 - **Helm rendering**: `HelmRenderer` shells out to `helm template`; uses `redirectErrorStream(true)` to avoid deadlock
 - **Rendered manifests are cached** in `K3sClusterManager` for reuse during teardown
 - **E2E test data isolation**: When querying `BATCH_STEP_EXECUTION`, always scope by `JOB_EXECUTION_ID` — use `MysqlVerifier.countStepExecutionsForJob()`, not the unscoped query. Multiple test methods run the same job, and step executions accumulate across runs.
@@ -219,7 +296,8 @@ Single non-partitioned chunk step — reads financial transactions from CSV, app
 | Scope | Where to define | Example constants |
 |-------|----------------|-------------------|
 | Integration tests | `TestContainerImages` (in `it/config/`) | `MYSQL_IMAGE`, `REDPANDA_IMAGE` |
-| E2E tests | `E2EContainerImages` (in `e2e/`) | `APP_IMAGE`, `MYSQL_IMAGE`, `KAFKA_IMAGE`, `K3S_IMAGE`, `SCHEMA_REGISTRY_IMAGE` |
+| E2E tests | `E2EContainerImages` (in `e2e/`) | `APP_IMAGE`, `CRUD_IMAGE`, `GATEWAY_IMAGE`, `MYSQL_IMAGE`, `KAFKA_IMAGE`, `K3S_IMAGE`, `SCHEMA_REGISTRY_IMAGE` |
+| CRUD integration tests | `CrudTestContainerImages` (in `crud/it/config/`) | `MYSQL_IMAGE` |
 | Helm chart | `values.yaml` (`global.initImage`, `*.image.repository/tag`) | busybox, kafka, mysql images |
 
 **Pattern**: `public final class` with `private` constructor and `public static final String` fields (same as `BatchStepNames`).
@@ -287,6 +365,8 @@ try {
 - **MySQL probes must use `tcpSocket`, not `mysqladmin`**: `mysqladmin ping -h localhost` connects via Unix socket, but the MySQL Docker image creates the socket at `/var/lib/mysql/mysql.sock` while `mysqladmin` looks for it at the compiled-in default path — causing probe failures even when MySQL is listening on port 3306. `tcpSocket` on port 3306 avoids this entirely. This applies to all three probes (startup, liveness, readiness).
 - **MySQL `startupProbe` is required**: MySQL first-start initialization (data dir creation, InnoDB init, `docker-entrypoint-initdb.d` DDL scripts) can take 5-10 minutes on CI runners. Without a startup probe, the liveness probe kills the container before init completes, causing crash-loops. The startup probe gates liveness/readiness during this phase. The Docker entrypoint runs the temporary init mysqld with `--skip-networking`, so port 3306 only opens after init finishes — making `tcpSocket` safe for startup detection.
 - **App Deployment `progressDeadlineSeconds`**: defaults to 900s (configurable via `app.progressDeadlineSeconds`). Kubernetes's default of 600s is too short when init containers wait for slow MySQL first-start — the Deployment declares itself `Failed` before the Helm timeout fires.
+- **E2E values image tags must match `E2EContainerImages` constants**: The E2E Helm values files (`e2e-remote.yaml`, `e2e-standalone.yaml`) specify `image.tag` for each component. These MUST match the constants in `E2EContainerImages.java` (e.g., `MYSQL_IMAGE = "mysql:8.4"` → `mysql.image.tag: "8.4"`). Mismatches cause `ErrImageNeverPull` because K3s loads one version but the Helm chart deploys a different one with `pullPolicy: Never`.
+- **E2E version assertions must derive from constants, not hardcode**: Test assertions like `assertThat(version).startsWith("8.4")` should derive the expected value from `TestContainerImages.MYSQL_IMAGE`, not hardcode it. Otherwise bumping the image version breaks the assertion.
 - **CI `kubectl wait` must exclude Job pods**: The `Verify pods are ready` step uses `--field-selector=status.phase=Running` to skip `Completed` Job pods (e.g., `kafka-topics`). A completed pod's `Ready` condition is `False` (container exited), so `kubectl wait --for=condition=ready` without this filter always times out.
 
 ## Key Directories
@@ -333,16 +413,29 @@ k8s-batch-integration-tests/src/test/java/com/cominotti/k8sbatch/it/
 helm/k8s-batch/
   templates/
     app/              — Deployment, Service, HPA, Ingress, ConfigMap
+    gateway/          — Deployment, Service, ConfigMap, HPA (gated on gateway.enabled)
+    crud/             — Deployment, Service, ConfigMap, HPA (gated on crud.enabled)
     mysql/            — StatefulSet, Service, Secret, ConfigMap (Batch DDL)
     kafka/            — StatefulSet (KRaft), Services, topic init Job, Schema Registry Deployment+Service
   tests/              — helm-unittest YAML tests (*_test.yaml)
 
+k8s-batch-crud/src/main/java/com/cominotti/k8sbatch/crud/
+  domain/             — Customer, Account (JPA entities), CustomerService, AccountService, enums, EntityNotFoundException
+  adapters/
+    persistingcustomers/jpa/  — CustomerRepository (Spring Data JPA)
+    persistingaccounts/jpa/   — AccountRepository (Spring Data JPA)
+    managingcustomers/rest/   — CustomerController, dto/ (CreateCustomerRequest, CustomerResponse, etc.)
+    managingaccounts/rest/    — AccountController, dto/ (CreateAccountRequest, AccountResponse, etc.)
+    handlingerrors/rest/      — GlobalExceptionHandler (@RestControllerAdvice)
+  config/             — JpaAuditingConfig
+
 k8s-batch-e2e-tests/src/test/java/com/cominotti/k8sbatch/e2e/
   cluster/            — K3sClusterManager, DeploymentWaiter, HelmRenderer, PortForwardManager, PodUtils
-  client/             — BatchAppClient (HTTP), MysqlVerifier (JDBC)
+  client/             — BatchAppClient (HTTP), CrudAppClient (HTTP), MysqlVerifier (JDBC)
   diagnostics/        — PodDiagnostics (failure dump)
   deploy/             — DeployHealthCheckE2E
   batch/              — FileRangeJobE2E, MultiFileJobE2E, StandaloneProfileE2E, PartitionDistributionE2E
+  crud/               — CustomerCrudE2E
 
 .github/workflows/    — CI pipelines (helm-validate.yml)
 

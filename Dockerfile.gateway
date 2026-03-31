@@ -15,6 +15,9 @@ COPY k8s-batch-jobs/pom.xml k8s-batch-jobs/
 COPY k8s-batch-integration-tests/pom.xml k8s-batch-integration-tests/
 COPY k8s-batch-e2e-tests/pom.xml k8s-batch-e2e-tests/
 COPY k8s-batch-api-gateway-tests/pom.xml k8s-batch-api-gateway-tests/
+COPY k8s-batch-common/pom.xml k8s-batch-common/
+COPY k8s-batch-crud/pom.xml k8s-batch-crud/
+COPY k8s-batch-crud-tests/pom.xml k8s-batch-crud-tests/
 RUN mvn dependency:go-offline -B -pl k8s-batch-api-gateway -am
 
 # Copy license scripts (needed for Maven validate phase) and source

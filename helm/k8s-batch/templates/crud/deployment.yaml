@@ -1,0 +1,92 @@
+{{- if .Values.crud.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "k8s-batch.fullname" . }}-crud
+  labels:
+    {{- include "k8s-batch.labels" . | nindent 4 }}
+    app.kubernetes.io/component: crud
+spec:
+  {{- if not .Values.crudHpa.enabled }}
+  # Omit replicas when HPA is enabled to prevent Helm/HPA conflicts
+  replicas: {{ .Values.crud.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "k8s-batch.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: crud
+  template:
+    metadata:
+      labels:
+        {{- include "k8s-batch.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: crud
+      annotations:
+        # Triggers rolling restart when ConfigMap content changes
+        checksum/config: {{ include (print .Template.BasePath "/crud/configmap.yaml") . | sha256sum }}
+        # Prometheus scraping
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ .Values.crud.config.serverPort | quote }}
+        prometheus.io/path: "/actuator/prometheus"
+    spec:
+      {{- with .Values.app.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.crud.podSecurityContext | nindent 8 }}
+      initContainers:
+        # Wait for MySQL before starting — the CRUD service runs Liquibase at startup
+        - name: wait-for-mysql
+          image: "{{ .Values.global.initImage.repository }}:{{ .Values.global.initImage.tag }}"
+          securityContext:
+            runAsNonRoot: false
+            runAsUser: 0
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z {{ include "k8s-batch.mysql.host" . }} {{ .Values.mysql.service.port }}; do
+                echo "Waiting for MySQL..."
+                sleep {{ .Values.global.initSleepSeconds }}
+              done
+      containers:
+        - name: crud
+          image: "{{ .Values.crud.image.repository }}:{{ .Values.crud.image.tag }}"
+          imagePullPolicy: {{ .Values.crud.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.crud.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.crud.config.serverPort }}
+              protocol: TCP
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: {{ include "k8s-batch.mysql.jdbcUrl" . | quote }}
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "k8s-batch.mysql.secretName" . }}
+                  key: username
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "k8s-batch.mysql.secretName" . }}
+                  key: password
+            - name: SPRING_DATASOURCE_DRIVER_CLASS_NAME
+              value: {{ include "k8s-batch.datasource.driverClassName" . | quote }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "k8s-batch.fullname" . }}-crud-config
+          livenessProbe:
+            {{- toYaml .Values.crud.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.crud.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.crud.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+{{- end }}

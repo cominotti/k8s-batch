@@ -20,12 +20,15 @@
     <description>Spring Boot + Spring Batch reference project for Kubernetes horizontal scaling</description>
 
     <modules>
+        <module>k8s-batch-common</module>
         <module>k8s-batch-rules-kie</module>
         <module>k8s-batch-jobs</module>
         <module>k8s-batch-integration-tests</module>
         <module>k8s-batch-e2e-tests</module>
         <module>k8s-batch-api-gateway</module>
         <module>k8s-batch-api-gateway-tests</module>
+        <module>k8s-batch-crud</module>
+        <module>k8s-batch-crud-tests</module>
     </modules>
 
     <properties>
@@ -67,6 +70,11 @@
         <dependencies>
             <dependency>
                 <groupId>com.cominotti.k8sbatch</groupId>
+                <artifactId>k8s-batch-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.cominotti.k8sbatch</groupId>
                 <artifactId>k8s-batch-rules-kie</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -78,6 +86,11 @@
             <dependency>
                 <groupId>com.cominotti.k8sbatch</groupId>
                 <artifactId>k8s-batch-api-gateway</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.cominotti.k8sbatch</groupId>
+                <artifactId>k8s-batch-crud</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

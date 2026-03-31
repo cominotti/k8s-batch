@@ -65,7 +65,7 @@ mysql:
   enabled: true
   image:
     repository: mysql
-    tag: "8.0"
+    tag: "8.4"
     pullPolicy: Never
   auth:
     rootPassword: e2e_root
@@ -98,9 +98,54 @@ gateway:
 gatewayHpa:
   enabled: false
 
+# CRUD service enabled in standalone too — only needs MySQL, not Kafka
+crud:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: k8s-batch-crud
+    tag: "e2e"
+    pullPolicy: Never
+  podSecurityContext:
+    runAsNonRoot: false
+  securityContext:
+    runAsUser: 0
+    runAsGroup: 0
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 384Mi
+  livenessProbe:
+    httpGet:
+      path: /actuator/health/liveness
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 15
+    failureThreshold: 10
+    timeoutSeconds: 5
+  readinessProbe:
+    httpGet:
+      path: /actuator/health/readiness
+      port: http
+    initialDelaySeconds: 15
+    periodSeconds: 10
+    failureThreshold: 10
+    timeoutSeconds: 5
+
+crudHpa:
+  enabled: false
+
 features:
   kafka: false
   schemaRegistry: false
   gateway: false
+  crud: true
   hpa: false
   ingress: false

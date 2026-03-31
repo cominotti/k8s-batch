@@ -60,7 +60,9 @@ app:
   # -- Active Spring profile(s). Controls partitioning transport and available jobs.
   # Options: "remote-partitioning" (+ remote-kafka or remote-jms), "standalone".
   # See CLAUDE.md "Profile Strategy" for the full profile matrix.
-  springProfile: remote-partitioning
+  # Composable profiles: base "remote-partitioning" + transport-specific "remote-kafka".
+  # Both are required for Kafka-based remote partitioning and the transaction enrichment job.
+  springProfile: remote-partitioning,remote-kafka
 
   # -- Kubernetes Deployment progressDeadlineSeconds. The Deployment is marked Failed if no
   # new pods become available within this window. Must be longer than the total time for
@@ -212,6 +214,86 @@ gatewayHpa:
         - type: Pods
           value: 3
           periodSeconds: 60
+
+# ======================================================================
+# CRUD Service (Customer/Account management)
+# ======================================================================
+# -- Standalone JPA-based CRUD microservice sharing the same MySQL database as the batch app.
+# Schema migrations are managed by Liquibase changelogs from k8s-batch-common.
+crud:
+  enabled: true
+
+  replicaCount: 2
+
+  image:
+    repository: ghcr.io/cominotti/k8s-batch-crud
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  podSecurityContext:
+    runAsNonRoot: true
+    fsGroup: 1000
+
+  securityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+
+  # -- Lower initial delays than batch app because the CRUD service has no Batch schema validation overhead.
+  livenessProbe:
+    httpGet:
+      path: /actuator/health/liveness
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 15
+    failureThreshold: 5
+    timeoutSeconds: 5
+  readinessProbe:
+    httpGet:
+      path: /actuator/health/readiness
+      port: http
+    initialDelaySeconds: 15
+    periodSeconds: 10
+    failureThreshold: 5
+    timeoutSeconds: 5
+
+  service:
+    type: ClusterIP
+    port: 8081
+
+  config:
+    serverPort: 8081
+    extra: {}
+
+# ======================================================================
+# CRUD HPA
+# ======================================================================
+crudHpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      podScaleDownRate: 1
+      periodSeconds: 120
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      podScaleUpRate: 3
+      periodSeconds: 60
 
 # ======================================================================
 # Ingress
@@ -466,4 +548,5 @@ features:
   schemaRegistry: true    # Schema Registry Deployment + Service (required for Avro jobs)
   hpa: true               # HPA for app (when false, app.replicaCount takes effect)
   gateway: true           # API gateway Deployment + Service + HPA
+  crud: true              # CRUD service Deployment + Service + HPA
   ingress: false          # Ingress resource (requires an Ingress controller in the cluster)
