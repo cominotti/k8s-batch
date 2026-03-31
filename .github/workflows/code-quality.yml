@@ -1,0 +1,37 @@
+name: Code Quality
+
+on:
+  push:
+    paths:
+      - '**/*.java'
+      - '**/pom.xml'
+      - 'config/checkstyle/**'
+      - 'scripts/license/**'
+      - '.github/workflows/code-quality.yml'
+  pull_request:
+    paths:
+      - '**/*.java'
+      - '**/pom.xml'
+      - 'config/checkstyle/**'
+      - 'scripts/license/**'
+      - '.github/workflows/code-quality.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+
+      - name: SPDX license headers + Checkstyle JavaDoc
+        run: mvn validate -q

@@ -62,7 +62,7 @@ jobs:
           java-version: 21
 
       - name: Build application JAR
-        run: mvn package -DskipTests -q
+        run: mvn package -DskipTests -Dskip.checkstyle=true -q
 
       - name: Build Docker image
         run: docker build -t k8s-batch:test .
