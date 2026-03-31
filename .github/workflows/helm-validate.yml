@@ -113,10 +113,13 @@ jobs:
             --set kafka.topics.transactionEvents.replicationFactor=1 \
             --set kafka.topics.enrichedTransactionEvents.replicationFactor=1 \
             --set gateway.enabled=false \
+            --set crud.enabled=false \
             --set hpa.enabled=false \
             --set gatewayHpa.enabled=false \
+            --set crudHpa.enabled=false \
             --set features.hpa=false \
             --set features.gateway=false \
+            --set features.crud=false \
             --wait --timeout 15m
 
       # field-selector excludes Completed Job pods (e.g., kafka-topics) — their Ready
