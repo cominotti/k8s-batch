@@ -70,6 +70,8 @@ mysql:
   auth:
     rootPassword: e2e_root
     database: k8sbatch
+    additionalDatabases:
+      crud: k8scrud
     username: k8sbatch
     password: e2e_pass
   resources:

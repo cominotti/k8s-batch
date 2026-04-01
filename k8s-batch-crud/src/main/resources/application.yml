@@ -9,10 +9,10 @@ spring:
       enabled: true
 
   # ── DataSource / HikariCP ──────────────────────────────────────────────
-  # Shares the same k8sbatch MySQL database as the batch service.
+  # Uses its own k8scrud database (database-per-service pattern). The batch service uses k8sbatch.
   # rewriteBatchedStatements=true is critical for MySQL batch INSERT performance with Hibernate.
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/k8sbatch?useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true&cachePrepStmts=true&prepStmtCacheSize=250&prepStmtCacheSqlLimit=2048&useServerPrepStmts=true}
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/k8scrud?useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true&cachePrepStmts=true&prepStmtCacheSize=250&prepStmtCacheSqlLimit=2048&useServerPrepStmts=true}
     username: ${SPRING_DATASOURCE_USERNAME:k8sbatch}
     password: ${SPRING_DATASOURCE_PASSWORD:k8sbatch_secret}
     driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:com.mysql.cj.jdbc.Driver}
@@ -51,7 +51,7 @@ spring:
         generate_statistics: false
 
   # ── Liquibase ───────────────────────────────────────────────────────────
-  # Changelogs come from k8s-batch-common JAR on the classpath
+  # Changelogs are owned by this module (database-per-service pattern)
   liquibase:
     enabled: true
     change-log: classpath:db/changelog/db.changelog-master.xml

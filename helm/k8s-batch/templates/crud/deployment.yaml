@@ -61,7 +61,7 @@ spec:
               protocol: TCP
           env:
             - name: SPRING_DATASOURCE_URL
-              value: {{ include "k8s-batch.mysql.jdbcUrl" . | quote }}
+              value: {{ include "k8s-batch.mysql.crudJdbcUrl" . | quote }}
             - name: SPRING_DATASOURCE_USERNAME
               valueFrom:
                 secretKeyRef:

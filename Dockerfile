@@ -15,14 +15,12 @@ COPY k8s-batch-integration-tests/pom.xml k8s-batch-integration-tests/
 COPY k8s-batch-e2e-tests/pom.xml k8s-batch-e2e-tests/
 COPY k8s-batch-api-gateway/pom.xml k8s-batch-api-gateway/
 COPY k8s-batch-api-gateway-tests/pom.xml k8s-batch-api-gateway-tests/
-COPY k8s-batch-common/pom.xml k8s-batch-common/
 COPY k8s-batch-crud/pom.xml k8s-batch-crud/
 COPY k8s-batch-crud-tests/pom.xml k8s-batch-crud-tests/
 RUN mvn dependency:go-offline -B -pl k8s-batch-jobs -am
 
 # Copy license scripts (needed for Maven validate phase) and source
 COPY scripts/license scripts/license
-COPY k8s-batch-common/src k8s-batch-common/src
 COPY k8s-batch-rules-kie/src k8s-batch-rules-kie/src
 COPY k8s-batch-jobs/src k8s-batch-jobs/src
 # skip.checkstyle: config/checkstyle/suppressions.xml is not in the Docker context —

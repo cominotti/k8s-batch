@@ -7,6 +7,20 @@ metadata:
     {{- include "k8s-batch.labels" . | nindent 4 }}
     app.kubernetes.io/component: mysql
 data:
+  {{- if .Values.mysql.auth.additionalDatabases }}
+  00-create-databases.sql: |
+    -- Database-per-service: create additional logical databases beyond MYSQL_DATABASE ({{ .Values.mysql.auth.database }}).
+    -- This script runs alphabetically before 01-spring-batch-schema.sql during MySQL first-start init.
+    -- IMPORTANT: docker-entrypoint-initdb.d scripts only execute on first init (empty data dir).
+    -- For existing PVCs, run these statements manually.
+    {{- range $key, $dbName := .Values.mysql.auth.additionalDatabases }}
+    CREATE DATABASE IF NOT EXISTS {{ $dbName }}
+      CHARACTER SET {{ $.Values.mysql.config.mysqlCharacterSetServer }}
+      COLLATE {{ $.Values.mysql.config.mysqlCollationServer }};
+    GRANT ALL PRIVILEGES ON {{ $dbName }}.* TO '{{ $.Values.mysql.auth.username }}'@'%';
+    {{- end }}
+    FLUSH PRIVILEGES;
+  {{- end }}
   01-spring-batch-schema.sql: |
     -- Spring Batch Core Schema for MySQL
     CREATE TABLE IF NOT EXISTS BATCH_JOB_INSTANCE (

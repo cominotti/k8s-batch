@@ -50,97 +50,27 @@ mvn validate -Dskip.checkstyle=true            # skip JavaDoc checks entirely
 
 | Module | Purpose |
 |--------|---------|
-| `k8s-batch-common` | Shared Liquibase changelogs for database schema management across services (zero Java code, zero dependencies) |
 | `k8s-batch-rules-kie` | KIE-based rules engine adapters (DMN + Drools Rule Units) and rules PoC domain types |
-| `k8s-batch-jobs` | Main Spring Boot application (REST, batch jobs, config). Depends on `k8s-batch-rules-kie` and `k8s-batch-common` |
+| `k8s-batch-jobs` | Main Spring Boot application (REST, batch jobs, config). Depends on `k8s-batch-rules-kie`. Owns batch Liquibase changelogs (001-003) |
 | `k8s-batch-integration-tests` | Testcontainers integration tests for batch (separate to keep test infra out of production artifact) |
 | `k8s-batch-e2e-tests` | E2E tests using Testcontainers K3s — deploys Helm chart into real K8s cluster |
 | `k8s-batch-api-gateway` | Spring Cloud Gateway Server MVC (Servlet-based, not reactive). Routes to batch and CRUD backends |
 | `k8s-batch-api-gateway-tests` | Integration tests for the API gateway (WireMock backend, circuit breaker) |
-| `k8s-batch-crud` | JPA/Hibernate CRUD microservice for Customer/Account management. Shares same MySQL database via `k8s-batch-common` changelogs |
+| `k8s-batch-crud` | JPA/Hibernate CRUD microservice for Customer/Account management. Owns its own `k8scrud` database and Liquibase changelogs (004-006) |
 | `k8s-batch-crud-tests` | Integration tests for the CRUD service (@DataJpaTest slices + @SpringBootTest REST round-trips) |
 
-## Spring Batch 6.x Package Rules
+## Rules Files Index
 
-Spring Batch 6 restructured packages. **Always use these imports**:
+**IMPORTANT**: When creating, renaming, or deleting a rules file in `.agents/rules/`, update this table in the same commit. This index is the sync map between CLAUDE.md and the glob-matched rules files — it must always reflect the current set of rules.
 
-| Class | Package |
-|-------|---------|
-| `Job` | `org.springframework.batch.core.job.Job` |
-| `JobExecution` | `org.springframework.batch.core.job.JobExecution` |
-| `JobParameters` / `JobParametersBuilder` | `org.springframework.batch.core.job.parameters.*` |
-| `Step` | `org.springframework.batch.core.step.Step` |
-| `StepExecution` | `org.springframework.batch.core.step.StepExecution` |
-| `StepBuilder` | `org.springframework.batch.core.step.builder.StepBuilder` |
-| `JobBuilder` | `org.springframework.batch.core.job.builder.JobBuilder` |
-| `Partitioner` | `org.springframework.batch.core.partition.Partitioner` |
-| `BatchStatus` | `org.springframework.batch.core.BatchStatus` |
-| `ExecutionContext` | `org.springframework.batch.infrastructure.item.ExecutionContext` |
-| `ItemProcessor` | `org.springframework.batch.infrastructure.item.ItemProcessor` |
-| `FlatFileItemReader` | `org.springframework.batch.infrastructure.item.file.FlatFileItemReader` |
-| `JdbcBatchItemWriter` | `org.springframework.batch.infrastructure.item.database.JdbcBatchItemWriter` |
-| `JobExecutionListener` | `org.springframework.batch.core.listener.JobExecutionListener` |
-| `StepExecutionListener` | `org.springframework.batch.core.listener.StepExecutionListener` |
-| `ExitStatus` | `org.springframework.batch.core.ExitStatus` |
-
-**Never use** the old `org.springframework.batch.item.*` or `org.springframework.batch.core.Job` (top-level) packages.
-
-## Chunk Step Builder Pattern
-
-Use the new builder API (the old `chunk(int, TransactionManager)` is deprecated):
-
-```java
-new StepBuilder("stepName", jobRepository)
-    .<Input, Output>chunk(chunkSize)
-    .transactionManager(transactionManager)
-    .reader(reader)
-    .processor(processor)
-    .writer(writer)
-    .build();
-```
-
-## Spring Kafka Serializers
-
-Use `JacksonJsonSerializer` / `JacksonJsonDeserializer` for Kafka partition request messages (the old `JsonSerializer` / `JsonDeserializer` are deprecated). Set `JacksonJsonDeserializer.TRUSTED_PACKAGES` to `"*"` for remote partitioning messages.
-
-## Testcontainers 2.x Rules
-
-- **Artifact names** use `testcontainers-` prefix: `testcontainers-mysql`, `testcontainers-redpanda`, `testcontainers-junit-jupiter`
-- **MySQL**: `org.testcontainers.mysql.MySQLContainer` (not `org.testcontainers.containers.MySQLContainer`). **Non-generic** — no `<?>` wildcard.
-- **Redpanda** (replaces Confluent Kafka for integration tests): `org.testcontainers.redpanda.RedpandaContainer` — Kafka-compatible broker with built-in Schema Registry. Use `getBootstrapServers()` for Kafka API, `getSchemaRegistryAddress()` for Schema Registry URL. Much faster startup (~5-10s vs 30-60s for Confluent Kafka). E2E tests still use real Confluent Kafka via the Helm chart.
-- **`@ServiceConnection`** handles JDBC wiring automatically — never use `@DynamicPropertySource` for MySQL
-- **Kafka bootstrap servers** are set via `System.setProperty` in `ContainerHolder` (Kafka `@ServiceConnection` requires `spring-boot-kafka` which conflicts with manual `RemotePartitioningKafkaConfig`)
-- **Schema Registry URL** is set via `System.setProperty("spring.kafka.properties.schema.registry.url", REDPANDA.getSchemaRegistryAddress())` in `ContainerHolder.startAll()`
-- **RabbitMQ (JMS tests)**: `JmsContainersConfig` creates a JMS `ConnectionFactory` bean (`RMQConnectionFactory`) wired to the Testcontainer RabbitMQ instance
-- **Container lifecycle** is managed by `ContainerHolder` (not directly in config classes):
-  - `ContainerHolder.startMysqlOnly()` — standalone tests, skips all brokers
-  - `ContainerHolder.startAll()` — parallel startup of MySQL + Redpanda for Kafka remote tests
-  - `ContainerHolder.startMysqlAndRabbitMq()` — parallel startup for JMS remote tests
-  - `SharedContainersConfig` delegates to `ContainerHolder.startAll()` + creates Kafka topics
-  - `JmsContainersConfig` delegates to `ContainerHolder.startMysqlAndRabbitMq()` + creates JMS `ConnectionFactory`
-  - `MysqlOnlyContainersConfig` delegates to `ContainerHolder.startMysqlOnly()`
-- **Parallel startup**: use `Startables.deepStart(Stream.of(MYSQL, REDPANDA)).join()` — not sequential `.start()` calls
-
-## Spring Boot 4.x Rules
-
-- `TestRestTemplate` is removed. Use `RestClient` with `@LocalServerPort`.
-- `spring-boot-starter-batch-jdbc` is required explicitly for database-backed `JobRepository`.
-- `spring.batch.job.enabled: false` prevents auto-launching jobs at startup.
-- **Auto-configuration modules extracted**: `spring-boot-liquibase`, `spring-boot-integration`, `spring-boot-kafka` are separate dependencies in SB4 (not in `spring-boot-autoconfigure`).
-- **JPA test modules restructured in SB4**: `@DataJpaTest`, `TestEntityManager`, and `@AutoConfigureTestDatabase` moved to NEW packages and separate JARs:
-  - `@DataJpaTest` → `spring-boot-data-jpa-test` at `org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest`
-  - `TestEntityManager` → `spring-boot-jpa-test` at `org.springframework.boot.jpa.test.autoconfigure.TestEntityManager`
-  - `@AutoConfigureTestDatabase` → `spring-boot-jdbc-test` at `org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase`
-  - **All three JARs must be declared explicitly** in test module POMs — they are NOT transitive from `spring-boot-starter-test`
-- **Multi-module `@SpringBootTest`**: always use `classes = K8sBatchApplication.class` — Spring can't find it by package scanning across modules.
-- **`spring-boot-maven-plugin` classifier**: use `<classifier>exec</classifier>` so dependent modules see the original JAR, not the fat JAR.
-
-## Test Utilities
-
-- **Use `JobOperatorTestUtils`** (not the deprecated `JobLauncherTestUtils`)
-- Constructor: `new JobOperatorTestUtils(jobOperator, jobRepository)`
-- Launch jobs with `startJob(params)` (not `launchJob`)
-- **`JobRepositoryTestUtils`** is not deprecated — use for cleanup: `removeJobExecutions()`
+| Rule File | Globs | Content |
+|-----------|-------|---------|
+| `rules/git.md` | *(always)* | Commit signing, squash merge strategy, commit message format |
+| `rules/spring-batch-6.md` | `**/*.java` | SB6 package imports, chunk builder API, Kafka serializers, test utilities |
+| `rules/spring-boot-4.md` | `**/*.java` | SB4 migration rules, Testcontainers 2.x conventions |
+| `rules/coding-standards.md` | `**/*.java`, `**/*.sh` | Image/version constants, logging, AutoCloseable, license/SPDX, checkstyle |
+| `rules/helm-conventions.md` | `helm/**`, `**/e2e/**/*.java`, `.github/workflows/**` | Helm chart conventions, MySQL probes, CI rules, E2E image sync |
+| `rules/database-per-service.md` | `helm/**`, `**/application.yml`, `**/changelog/**`, `docker-compose.yml`, `**/ContainerHolder.java` | Database-per-service topology, Liquibase ownership, MySQL multi-DB conventions |
 
 ## CRUD Service (JPA/Hibernate 7.x)
 
@@ -198,11 +128,25 @@ private void doCleanup() {
 
 This ensures both DELETEs run in a single committed transaction on the same connection.
 
-## Shared Liquibase Changelogs (`k8s-batch-common`)
+## Database Topology
 
-All Liquibase changelogs live in `k8s-batch-common/src/main/resources/db/changelog/`. Both the batch service and CRUD service depend on `k8s-batch-common`, so changelogs are on both classpaths. Liquibase's `DATABASECHANGELOGLOCK` prevents concurrent migration races.
+The project uses a **database-per-service** pattern: one shared MySQL StatefulSet, but each microservice owns its own logical database. This gives strong schema isolation (no cross-domain FKs, independent Liquibase migration timelines) without multiplying infrastructure.
 
-**CRITICAL**: When moving changelogs between modules, always run `mvn clean` before compiling. Incremental builds do NOT remove files deleted from `src/` — stale changelogs in `target/classes/` cause `Found 2 files with the path` Liquibase errors.
+| Service | Database | Tables |
+|---------|----------|--------|
+| `k8s-batch-jobs` | `k8sbatch` | Spring Batch meta-tables (`BATCH_*`) + batch app tables (`target_records`, `enriched_transactions`, `rules_poc_enriched_transactions`) |
+| `k8s-batch-crud` | `k8scrud` | CRUD domain tables (`customers`, `accounts`) + Hibernate sequence tables (`customer_sequence`, `account_sequence`) |
+
+In Kubernetes, `mysql.auth.database` creates the primary `k8sbatch` database via `MYSQL_DATABASE` env var. Additional databases are created by the init ConfigMap `00-create-databases.sql` (templated from `mysql.auth.additionalDatabases` in `values.yaml`). In Docker Compose, `config/mysql-init/00-create-databases.sql` serves the same role.
+
+## Per-Service Liquibase Changelogs
+
+Each service owns its own Liquibase changelogs under `src/main/resources/db/changelog/`. When adding a new CRUD service, create its changelogs in its own module — do NOT modify other services' changelogs.
+
+- **Batch service**: `k8s-batch-jobs/src/main/resources/db/changelog/` — changelogs 001-003
+- **CRUD service**: `k8s-batch-crud/src/main/resources/db/changelog/` — changelogs 004-006
+
+**CRITICAL**: After moving changelogs between modules, always run `mvn clean` before compiling. Incremental builds do NOT remove files deleted from `src/` — stale changelogs in `target/classes/` cause `Found 2 files with the path` Liquibase errors.
 
 **Dockerfile COPY rules**: When adding a new module to the parent POM `<modules>`, ALL Dockerfiles must add `COPY <new-module>/pom.xml <new-module>/` for the module's POM. Maven resolves the full reactor from the parent POM and fails if any `<module>` directory is missing. Source directories (`src/`) only need to be COPYed for modules in the build's `-pl ... -am` dependency chain.
 
@@ -289,165 +233,6 @@ Single non-partitioned chunk step — reads financial transactions from CSV, app
 - **Rendered manifests are cached** in `K3sClusterManager` for reuse during teardown
 - **E2E test data isolation**: When querying `BATCH_STEP_EXECUTION`, always scope by `JOB_EXECUTION_ID` — use `MysqlVerifier.countStepExecutionsForJob()`, not the unscoped query. Multiple test methods run the same job, and step executions accumulate across runs.
 
-## Image and Version Constants Rule
-
-**Never hardcode Docker image names, tags, or version numbers as string literals.** They must be defined in constants classes or values files and referenced by name.
-
-| Scope | Where to define | Example constants |
-|-------|----------------|-------------------|
-| Integration tests | `TestContainerImages` (in `it/config/`) | `MYSQL_IMAGE`, `REDPANDA_IMAGE` |
-| E2E tests | `E2EContainerImages` (in `e2e/`) | `APP_IMAGE`, `CRUD_IMAGE`, `GATEWAY_IMAGE`, `MYSQL_IMAGE`, `KAFKA_IMAGE`, `K3S_IMAGE`, `SCHEMA_REGISTRY_IMAGE` |
-| CRUD integration tests | `CrudTestContainerImages` (in `crud/it/config/`) | `MYSQL_IMAGE` |
-| Helm chart | `values.yaml` (`global.initImage`, `*.image.repository/tag`) | busybox, kafka, mysql images |
-
-**Pattern**: `public final class` with `private` constructor and `public static final String` fields (same as `BatchStepNames`).
-
-**Log messages** must reference the constant or use a container's `getDockerImageName()` — never duplicate the version string:
-
-```java
-// CORRECT
-log.info("Starting container | image={}", TestContainerImages.REDPANDA_IMAGE);
-log.info("Container started | image={}", REDPANDA.getDockerImageName());
-
-// WRONG — duplicates the version string
-log.info("Starting Redpanda container (redpanda:v25.1.9)...");
-```
-
-## Logging Conventions
-
-- **Logger declaration**: plain SLF4J `private static final Logger log = LoggerFactory.getLogger(ClassName.class)` — no Lombok
-- **Log format**: `key=value | key=value` pipe-separated structured fields for machine parseability
-- **Configuration**: `logback-spring.xml` with `<springProfile>` blocks — do NOT use `logging.level` in application YAML files (avoids precedence confusion)
-- **Profile levels**: production=INFO, standalone=INFO (`StandaloneJobConfig` at DEBUG), integration-test=WARN (override with `-Dtest.log.level=DEBUG`)
-- **Batch listeners**: `LoggingJobExecutionListener` and `LoggingStepExecutionListener` are `@Component` beans — register via `.listener()` on `JobBuilder` and `StepBuilder`/`RemotePartitioningManagerStepBuilder` respectively
-- **Duration utility**: `BatchDurationUtils.between(start, end)` for null-safe `Duration.between()` — shared by both listeners
-- **Log levels**: INFO for business events (job/step lifecycle, partition creation, config init), DEBUG for per-item details (filtered records, reader/writer creation), ERROR for failures, WARN for unexpected-but-non-fatal statuses
-
-## AutoCloseable / Resource Management
-
-**Always use try-with-resources** for objects that implement `AutoCloseable` or `Closeable`. Never use manual `try-finally` with `.close()` or `.dispose()`.
-
-```java
-// CORRECT
-try (KieSession session = kieContainer.newKieSession()) {
-    session.insert(fact);
-    session.fireAllRules();
-}
-
-// WRONG — manual try-finally
-KieSession session = kieContainer.newKieSession();
-try {
-    session.insert(fact);
-    session.fireAllRules();
-} finally {
-    session.dispose();
-}
-```
-
-**Scope**: sessions (KieSession, StatefulSession, RuleUnitInstance), streams, connections, prepared statements, readers/writers — any short-lived resource acquired and released within a method.
-
-**Exception**: long-lived resources managed by Spring's bean lifecycle (e.g., `KnowledgeService` cleaned up via `@PreDestroy`) do not use try-with-resources.
-
-## Helm Chart Conventions
-
-- Schema initialization: MySQL `docker-entrypoint-initdb.d` ConfigMap, not `initialize-schema: always`
-- App Deployment omits `replicas` when HPA is enabled (prevents Helm/HPA conflicts)
-- `checksum/config` annotation on Deployment triggers rolling restart on ConfigMap changes
-- Init containers gate app startup until MySQL, Kafka, and Schema Registry (when enabled) are reachable
-- Kafka runs in **KRaft mode** (no Zookeeper). Internal topic replication factors (`KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR`, `KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR`, `KAFKA_TRANSACTION_STATE_LOG_MIN_ISR`) are derived from `min(kafka.replicaCount, 3)` in the StatefulSet template — required for single-broker deployments (E2E uses `replicaCount: 1`)
-- **Schema Registry** uses a `Deployment` (stateless — stores schemas in `_schemas` Kafka topic). Gated on `schemaRegistry.enabled AND features.schemaRegistry`. Schema Registry URL wired to app via `SPRING_KAFKA_PROPERTIES_SCHEMA_REGISTRY_URL` env var.
-- **Topic creation**: `job-create-topics.yaml` uses `range $key, $val` over `kafka.topics` map (skipping `extra` list). Adding a new topic is a values-only change — no template editing needed
-- **Init container image** (`busybox`) is parameterized via `global.initImage` in `values.yaml` — never hardcode it in templates
-- **Helm unit tests**: `helm/k8s-batch/tests/*_test.yaml` using `helm-unittest` plugin. Run with `helm unittest helm/k8s-batch`
-- **Template dependencies**: when a template references another (e.g., deployment includes configmap for checksum), both must be listed in `templates:` in the test file, and use `documentSelector` with `skipEmptyTemplates: true` to target the correct document
-- **CI validation**: `.github/workflows/helm-validate.yml` runs helm lint, unittest, kubeconform, and K3s smoke test. The K3s smoke test pre-pulls infrastructure images (`docker pull`) and imports them into K3s (`k3d image import`) before `helm install`. **Image versions in the CI workflow must always match their source of truth**: `values.yaml` for Helm-managed images (`mysql`, `kafka`, `schemaRegistry`, `global.initImage`) and `E2EContainerImages` / `TestContainerImages` for test-managed images. When bumping an image version, update both the source of truth and the CI workflow's pre-pull step in the same commit
-- **`values.yaml` documentation**: every non-trivial parameter must have a YAML comment explaining what it does, why the value was chosen, and how it relates to other parameters. Use `# --` prefix for block-level descriptions above a parameter group, and inline `#` comments on individual fields when the reasoning is not obvious from the name alone. This is especially important for probes, resource limits, timeouts, and any value derived from a formula (e.g., `periodSeconds * failureThreshold = max init window`)
-- **MySQL probes must use `tcpSocket`, not `mysqladmin`**: `mysqladmin ping -h localhost` connects via Unix socket, but the MySQL Docker image creates the socket at `/var/lib/mysql/mysql.sock` while `mysqladmin` looks for it at the compiled-in default path — causing probe failures even when MySQL is listening on port 3306. `tcpSocket` on port 3306 avoids this entirely. This applies to all three probes (startup, liveness, readiness).
-- **MySQL `startupProbe` is required**: MySQL first-start initialization (data dir creation, InnoDB init, `docker-entrypoint-initdb.d` DDL scripts) can take 5-10 minutes on CI runners. Without a startup probe, the liveness probe kills the container before init completes, causing crash-loops. The startup probe gates liveness/readiness during this phase. The Docker entrypoint runs the temporary init mysqld with `--skip-networking`, so port 3306 only opens after init finishes — making `tcpSocket` safe for startup detection.
-- **App Deployment `progressDeadlineSeconds`**: defaults to 900s (configurable via `app.progressDeadlineSeconds`). Kubernetes's default of 600s is too short when init containers wait for slow MySQL first-start — the Deployment declares itself `Failed` before the Helm timeout fires.
-- **E2E values image tags must match `E2EContainerImages` constants**: The E2E Helm values files (`e2e-remote.yaml`, `e2e-standalone.yaml`) specify `image.tag` for each component. These MUST match the constants in `E2EContainerImages.java` (e.g., `MYSQL_IMAGE = "mysql:8.4"` → `mysql.image.tag: "8.4"`). Mismatches cause `ErrImageNeverPull` because K3s loads one version but the Helm chart deploys a different one with `pullPolicy: Never`.
-- **E2E version assertions must derive from constants, not hardcode**: Test assertions like `assertThat(version).startsWith("8.4")` should derive the expected value from `TestContainerImages.MYSQL_IMAGE`, not hardcode it. Otherwise bumping the image version breaks the assertion.
-- **CI `kubectl wait` must exclude Job pods**: The `Verify pods are ready` step uses `--field-selector=status.phase=Running` to skip `Completed` Job pods (e.g., `kafka-topics`). A completed pod's `Ready` condition is `False` (container exited), so `kubectl wait --for=condition=ready` without this filter always times out.
-
-## Key Directories
-
-```
-k8s-batch-rules-kie/src/main/java/com/cominotti/k8sbatch/
-  batch/rulespoc/domain/      — TransactionRulesEvaluator port, FinancialTransaction, EnrichedFinancialTransaction, RiskScore, EnrichmentRuleConstants
-  batch/rulespoc/adapters/evaluatingrules/         — TransactionFact (shared mutable fact)
-  batch/rulespoc/adapters/evaluatingrules/dmn/     — DmnTransactionRulesEvaluator (Java + DMN hybrid)
-  batch/rulespoc/adapters/evaluatingrules/droolsruleunit/ — DroolsRuleUnitTransactionRulesEvaluator, TransactionEnrichmentUnit
-
-k8s-batch-jobs/src/main/java/com/cominotti/k8sbatch/
-  batch/common/domain/    — CsvRecord, CsvRecordProcessor, BatchStepNames, BatchPartitionProperties
-  batch/common/adapters/readingcsv/file/          — CsvRecordReaderFactory
-  batch/common/adapters/persistingrecords/jdbc/   — CsvRecordWriter
-  batch/common/adapters/observingexecution/logging/ — logging listeners, BatchDurationUtils
-  batch/filerange/domain/ — FileRangePartitioner
-  batch/filerange/config/ — FileRangeJobConfig
-  batch/multifile/domain/ — MultiFilePartitioner
-  batch/multifile/config/ — MultiFileJobConfig
-  batch/transaction/domain/   — TransactionEnrichmentProcessor, TransactionJobProperties, TransactionTopicNames
-  batch/transaction/adapters/streamingevents/kafka/           — TransactionKafkaConfig
-  batch/transaction/adapters/persistingtransactions/jdbc/     — EnrichedTransactionWriter
-  batch/transaction/config/   — TransactionEnrichmentJobConfig
-  batch/rulespoc/adapters/evaluatingrules/drools/  — DroolsTransactionRulesEvaluator
-  batch/rulespoc/adapters/evaluatingrules/evrete/  — EvreteTransactionRulesEvaluator
-  batch/rulespoc/adapters/persistingresults/jdbc/  — EnrichedFinancialTransactionWriter
-  batch/rulespoc/adapters/readingcsv/file/         — FinancialTransactionReaderFactory
-  batch/rulespoc/config/      — RulesEnginePocJobConfig, RulesEngineProcessor, RulesEngineProperties
-  config/             — RemotePartitioningBaseConfig, RemotePartitioningKafkaConfig, RemotePartitioningJmsConfig, StandaloneJobConfig
-  web/adapters/launchingjobs/rest/ — JobController, HelloController
-  web/config/         — AsyncJobOperatorConfig
-  web/dto/            — JobExecutionResponse
-
-k8s-batch-integration-tests/src/test/java/com/cominotti/k8sbatch/it/
-  config/             — ContainerHolder, SharedContainersConfig, JmsContainersConfig, MysqlOnlyContainersConfig, BatchTestJobConfig
-  rest/               — REST endpoint tests
-  batch/standalone/   — standalone batch tests
-  batch/remote/       — Kafka remote partitioning tests
-  batch/jms/          — JMS remote partitioning tests (RabbitMQ via JMS client)
-  database/           — schema verification tests
-  infra/              — connectivity smoke tests
-
-helm/k8s-batch/
-  templates/
-    app/              — Deployment, Service, HPA, Ingress, ConfigMap
-    gateway/          — Deployment, Service, ConfigMap, HPA (gated on gateway.enabled)
-    crud/             — Deployment, Service, ConfigMap, HPA (gated on crud.enabled)
-    mysql/            — StatefulSet, Service, Secret, ConfigMap (Batch DDL)
-    kafka/            — StatefulSet (KRaft), Services, topic init Job, Schema Registry Deployment+Service
-  tests/              — helm-unittest YAML tests (*_test.yaml)
-
-k8s-batch-crud/src/main/java/com/cominotti/k8sbatch/crud/
-  domain/             — Customer, Account (JPA entities), CustomerService, AccountService, enums, EntityNotFoundException
-  adapters/
-    persistingcustomers/jpa/  — CustomerRepository (Spring Data JPA)
-    persistingaccounts/jpa/   — AccountRepository (Spring Data JPA)
-    managingcustomers/rest/   — CustomerController, dto/ (CreateCustomerRequest, CustomerResponse, etc.)
-    managingaccounts/rest/    — AccountController, dto/ (CreateAccountRequest, AccountResponse, etc.)
-    handlingerrors/rest/      — GlobalExceptionHandler (@RestControllerAdvice)
-  config/             — JpaAuditingConfig
-
-k8s-batch-e2e-tests/src/test/java/com/cominotti/k8sbatch/e2e/
-  cluster/            — K3sClusterManager, DeploymentWaiter, HelmRenderer, PortForwardManager, PodUtils
-  client/             — BatchAppClient (HTTP), CrudAppClient (HTTP), MysqlVerifier (JDBC)
-  diagnostics/        — PodDiagnostics (failure dump)
-  deploy/             — DeployHealthCheckE2E
-  batch/              — FileRangeJobE2E, MultiFileJobE2E, StandaloneProfileE2E, PartitionDistributionE2E
-  crud/               — CustomerCrudE2E
-
-.github/workflows/    — CI pipelines (helm-validate.yml)
-
-scripts/license/
-  check-spdx.sh       — validates SPDX headers on all Java/shell files
-  apply-spdx.sh       — auto-applies missing SPDX headers
-
-config/checkstyle/
-  javadoc-checks.xml   — Checkstyle rules for JavaDoc gap detection
-  suppressions.xml     — exclusions for generated code and test method-level
-```
-
 ## Claude Code Automations
 
 - **`/helm-validate`** — runs helm lint, unittest, and template render
@@ -456,28 +241,3 @@ config/checkstyle/
 - **`helm-reviewer`** subagent — reviews Helm changes against project conventions (invoked automatically during PR reviews)
 - **`/spring-migration`** — reviews Java code for deprecated Spring, Spring Batch, Spring Boot, and Fabric8 APIs; checks imports, method calls, and configuration against current non-deprecated alternatives
 - **`.mcp.json`** — shares context7 MCP server config with collaborators
-
-## License
-
-Apache-2.0. Every Java and shell source file must start with an SPDX header:
-
-- **Java**: `// SPDX-License-Identifier: Apache-2.0` as the very first line
-- **Shell**: `# SPDX-License-Identifier: Apache-2.0` (line 2 if shebang present, line 1 otherwise)
-
-**Enforcement**: `check-spdx.sh` runs automatically during Maven's `validate` phase via `exec-maven-plugin`. Any `mvn compile`, `mvn test`, or `mvn verify` will fail if headers are missing.
-
-**Auto-fix**: `mvn -Plicense-fix validate` or directly `./scripts/license/apply-spdx.sh`
-
-## Checkstyle JavaDoc Validation
-
-Deterministic JavaDoc gap detection via `maven-checkstyle-plugin` (Checkstyle 10.25.0). Runs in `validate` phase — no compilation needed.
-
-**What it checks**: missing JavaDoc on public types/methods, missing `@param`/`@return`/`@throws` tags, empty tag descriptions, malformed JavaDoc, trivial summary sentences.
-
-**What it skips**: Avro-generated classes (`generated-sources/`), method-level checks on test classes (only class-level JavaDoc required on tests).
-
-**Configuration**: `config/checkstyle/javadoc-checks.xml` (checks) + `config/checkstyle/suppressions.xml` (exclusions).
-
-**Build behavior**: Fails the build by default. Use `-Dcheckstyle.failOnViolation=false` for report-only mode, or `-Dskip.checkstyle=true` to skip entirely.
-
-**XML report**: `<module>/target/checkstyle-javadoc.xml` per module — consumed by the `/doc-review` skill as a deterministic baseline.

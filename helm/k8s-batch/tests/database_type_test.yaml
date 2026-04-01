@@ -66,6 +66,62 @@ tests:
       - hasDocuments:
           count: 0
 
+  - it: should include 00-create-databases.sql when additionalDatabases is set
+    documentSelector:
+      path: metadata.name
+      value: test-release-k8s-batch-mysql-init
+      skipEmptyTemplates: true
+    set:
+      mysql.auth.additionalDatabases:
+        crud: k8scrud
+    asserts:
+      - matchRegex:
+          path: data["00-create-databases.sql"]
+          pattern: "CREATE DATABASE IF NOT EXISTS k8scrud"
+      - matchRegex:
+          path: data["00-create-databases.sql"]
+          pattern: "GRANT ALL PRIVILEGES ON k8scrud"
+
+---
+suite: CRUD service database URL
+templates:
+  - templates/crud/deployment.yaml
+  - templates/crud/configmap.yaml
+release:
+  name: test-release
+tests:
+  - it: should use CRUD-specific JDBC URL pointing to k8scrud database
+    documentSelector:
+      path: kind
+      value: Deployment
+      skipEmptyTemplates: true
+    set:
+      crud.enabled: true
+      mysql.auth.additionalDatabases:
+        crud: k8scrud
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SPRING_DATASOURCE_URL
+            value: "jdbc:mysql://test-release-k8s-batch-mysql:3306/k8scrud?useSSL=false&allowPublicKeyRetrieval=true"
+
+  - it: should not use batch database URL for CRUD service
+    documentSelector:
+      path: kind
+      value: Deployment
+      skipEmptyTemplates: true
+    set:
+      crud.enabled: true
+      mysql.auth.additionalDatabases:
+        crud: k8scrud
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SPRING_DATASOURCE_URL
+            value: "jdbc:mysql://test-release-k8s-batch-mysql:3306/k8sbatch?useSSL=false&allowPublicKeyRetrieval=true"
+
 ---
 suite: database driver class
 templates:

@@ -8,7 +8,6 @@ WORKDIR /app
 # Copy dependency descriptors first for Docker layer caching
 COPY pom.xml .
 COPY k8s-batch-crud/pom.xml k8s-batch-crud/
-COPY k8s-batch-common/pom.xml k8s-batch-common/
 # All sibling module POMs must be present even though only k8s-batch-crud is built —
 # Maven resolves the full reactor from the parent POM and fails if any <module> is missing.
 COPY k8s-batch-rules-kie/pom.xml k8s-batch-rules-kie/
@@ -22,7 +21,6 @@ RUN mvn dependency:go-offline -B -pl k8s-batch-crud -am
 
 # Copy license scripts (needed for Maven validate phase) and source
 COPY scripts/license scripts/license
-COPY k8s-batch-common/src k8s-batch-common/src
 COPY k8s-batch-crud/src k8s-batch-crud/src
 # skip.checkstyle: config/checkstyle/suppressions.xml is not in the Docker context —
 # checkstyle is a CI/dev validation tool, not needed for producing the runtime JAR

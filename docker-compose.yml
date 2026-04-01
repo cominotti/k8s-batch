@@ -39,12 +39,34 @@ services:
       MYSQL_PASSWORD: k8sbatch_secret
     volumes:
       - mysql-data:/var/lib/mysql
+      - ./config/mysql-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_secret"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 30s
+
+  crud:
+    build:
+      context: .
+      dockerfile: Dockerfile.crud
+    ports:
+      - "8081:8081"
+    environment:
+      # Database-per-service: CRUD uses k8scrud, batch uses k8sbatch
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/k8scrud?useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
+      SPRING_DATASOURCE_USERNAME: k8sbatch
+      SPRING_DATASOURCE_PASSWORD: k8sbatch_secret
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
 
   kafka:
     image: confluentinc/cp-kafka:7.9.0

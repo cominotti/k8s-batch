@@ -32,14 +32,32 @@ MySQL host
 {{- end }}
 
 {{/*
-Database JDBC URL (MySQL or Oracle based on database.type)
+Generic JDBC URL builder (database-per-service pattern).
+Accepts a dict with "ctx" (root context) and "dbName" (database name).
+All per-service helpers below delegate to this one.
+*/}}
+{{- define "k8s-batch.mysql.jdbcUrlFor" -}}
+{{- $ctx := .ctx -}}
+{{- $dbName := .dbName -}}
+{{- if eq $ctx.Values.database.type "oracle" -}}
+jdbc:oracle:thin:@//{{ include "k8s-batch.mysql.host" $ctx }}:{{ $ctx.Values.mysql.service.port }}/{{ $dbName }}
+{{- else -}}
+jdbc:mysql://{{ include "k8s-batch.mysql.host" $ctx }}:{{ $ctx.Values.mysql.service.port }}/{{ $dbName }}?useSSL=false&allowPublicKeyRetrieval=true
+{{- end -}}
+{{- end }}
+
+{{/*
+Batch service JDBC URL (uses mysql.auth.database)
 */}}
 {{- define "k8s-batch.mysql.jdbcUrl" -}}
-{{- if eq .Values.database.type "oracle" -}}
-jdbc:oracle:thin:@//{{ include "k8s-batch.mysql.host" . }}:{{ .Values.mysql.service.port }}/{{ .Values.mysql.auth.database }}
-{{- else -}}
-jdbc:mysql://{{ include "k8s-batch.mysql.host" . }}:{{ .Values.mysql.service.port }}/{{ .Values.mysql.auth.database }}?useSSL=false&allowPublicKeyRetrieval=true
-{{- end -}}
+{{- include "k8s-batch.mysql.jdbcUrlFor" (dict "ctx" . "dbName" .Values.mysql.auth.database) -}}
+{{- end }}
+
+{{/*
+CRUD service JDBC URL (uses mysql.auth.additionalDatabases.crud)
+*/}}
+{{- define "k8s-batch.mysql.crudJdbcUrl" -}}
+{{- include "k8s-batch.mysql.jdbcUrlFor" (dict "ctx" . "dbName" .Values.mysql.auth.additionalDatabases.crud) -}}
 {{- end }}
 
 {{/*

@@ -22,7 +22,7 @@ final class CrudContainerHolder {
     private static final Logger log = LoggerFactory.getLogger(CrudContainerHolder.class);
 
     static final MySQLContainer MYSQL = new MySQLContainer(CrudTestContainerImages.MYSQL_IMAGE)
-            .withDatabaseName("k8sbatch")
+            .withDatabaseName("k8scrud")
             .withUsername("test")
             .withPassword("test");
 

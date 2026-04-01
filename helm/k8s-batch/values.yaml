@@ -379,6 +379,11 @@ mysql:
   auth:
     rootPassword: ""
     database: k8sbatch
+    # -- Additional logical databases created by the init ConfigMap (database-per-service pattern).
+    # Each microservice owns its own database within the shared MySQL instance.
+    # Adding a new service is a values-only change — no template editing needed.
+    additionalDatabases:
+      crud: k8scrud
     username: k8sbatch
     password: ""
     existingSecret: ""    # name of an existing Secret with keys: root-password, username, password
