@@ -2,8 +2,8 @@
 
 package com.cominotti.k8sbatch.crud.domain;
 
-import com.cominotti.k8sbatch.crud.adapters.persistingaccounts.jpa.AccountRepository;
-import com.cominotti.k8sbatch.crud.adapters.persistingcustomers.jpa.CustomerRepository;
+import com.cominotti.k8sbatch.crud.domain.port.AccountPersistencePort;
+import com.cominotti.k8sbatch.crud.domain.port.CustomerPersistencePort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -18,6 +18,10 @@ import java.util.Optional;
  *
  * <p>Accounts are separate aggregates from Customers because they must be independently queryable
  * by {@code accountId} for correlation with the batch pipeline's {@code enriched_transactions}.
+ *
+ * <p><strong>CQS note:</strong> Write methods (create, update, delete) return the mutated entity
+ * as a pragmatic relaxation of Command-Query Separation — this avoids an extra round-trip to
+ * query the entity after mutation and is the standard Spring convention.
  */
 @Service
 @Transactional(readOnly = true)
@@ -25,16 +29,16 @@ public class AccountService {
 
     private static final Logger log = LoggerFactory.getLogger(AccountService.class);
 
-    private final AccountRepository accountRepository;
-    private final CustomerRepository customerRepository;
+    private final AccountPersistencePort accountRepository;
+    private final CustomerPersistencePort customerRepository;
 
     /**
-     * Creates the service with the required repositories.
+     * Creates the service with the required persistence ports.
      *
      * @param accountRepository  persistence port for account entities
      * @param customerRepository persistence port for customer entities (validates ownership)
      */
-    public AccountService(AccountRepository accountRepository, CustomerRepository customerRepository) {
+    public AccountService(AccountPersistencePort accountRepository, CustomerPersistencePort customerRepository) {
         this.accountRepository = accountRepository;
         this.customerRepository = customerRepository;
     }
@@ -101,7 +105,7 @@ public class AccountService {
         log.info("Updating account status | id={} | status={}", id, status);
         Account account = accountRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Account", id));
-        account.setStatus(status);
+        account.transitionTo(status);
         return account;
     }
 

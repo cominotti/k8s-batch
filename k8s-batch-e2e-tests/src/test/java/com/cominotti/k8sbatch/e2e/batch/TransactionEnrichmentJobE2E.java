@@ -2,7 +2,7 @@
 
 package com.cominotti.k8sbatch.e2e.batch;
 
-import com.cominotti.k8sbatch.batch.transaction.domain.TransactionTopicNames;
+import com.cominotti.k8sbatch.batch.transaction.adapters.streamingevents.kafka.TransactionTopicNames;
 import com.cominotti.k8sbatch.e2e.AbstractE2ETest;
 import com.cominotti.k8sbatch.e2e.E2EProfile;
 import com.cominotti.k8sbatch.e2e.client.BatchAppClient.JobResponse;

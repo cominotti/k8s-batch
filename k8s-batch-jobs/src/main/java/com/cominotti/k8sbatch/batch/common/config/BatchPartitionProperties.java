@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package com.cominotti.k8sbatch.batch.common.domain;
+package com.cominotti.k8sbatch.batch.common.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * Partition configuration bound to the {@code batch.partition.*} properties.
+ *
+ * <p>Lives in the config zone because it uses Spring Boot's {@code @ConfigurationProperties}
+ * annotation, keeping the domain package free of framework dependencies.
  *
  * @param gridSize  number of partitions the {@code Partitioner} creates (default: 4)
  * @param chunkSize items per transaction in each worker step's chunk processing (default: 100)

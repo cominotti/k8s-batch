@@ -2,8 +2,8 @@
 
 package com.cominotti.k8sbatch.crud.domain;
 
-import com.cominotti.k8sbatch.crud.adapters.persistingaccounts.jpa.AccountRepository;
-import com.cominotti.k8sbatch.crud.adapters.persistingcustomers.jpa.CustomerRepository;
+import com.cominotti.k8sbatch.crud.domain.port.AccountPersistencePort;
+import com.cominotti.k8sbatch.crud.domain.port.CustomerPersistencePort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -20,6 +20,10 @@ import java.util.Optional;
  * <p>Read-only by default ({@code @Transactional(readOnly = true)} at class level). Write methods
  * override with {@code @Transactional} to enable read-write transactions and Hibernate dirty
  * checking.
+ *
+ * <p><strong>CQS note:</strong> Write methods (create, update, delete) return the mutated entity
+ * as a pragmatic relaxation of Command-Query Separation — this avoids an extra round-trip to
+ * query the entity after mutation and is the standard Spring convention.
  */
 @Service
 @Transactional(readOnly = true)
@@ -27,16 +31,16 @@ public class CustomerService {
 
     private static final Logger log = LoggerFactory.getLogger(CustomerService.class);
 
-    private final CustomerRepository customerRepository;
-    private final AccountRepository accountRepository;
+    private final CustomerPersistencePort customerRepository;
+    private final AccountPersistencePort accountRepository;
 
     /**
-     * Creates the service with the required repositories.
+     * Creates the service with the required persistence ports.
      *
      * @param customerRepository persistence port for customer entities
      * @param accountRepository  persistence port for account entities (needed for cascade delete)
      */
-    public CustomerService(CustomerRepository customerRepository, AccountRepository accountRepository) {
+    public CustomerService(CustomerPersistencePort customerRepository, AccountPersistencePort accountRepository) {
         this.customerRepository = customerRepository;
         this.accountRepository = accountRepository;
     }
@@ -110,8 +114,8 @@ public class CustomerService {
         log.info("Updating customer | id={} | status={}", id, status);
         Customer customer = customerRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Customer", id));
-        customer.setName(name);
-        customer.setStatus(status);
+        customer.rename(name);
+        customer.transitionTo(status);
         return customer;
     }
 

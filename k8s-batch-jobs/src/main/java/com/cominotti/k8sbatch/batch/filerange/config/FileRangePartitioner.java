@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package com.cominotti.k8sbatch.batch.filerange.domain;
+package com.cominotti.k8sbatch.batch.filerange.config;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,11 +19,15 @@ import java.util.Map;
 /**
  * Splits a single CSV file into line-range partitions for parallel processing.
  *
- * <p>Implements the Spring Batch {@link Partitioner} contract: {@link #partition(int)} returns a
- * map of {@link ExecutionContext} objects, one per partition. Each context carries the keys
- * {@code startLine}, {@code endLine}, and {@code resourcePath} — these travel over Kafka (remote
- * mode) or are passed in-memory (standalone mode), and are injected into worker step beans via
- * {@code @Value("#{stepExecutionContext['...']}}")} in {@code FileRangeJobConfig}.
+ * <p>Lives in the config zone because it implements the Spring Batch {@link Partitioner} contract
+ * and depends on Spring's {@link Resource} and {@link ExecutionContext} — both framework types.
+ * For CSV ETL (low domain complexity), extracting a separate domain strategy is not warranted.
+ *
+ * <p>{@link #partition(int)} returns a map of {@link ExecutionContext} objects, one per partition.
+ * Each context carries the keys {@code startLine}, {@code endLine}, and {@code resourcePath} —
+ * these travel over Kafka (remote mode) or are passed in-memory (standalone mode), and are
+ * injected into worker step beans via {@code @Value("#{stepExecutionContext['...']}}")} in
+ * {@code FileRangeJobConfig}.
  */
 public class FileRangePartitioner implements Partitioner {
 

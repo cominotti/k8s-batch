@@ -21,6 +21,7 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
@@ -59,6 +60,8 @@ public class Customer {
     @Column(nullable = false, length = 20)
     private CustomerStatus status;
 
+    // CascadeType.REMOVE intentionally omitted — CustomerService.deleteCustomer() uses bulk
+    // deleteByCustomerId() to avoid loading all accounts into memory before deleting them.
     @OneToMany(mappedBy = "customer", cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     private Set<Account> accounts = new HashSet<>();
 
@@ -118,7 +121,17 @@ public class Customer {
         return name;
     }
 
-    public void setName(String name) {
+    /**
+     * Updates the customer's display name.
+     *
+     * @param name the new name (must not be null or blank)
+     * @throws NullPointerException if name is null
+     */
+    public void rename(String name) {
+        Objects.requireNonNull(name, "name must not be null");
+        if (name.isBlank()) {
+            throw new IllegalArgumentException("name must not be blank");
+        }
         this.name = name;
     }
 
@@ -130,12 +143,28 @@ public class Customer {
         return status;
     }
 
-    public void setStatus(CustomerStatus status) {
-        this.status = status;
+    /**
+     * Transitions the customer to a new lifecycle status, enforcing the allowed state machine.
+     *
+     * @param target the desired new status
+     * @throws IllegalStateException if the transition is not allowed
+     */
+    public void transitionTo(CustomerStatus target) {
+        if (!this.status.canTransitionTo(target)) {
+            throw new IllegalStateException(
+                    "Cannot transition customer from " + status + " to " + target);
+        }
+        this.status = target;
     }
 
+    /**
+     * Returns an unmodifiable view of this customer's accounts. Use {@link #addAccount} and
+     * {@link #removeAccount} to modify the relationship.
+     *
+     * @return unmodifiable set of accounts
+     */
     public Set<Account> getAccounts() {
-        return accounts;
+        return Collections.unmodifiableSet(accounts);
     }
 
     public Instant getCreatedAt() {

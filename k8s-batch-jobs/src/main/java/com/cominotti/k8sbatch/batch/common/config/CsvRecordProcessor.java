@@ -1,13 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package com.cominotti.k8sbatch.batch.common.domain;
+package com.cominotti.k8sbatch.batch.common.config;
 
+import com.cominotti.k8sbatch.batch.common.domain.CsvRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.infrastructure.item.ItemProcessor;
 
 /**
  * Filters invalid CSV records in the chunk processing pipeline (reader → processor → writer).
+ *
+ * <p>Lives in the config zone (not domain) because it implements the Spring Batch
+ * {@link ItemProcessor} framework interface. The filtering logic itself is trivially simple
+ * (skip blank names) and does not warrant a separate domain interface.
  *
  * <p>Records with a null or blank name are filtered out. In Spring Batch, returning {@code null}
  * from {@link #process} signals the framework to skip writing this item — it increments the

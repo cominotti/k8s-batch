@@ -8,8 +8,6 @@ import com.cominotti.k8sbatch.batch.common.domain.BatchStepNames;
 import com.cominotti.k8sbatch.batch.common.adapters.observingexecution.logging.LoggingJobExecutionListener;
 import com.cominotti.k8sbatch.batch.common.adapters.observingexecution.logging.LoggingStepExecutionListener;
 import com.cominotti.k8sbatch.batch.transaction.adapters.persistingtransactions.jdbc.EnrichedTransactionWriter;
-import com.cominotti.k8sbatch.batch.transaction.domain.TransactionEnrichmentProcessor;
-import com.cominotti.k8sbatch.batch.transaction.domain.TransactionJobProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.configuration.annotation.StepScope;
@@ -95,7 +93,7 @@ public class TransactionEnrichmentJobConfig {
      * previous execution checkpoint exists).
      *
      * @param consumerFactory Avro-deserializing consumer factory from
-     *     {@link com.cominotti.k8sbatch.batch.transaction.adapters.streamingevents.kafka.TransactionKafkaConfig
+     *     {@link com.cominotti.k8sbatch.batch.transaction.config.TransactionKafkaConfig
      *     TransactionKafkaConfig}
      * @param partitions      comma-separated partition indices from job parameters (defaults to "0")
      * @return reader configured for the specified Kafka partitions
@@ -152,7 +150,7 @@ public class TransactionEnrichmentJobConfig {
      * not tombstoned, on the topic.
      *
      * @param kafkaTemplate template configured with the output topic in
-     *     {@link com.cominotti.k8sbatch.batch.transaction.adapters.streamingevents.kafka.TransactionKafkaConfig
+     *     {@link com.cominotti.k8sbatch.batch.transaction.config.TransactionKafkaConfig
      *     TransactionKafkaConfig}
      * @return configured Kafka writer
      */

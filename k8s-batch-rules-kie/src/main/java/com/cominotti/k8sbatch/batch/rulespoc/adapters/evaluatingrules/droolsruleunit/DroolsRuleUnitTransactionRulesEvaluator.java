@@ -68,7 +68,7 @@ public class DroolsRuleUnitTransactionRulesEvaluator implements TransactionRules
     public EnrichedFinancialTransaction evaluate(FinancialTransaction transaction) {
         TransactionFact fact = TransactionFact.from(transaction);
 
-        // Phase 1: Java — exchange rate lookup + USD conversion (sequential, trivial)
+        // Phase 1: Java — exchange rate lookup + USD conversion
         fact.setExchangeRate(ruleConstants.rateFor(fact.getCurrency()));
         fact.setAmountUsd(fact.getAmount().multiply(fact.getExchangeRate()));
 

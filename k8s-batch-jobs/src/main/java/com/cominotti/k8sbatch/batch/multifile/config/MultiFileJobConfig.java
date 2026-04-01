@@ -6,12 +6,11 @@ import com.cominotti.k8sbatch.batch.common.adapters.observingexecution.logging.L
 import com.cominotti.k8sbatch.batch.common.adapters.observingexecution.logging.LoggingStepExecutionListener;
 import com.cominotti.k8sbatch.batch.common.adapters.persistingrecords.jdbc.CsvRecordWriter;
 import com.cominotti.k8sbatch.batch.common.adapters.readingcsv.file.CsvRecordReaderFactory;
-import com.cominotti.k8sbatch.batch.common.domain.BatchFileProperties;
-import com.cominotti.k8sbatch.batch.common.domain.BatchPartitionProperties;
+import com.cominotti.k8sbatch.batch.common.config.BatchFileProperties;
+import com.cominotti.k8sbatch.batch.common.config.BatchPartitionProperties;
 import com.cominotti.k8sbatch.batch.common.domain.BatchStepNames;
 import com.cominotti.k8sbatch.batch.common.domain.CsvRecord;
-import com.cominotti.k8sbatch.batch.common.domain.CsvRecordProcessor;
-import com.cominotti.k8sbatch.batch.multifile.domain.MultiFilePartitioner;
+import com.cominotti.k8sbatch.batch.common.config.CsvRecordProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.configuration.annotation.StepScope;

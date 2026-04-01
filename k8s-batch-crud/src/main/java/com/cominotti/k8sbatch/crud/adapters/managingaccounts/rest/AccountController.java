@@ -96,7 +96,7 @@ public class AccountController {
                     .toList();
             return ResponseEntity.ok(accounts);
         }
-        return ResponseEntity.ok(List.of());
+        return ResponseEntity.badRequest().body("At least one filter (accountId or customerId) is required");
     }
 
     /**

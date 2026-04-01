@@ -4,7 +4,7 @@ package com.cominotti.k8sbatch.batch.rulespoc.config;
 
 import com.cominotti.k8sbatch.batch.common.adapters.observingexecution.logging.LoggingJobExecutionListener;
 import com.cominotti.k8sbatch.batch.common.adapters.observingexecution.logging.LoggingStepExecutionListener;
-import com.cominotti.k8sbatch.batch.common.domain.BatchFileProperties;
+import com.cominotti.k8sbatch.batch.common.config.BatchFileProperties;
 import com.cominotti.k8sbatch.batch.common.domain.BatchStepNames;
 import com.cominotti.k8sbatch.batch.rulespoc.adapters.persistingresults.jdbc.EnrichedFinancialTransactionWriter;
 import com.cominotti.k8sbatch.batch.rulespoc.adapters.readingcsv.file.FinancialTransactionReaderFactory;

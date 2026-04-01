@@ -1,19 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package com.cominotti.k8sbatch.batch.common.domain;
+package com.cominotti.k8sbatch.batch.common.config;
 
+import com.cominotti.k8sbatch.batch.common.domain.PathValidator;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-
-import java.nio.file.Path;
 
 /**
  * File access configuration for batch jobs, bound to the {@code batch.file.*} properties.
  *
- * <p>Input file paths supplied via job parameters are validated to ensure they reside within
- * {@code allowedBaseDir}, preventing path traversal attacks (CWE-22). Set this to the actual
- * data volume mount path in production (e.g. {@code /data}) to enforce a strict boundary.
- * The default {@code /} allows any valid absolute path and is suitable for local development
- * and integration testing.
+ * <p>Lives in the config zone because it uses Spring Boot's {@code @ConfigurationProperties}
+ * annotation, keeping the domain package free of framework dependencies. Path traversal
+ * validation is delegated to the domain's {@link PathValidator}.
  *
  * @param allowedBaseDir canonical base directory that all job input file paths must reside in.
  *                       Defaults to {@code /} (system root) when not explicitly configured.
@@ -43,13 +40,6 @@ public record BatchFileProperties(String allowedBaseDir) {
      * @throws IllegalArgumentException if the resolved path escapes the allowed base
      */
     public String requireWithinAllowedBase(String inputPath) {
-        Path base = Path.of(allowedBaseDir).toAbsolutePath().normalize();
-        Path resolved = base.resolve(inputPath).normalize().toAbsolutePath();
-        if (!resolved.startsWith(base)) {
-            throw new IllegalArgumentException(
-                    "Input path is not within the allowed base directory | path=" + inputPath
-                            + " | allowedBaseDir=" + allowedBaseDir);
-        }
-        return resolved.toString();
+        return PathValidator.requireWithinAllowedBase(inputPath, allowedBaseDir);
     }
 }

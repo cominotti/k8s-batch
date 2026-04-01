@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package com.cominotti.k8sbatch.batch.transaction.domain;
+package com.cominotti.k8sbatch.batch.transaction.config;
 
+import com.cominotti.k8sbatch.batch.transaction.adapters.streamingevents.kafka.TransactionTopicNames;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * Transaction enrichment job configuration bound to the {@code batch.transaction.*} properties.
+ *
+ * <p>Lives in the config zone because it uses Spring Boot's {@code @ConfigurationProperties}
+ * annotation, keeping the domain package free of framework dependencies.
  *
  * @param inputTopic               Kafka topic to consume raw {@code TransactionEvent} messages from
  * @param outputTopic              Kafka topic to publish enriched {@code EnrichedTransactionEvent} messages to

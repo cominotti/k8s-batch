@@ -84,7 +84,7 @@ class CustomerRepositoryIT extends AbstractCrudSliceTest {
         tem.flush();
         assertThat(customer.getVersion()).isZero();
 
-        customer.setName("Updated Name");
+        customer.rename("Updated Name");
         tem.flush();
         assertThat(customer.getVersion()).isEqualTo(1);
     }

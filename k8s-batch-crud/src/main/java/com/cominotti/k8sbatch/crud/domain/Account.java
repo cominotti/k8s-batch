@@ -116,8 +116,18 @@ public class Account {
         return status;
     }
 
-    public void setStatus(AccountStatus status) {
-        this.status = status;
+    /**
+     * Transitions the account to a new lifecycle status, enforcing the allowed state machine.
+     *
+     * @param target the desired new status
+     * @throws IllegalStateException if the transition is not allowed
+     */
+    public void transitionTo(AccountStatus target) {
+        if (!this.status.canTransitionTo(target)) {
+            throw new IllegalStateException(
+                    "Cannot transition account from " + status + " to " + target);
+        }
+        this.status = target;
     }
 
     public Instant getCreatedAt() {

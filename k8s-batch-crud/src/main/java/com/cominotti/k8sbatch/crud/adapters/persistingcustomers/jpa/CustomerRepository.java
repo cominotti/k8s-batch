@@ -3,26 +3,21 @@
 package com.cominotti.k8sbatch.crud.adapters.persistingcustomers.jpa;
 
 import com.cominotti.k8sbatch.crud.domain.Customer;
+import com.cominotti.k8sbatch.crud.domain.port.CustomerPersistencePort;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
 
 /**
- * Spring Data JPA repository for {@link Customer} entities.
+ * Spring Data JPA adapter for {@link Customer} persistence. Implements the domain's
+ * {@link CustomerPersistencePort} — Spring Data generates the implementation at runtime.
  *
- * <p>The repository interface itself is the hexagonal persistence port — Spring Data generates
- * the implementation at runtime. No separate port interface is needed.
+ * <p>Domain-specific query methods ({@code findByEmail}, {@code findWithAccountsById}) are
+ * inherited from the port interface. This adapter re-declares {@code findWithAccountsById}
+ * to add the {@code @EntityGraph} annotation, and adds methods not on the port.
  */
-public interface CustomerRepository extends JpaRepository<Customer, Long> {
-
-    /**
-     * Finds a customer by their unique email address (natural business key).
-     *
-     * @param email the email to search for
-     * @return the customer if found
-     */
-    Optional<Customer> findByEmail(String email);
+public interface CustomerRepository extends JpaRepository<Customer, Long>, CustomerPersistencePort {
 
     /**
      * Checks whether a customer with the given email already exists.
@@ -40,5 +35,6 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
      * @return the customer with accounts loaded
      */
     @EntityGraph(attributePaths = "accounts")
+    @Override
     Optional<Customer> findWithAccountsById(Long id);
 }

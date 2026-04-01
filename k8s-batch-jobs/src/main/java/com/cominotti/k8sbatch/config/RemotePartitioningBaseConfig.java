@@ -2,11 +2,11 @@
 
 package com.cominotti.k8sbatch.config;
 
-import com.cominotti.k8sbatch.batch.common.domain.BatchPartitionProperties;
+import com.cominotti.k8sbatch.batch.common.config.BatchPartitionProperties;
 import com.cominotti.k8sbatch.batch.common.domain.BatchStepNames;
 import com.cominotti.k8sbatch.batch.common.adapters.observingexecution.logging.LoggingStepExecutionListener;
-import com.cominotti.k8sbatch.batch.filerange.domain.FileRangePartitioner;
-import com.cominotti.k8sbatch.batch.multifile.domain.MultiFilePartitioner;
+import com.cominotti.k8sbatch.batch.filerange.config.FileRangePartitioner;
+import com.cominotti.k8sbatch.batch.multifile.config.MultiFilePartitioner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.repository.JobRepository;
