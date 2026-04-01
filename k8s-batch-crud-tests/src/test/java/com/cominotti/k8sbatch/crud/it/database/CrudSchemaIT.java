@@ -36,9 +36,10 @@ class CrudSchemaIT extends AbstractCrudIntegrationTest {
 
     @Test
     void shouldHaveAllLiquibaseMigrations() {
+        // Database-per-service: CRUD service runs only its own changelogs (004-006)
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM DATABASECHANGELOG", Integer.class);
-        assertThat(count).isGreaterThanOrEqualTo(6);
+        assertThat(count).isGreaterThanOrEqualTo(3);
     }
 
     private boolean tableExists(String tableName) {

@@ -50,7 +50,7 @@ class OptimisticLockingIT extends AbstractCrudIntegrationTest {
                         restClient().put()
                                 .uri("/api/customers/{id}", customer.id())
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .body(new UpdateCustomerRequest("Updated-" + idx, CustomerStatus.ACTIVE))
+                                .body(new UpdateCustomerRequest("Updated-" + idx, CustomerStatus.SUSPENDED))
                                 .retrieve()
                                 .body(CustomerResponse.class);
                         successes.incrementAndGet();
