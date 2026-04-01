@@ -120,7 +120,7 @@ jobs:
             --set features.hpa=false \
             --set features.gateway=false \
             --set features.crud=false \
-            --wait --timeout 15m
+            --wait --timeout 20m
 
       # field-selector excludes Completed Job pods (e.g., kafka-topics) — their Ready
       # condition is False after the container exits, so kubectl wait would always time out.
