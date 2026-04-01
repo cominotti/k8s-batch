@@ -105,7 +105,7 @@ class CustomerCrudE2E extends AbstractE2ETest {
     @Test
     @Order(4)
     void shouldPersistDataToMysql() throws Exception {
-        assertThat(mysqlVerifier.customersTableExists()).isTrue();
-        assertThat(mysqlVerifier.accountsTableExists()).isTrue();
+        assertThat(crudMysqlVerifier.customersTableExists()).isTrue();
+        assertThat(crudMysqlVerifier.accountsTableExists()).isTrue();
     }
 }

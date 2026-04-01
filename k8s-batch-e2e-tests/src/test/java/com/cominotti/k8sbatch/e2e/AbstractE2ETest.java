@@ -38,11 +38,17 @@ public abstract class AbstractE2ETest {
 
     private static final Logger log = LoggerFactory.getLogger(AbstractE2ETest.class);
 
+    private static final String BATCH_DATABASE = "k8sbatch";
+    private static final String CRUD_DATABASE = "k8scrud";
+    private static final String MYSQL_USERNAME = "k8sbatch";
+    private static final String MYSQL_PASSWORD = "e2e_pass";
+
     protected PortForwardManager portForwardManager;
     protected BatchAppClient appClient;
     protected BatchAppClient gatewayClient;
     protected CrudAppClient crudClient;
     protected MysqlVerifier mysqlVerifier;
+    protected MysqlVerifier crudMysqlVerifier;
 
     /**
      * Returns the Helm values filename to deploy for this test class.
@@ -119,7 +125,7 @@ public abstract class AbstractE2ETest {
 
         appClient = new BatchAppClient(appPort);
         // Credentials must match the Helm values file (mysql.auth.database/username/password)
-        mysqlVerifier = new MysqlVerifier(mysqlPort, "k8sbatch", "k8sbatch", "e2e_pass");
+        mysqlVerifier = new MysqlVerifier(mysqlPort, BATCH_DATABASE, MYSQL_USERNAME, MYSQL_PASSWORD);
 
         if (requiresGateway()) {
             int gatewayPort = portForwardManager.forwardToGateway(9090);
@@ -130,6 +136,7 @@ public abstract class AbstractE2ETest {
         if (requiresCrud()) {
             int crudPort = portForwardManager.forwardToCrud(8081);
             crudClient = new CrudAppClient(crudPort);
+            crudMysqlVerifier = new MysqlVerifier(mysqlPort, CRUD_DATABASE, MYSQL_USERNAME, MYSQL_PASSWORD);
             log.info("CRUD port-forward established | crudPort={}", crudPort);
         }
 
@@ -166,7 +173,7 @@ public abstract class AbstractE2ETest {
         if (mysqlVerifier != null) {
             mysqlVerifier.cleanTargetRecords();
             if (requiresCrud()) {
-                mysqlVerifier.cleanCrudTables();
+                crudMysqlVerifier.cleanCrudTables();
             }
         }
     }

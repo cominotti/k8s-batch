@@ -1,7 +1,7 @@
 ---
 name: run-integration-tests
 description: Build and run integration + E2E tests with Docker and Helm prerequisite checks
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 Run the full k8s-batch test suite (integration tests + E2E tests) with prerequisite validation.
