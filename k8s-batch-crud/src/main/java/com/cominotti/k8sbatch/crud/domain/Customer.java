@@ -125,7 +125,8 @@ public class Customer {
      * Updates the customer's display name.
      *
      * @param name the new name (must not be null or blank)
-     * @throws NullPointerException if name is null
+     * @throws NullPointerException     if name is null
+     * @throws IllegalArgumentException if name is blank
      */
     public void rename(String name) {
         Objects.requireNonNull(name, "name must not be null");
